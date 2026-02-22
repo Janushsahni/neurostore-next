@@ -1,7 +1,8 @@
 [package]
 name = "neuro-sentinel"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+description = "Multi-factor AI reputation and anomaly policy engine for NeuroStore"
 
 [dependencies]
 anyhow = { workspace = true }
