@@ -513,11 +513,11 @@
   </div>
 
   <section class="section earn-section" id="earn">
-    <div class="section-label reveal">Earn Crypto</div>
-    <h2 class="section-title reveal reveal-delay-1">Earn by Being a Node</h2>
+    <div class="section-label reveal">Earn Passive Income</div>
+    <h2 class="section-title reveal reveal-delay-1">Run a Node. Rent Your Disk. Get Paid.</h2>
     <p class="section-desc reveal reveal-delay-2">
-      Turn your unused hard drive space into passive income. Download the node software,
-      choose how much space to rent out, and start earning automatically based on AI reputation scores.
+      Turn idle hard drive space into income. Download the node, choose how much storage to rent,
+      and earn automatically based on AI reputation scores. No tokens — real USD or USDC payouts.
     </p>
 
     <div class="os-selector reveal">
@@ -532,56 +532,167 @@
         <button class="os-tab" onclick="switchOS('mac')">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
             <path
-              d="M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8m-3 5v6l5-3z" />
+              d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
           </svg>
           macOS
         </button>
         <button class="os-tab" onclick="switchOS('linux')">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" />
+            <path
+              d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.368 1.884 1.43.868.07 1.723-.37 2.324-.497.57-.122 1.263-.04 1.816-.401.478-.312.648-.868.59-1.459-.052-.529-.263-1.063-.222-1.509.015-.132.07-.199.166-.33.375-.408.656-.869.77-1.436.09-.431.07-.794.001-1.1.498-.656.79-1.348 1.003-2.03.214-.682.204-2.403-.154-2.86-.243-.31-.665-.381-1.064-.402-.348-.021-.696.033-1.012.066-.08.007-.148-.053-.173-.132a2.1 2.1 0 01-.122-.3c-.162-.508-.353-1.036-.645-1.383-.225-.264-.566-.387-.912-.381-.346.005-.682.147-.97.364-.226.163-.437.353-.623.533-.55.527-1.108 1.09-1.78 1.312-.503.158-1.025.07-1.49-.174-.468-.244-.881-.589-1.238-.964-.358-.374-.65-.787-.913-1.163-.573-.936-1.1-1.82-1.9-2.343-.723-.464-1.5-.661-2.26-.597z" />
           </svg>
           Linux
         </button>
       </div>
 
       <div class="os-content active" id="os-windows">
-        <h3>Windows Desktop or Server</h3>
-        <p>1. Download the Windows EXE</p>
-        <a class="download-btn"
-          href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe">⬇ Download
-          neuro-node.exe</a>
-        <p>2. Double click the `.exe` file. The terminal will ask you how much storage to rent in GB.</p>
-        <p>3. Keep it running in the background to earn!</p>
+        <div class="os-download-hero">
+          <h3>⚡ Windows — One-Click Setup</h3>
+          <p>Download the standalone node executable. No installer needed — just run it.</p>
+          <a class="download-btn" id="winDownloadBtn"
+            href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe" download>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+            </svg>
+            Download neuro-node.exe
+            <span class="download-size">5.4 MB</span>
+          </a>
+        </div>
+        <div class="os-steps">
+          <div class="step-item">
+            <span class="step-num">1</span>
+            <div>
+              <strong>Download &amp; Run</strong>
+              <p>Click the button above. Your browser will download <code>neuro-node.exe</code> directly.</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <span class="step-num">2</span>
+            <div>
+              <strong>Configure Storage</strong>
+              <p>Double-click the exe — the guided setup asks how much storage (in GB) to rent out.</p>
+            </div>
+          </div>
+          <div class="step-item">
+            <span class="step-num">3</span>
+            <div>
+              <strong>Earn Automatically</strong>
+              <p>Keep it running in the background. Your AI reputation score grows, payouts increase.</p>
+            </div>
+          </div>
+        </div>
+        <div class="smartscreen-note">
+          <div class="smartscreen-icon">🛡️</div>
+          <div>
+            <strong>Windows SmartScreen Notice</strong>
+            <p>Since this is open-source software not yet code-signed, Windows may show a
+              "Windows protected your PC" warning. This is normal for new software.</p>
+            <p><strong>To proceed:</strong> Click <em>"More info"</em> → then click <em>"Run anyway"</em>.
+              The exe is built transparently via
+              <a href="https://github.com/Janushsahni/neurostore-next/actions" target="_blank" rel="noopener">GitHub
+                Actions CI</a> —
+              you can verify the build yourself.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div class="os-content" id="os-mac">
-        <h3>macOS (Intel & Apple Silicon)</h3>
-        <p>1. Download the macOS Executable</p>
-        <a class="download-btn"
-          href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos">⬇ Download
-          neuro-node (macOS)</a>
-        <p>2. Open your Terminal and run the downloaded file.</p>
-        <div class="code-block">
-          <code>cd ~/Downloads<br>chmod +x neuro-node-macos<br>./neuro-node-macos</code>
+        <div class="os-download-hero">
+          <h3>🍎 macOS — Intel &amp; Apple Silicon</h3>
+          <p>Universal binary that runs natively on both Intel and M-series Macs.</p>
+          <a class="download-btn"
+            href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos" download>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+            </svg>
+            Download neuro-node (macOS)
+            <span class="download-size">4.6 MB</span>
+          </a>
         </div>
-        <p>3. Enter your storage amount when prompted.</p>
+        <div class="os-steps">
+          <div class="step-item">
+            <span class="step-num">1</span>
+            <div>
+              <strong>Download &amp; Make Executable</strong>
+              <div class="code-block">
+                <code>cd ~/Downloads<br>chmod +x neuro-node-macos</code>
+              </div>
+            </div>
+          </div>
+          <div class="step-item">
+            <span class="step-num">2</span>
+            <div>
+              <strong>Run the Node</strong>
+              <div class="code-block">
+                <code>./neuro-node-macos --interactive-setup</code>
+              </div>
+            </div>
+          </div>
+          <div class="step-item">
+            <span class="step-num">3</span>
+            <div>
+              <strong>Configure &amp; Earn</strong>
+              <p>Enter your storage allocation when prompted. Keep Terminal open to stay online.</p>
+            </div>
+          </div>
+        </div>
+        <div class="smartscreen-note">
+          <div class="smartscreen-icon">🍎</div>
+          <div>
+            <strong>macOS Gatekeeper</strong>
+            <p>If macOS blocks execution, run: <code>xattr -d com.apple.quarantine neuro-node-macos</code></p>
+          </div>
+        </div>
       </div>
 
       <div class="os-content" id="os-linux">
-        <h3>Linux (Ubuntu, Debian, CentOS)</h3>
-        <p>1. Run this one-line installer in your terminal:</p>
-        <div class="code-block">
-          <code>curl -sL https://neurostore.network/install.sh | bash</code>
+        <div class="os-download-hero">
+          <h3>🐧 Linux — Ubuntu / Debian / CentOS</h3>
+          <p>Static x64 binary — works on any modern Linux distribution.</p>
+          <a class="download-btn"
+            href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-linux" download>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+            </svg>
+            Download neuro-node (Linux)
+            <span class="download-size">6.5 MB</span>
+          </a>
         </div>
-        <p>2. Run the node directly:</p>
-        <div class="code-block">
-          <code>neuro-node</code>
+        <div class="os-steps">
+          <div class="step-item">
+            <span class="step-num">1</span>
+            <div>
+              <strong>Download &amp; Make Executable</strong>
+              <div class="code-block">
+                <code>curl -L -o neuro-node https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-linux<br>chmod +x neuro-node</code>
+              </div>
+            </div>
+          </div>
+          <div class="step-item">
+            <span class="step-num">2</span>
+            <div>
+              <strong>Run the Node</strong>
+              <div class="code-block">
+                <code>./neuro-node --interactive-setup</code>
+              </div>
+            </div>
+          </div>
+          <div class="step-item">
+            <span class="step-num">3</span>
+            <div>
+              <strong>Daemonize (Optional)</strong>
+              <p>Use our <code>systemd</code> service template for auto-start on boot:</p>
+              <div class="code-block">
+                <code>sudo cp neuro-node /usr/local/bin/<br>sudo cp neuro-node.service /etc/systemd/system/<br>sudo systemctl enable --now neuro-node</code>
+              </div>
+            </div>
+          </div>
         </div>
-        <p>3. The CLI will ask you how much storage to rent. To daemonize it, we provide a <code>systemd</code>
-          template.</p>
       </div>
     </div>
   </section>
+
 
   <!-- ═══ DRIVE PORTAL & DASHBOARD ═══ -->
   <section class="section portal-section" id="portal">

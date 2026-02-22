@@ -1733,20 +1733,182 @@ button:disabled {
 }
 
 .download-btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   background: var(--gradient-1);
-  color: #fff;
-  padding: 12px 24px;
+  color: #050a18;
+  padding: 16px 32px;
   border-radius: var(--radius-md);
   text-decoration: none;
-  font-weight: 600;
-  margin-bottom: 20px;
-  transition: opacity 0.3s;
+  font-weight: 700;
+  font-size: 1rem;
+  font-family: var(--font-body);
+  margin: 16px 0 20px;
+  transition: transform 0.25s var(--spring), box-shadow 0.3s;
+  box-shadow: 0 4px 20px var(--cyan-glow);
+  border: none;
+  cursor: pointer;
+  position: relative;
 }
 
 .download-btn:hover {
-  opacity: 0.9;
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 12px 40px var(--cyan-glow);
 }
+
+.download-btn svg {
+  flex-shrink: 0;
+}
+
+.download-size {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+/* ── Download Hero Area ── */
+.os-download-hero {
+  margin-bottom: 24px;
+}
+
+.os-download-hero h3 {
+  font-family: var(--font-head);
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.os-download-hero p {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  margin-bottom: 0;
+}
+
+/* ── Setup Steps ── */
+.os-steps {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.step-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color 0.3s;
+}
+
+.step-item:hover {
+  border-color: var(--border-glow);
+}
+
+.step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  background: var(--gradient-1);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #050a18;
+}
+
+.step-item strong {
+  display: block;
+  font-family: var(--font-head);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.step-item p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.step-item .code-block {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+/* ── SmartScreen / Gatekeeper Callout ── */
+.smartscreen-note {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  background: rgba(255, 207, 74, 0.04);
+  border: 1px solid rgba(255, 207, 74, 0.15);
+  border-radius: var(--radius-md);
+  margin-top: 8px;
+}
+
+.smartscreen-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.smartscreen-note strong {
+  display: block;
+  font-family: var(--font-head);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+
+.smartscreen-note p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0 0 6px;
+}
+
+.smartscreen-note p:last-child {
+  margin-bottom: 0;
+}
+
+.smartscreen-note a {
+  color: var(--cyan);
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 240, 255, 0.3);
+}
+
+.smartscreen-note a:hover {
+  text-decoration-color: var(--cyan);
+}
+
+.smartscreen-note code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  background: rgba(0, 240, 255, 0.06);
+  color: var(--cyan);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.smartscreen-note em {
+  color: var(--text);
+  font-style: italic;
+}
+
 
 /* ════════ NEURODRIVE UI ════════ */
 .drive-app {

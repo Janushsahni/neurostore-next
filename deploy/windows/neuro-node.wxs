@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Package Name="NeuroStore Node"
+           Manufacturer="NeuroStore"
+           Version="$(var.Version)"
+           UpgradeCode="E6A3B7D1-9F2C-4A18-B347-5C1D8E0F9A2B"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of NeuroStore Node is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="NeuroStore">
+
+        <Component Id="MainExecutable" Guid="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
+          <File Source="$(var.SourceDir)\neuro-node.exe" KeyPath="yes" />
+        </Component>
+
+        <Component Id="ServiceScripts" Guid="B2C3D4E5-F6A7-8901-BCDE-F12345678901">
+          <File Source="$(var.SourceDir)\install-service.ps1" />
+          <File Source="$(var.SourceDir)\install-service.bat" />
+          <File Source="$(var.SourceDir)\uninstall-service.ps1" />
+          <File Source="$(var.SourceDir)\uninstall-service.bat" />
+          <File Source="$(var.SourceDir)\show-node-address.ps1" />
+          <File Source="$(var.SourceDir)\show-node-address.bat" />
+          <File Source="$(var.SourceDir)\start-node.bat" />
+          <File Source="$(var.SourceDir)\README.txt" KeyPath="yes" />
+        </Component>
+
+        <Component Id="VersionFile" Guid="C3D4E5F6-A7B8-9012-CDEF-123456789012">
+          <File Source="$(var.SourceDir)\version.txt" KeyPath="yes" />
+        </Component>
+
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Start Menu shortcut -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="NeuroStoreMenuFolder" Name="NeuroStore">
+        <Component Id="StartMenuShortcut" Guid="D4E5F6A7-B8C9-0123-DEF0-234567890123">
+          <Shortcut Id="NodeShortcut"
+                    Name="NeuroStore Node"
+                    Description="Start NeuroStore decentralized storage node"
+                    Target="[INSTALLFOLDER]neuro-node.exe"
+                    Arguments="--interactive-setup"
+                    WorkingDirectory="INSTALLFOLDER" />
+          <Shortcut Id="NodeAddressShortcut"
+                    Name="Show Node Address"
+                    Description="Display your node's peer ID"
+                    Target="[INSTALLFOLDER]show-node-address.bat"
+                    WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveMenuFolder" On="uninstall" />
+          <RegistryValue Root="HKCU" Key="Software\NeuroStore\Node"
+                         Name="MenuInstalled" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Add install folder to PATH -->
+    <Component Id="PathEnv" Directory="INSTALLFOLDER" Guid="E5F6A7B8-C9D0-1234-EF01-345678901234">
+      <Environment Id="PathEntry" Name="PATH" Value="[INSTALLFOLDER]"
+                   Permanent="no" Part="last" Action="set" System="yes" />
+      <RegistryValue Root="HKLM" Key="Software\NeuroStore\Node"
+                     Name="PathSet" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Feature Id="MainFeature" Title="NeuroStore Node" Level="1">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="ServiceScripts" />
+      <ComponentRef Id="VersionFile" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="PathEnv" />
+    </Feature>
+
+  </Package>
+</Wix>
