@@ -1,0 +1,45 @@
+name: Release Cross-Platform Node Binaries
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: neuro-node.exe
+            asset_name: neuro-node.exe
+          - os: macos-latest
+            artifact_name: neuro-node
+            asset_name: neuro-node-macos
+          - os: ubuntu-latest
+            artifact_name: neuro-node
+            asset_name: neuro-node-linux
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build neuro-node binary
+        run: cargo build --release -p neuro-node
+
+      - name: Rename binary for macOS/Linux
+        if: matrix.os != 'windows-latest'
+        run: mv target/release/${{ matrix.artifact_name }} target/release/${{ matrix.asset_name }}
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/${{ matrix.asset_name }}

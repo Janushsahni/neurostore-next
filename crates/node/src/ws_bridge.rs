@@ -190,6 +190,7 @@ impl WsBridge {
     ) -> WsMessage {
         match B64.decode(&data_b64) {
             Ok(data) => {
+                let data: Vec<u8> = data;
                 let used_bytes = store.get_used_bytes();
                 if used_bytes + data.len() as u64 > capacity_bytes {
                     return WsMessage::StoreResponse {

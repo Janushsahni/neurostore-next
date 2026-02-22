@@ -16,7 +16,7 @@ use std::{
 };
 use store::SecureBlockStore;
 use tokio::sync::oneshot;
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "neuro-node", version, about = "Decentralized storage node")]
@@ -151,7 +151,7 @@ async fn run_node_with_shutdown(
         .iter()
         .map(|s| libp2p::PeerId::from_str(s))
         .collect::<Result<HashSet<_>, _>>()?;
-    let node = build_node(store, keypair, bootstrap_addrs, allowlist).await?;
+    let node = build_node(store.clone(), keypair, bootstrap_addrs, allowlist).await?;
     let listen_addr = parse_listen_multiaddr(&runtime.listen)?;
 
     info!(peer_id = %node.peer_id, "Node identity loaded");

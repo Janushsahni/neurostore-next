@@ -37,6 +37,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 tokio-tungstenite = { version = "0.20.1", features = ["rustls-tls-native-roots"] }
 libp2p-identity = "0.2"
+base64 = "0.22"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7"
