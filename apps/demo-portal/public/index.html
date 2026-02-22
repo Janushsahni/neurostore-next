@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Neurostore | Secure Decentralized Storage</title>
+    <title>Neurostore | Zero-Trust Decentralized Cloud Storage</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -13,9 +13,15 @@
           <span class="brand-mark">NS</span>
           <div>
             <p class="eyebrow">Neurostore</p>
-            <h1>Decentralized Cloud Storage for Real Workloads</h1>
+            <h1>Zero-Trust Decentralized Storage for Modern Apps</h1>
           </div>
         </div>
+        <nav class="mini-nav" aria-label="Primary">
+          <a href="#investor">Investor</a>
+          <a href="#demoFlow">Demo Flow</a>
+          <a href="#authBlock">Portal</a>
+          <a href="#launchPlan">Launch</a>
+        </nav>
         <div class="top-actions">
           <a
             class="btn"
@@ -24,81 +30,101 @@
             rel="noopener"
             >Download Node MSI</a
           >
-          <a class="btn secondary" href="#authBlock">Login to Upload</a>
+          <a class="btn secondary" href="#authBlock">Open Upload Portal</a>
         </div>
       </header>
 
       <section class="panel hero">
-        <p class="kicker">Enterprise Security • Browser Upload • Edge-Ready</p>
-        <h2>Server never sees your plaintext files.</h2>
-        <p>
-          Files are encrypted in your browser before upload, then distributed across independent storage nodes.
-          You keep the passphrase. Retrieval and decryption happen client-side.
-        </p>
-        <div class="hero-metrics">
+        <div class="hero-grid">
+          <div>
+            <p class="kicker">Client-Side Encryption • AI Placement • Failover Retrieval</p>
+            <h2>Server never sees plaintext. Users upload from browser only.</h2>
+            <p>
+              Neurostore encrypts files in-browser, distributes encrypted shards to independent nodes,
+              verifies storage receipts, and retrieves from surviving nodes during outages.
+            </p>
+            <div class="hero-cta">
+              <a class="btn" href="#authBlock">Login and Upload</a>
+              <a class="btn secondary" href="#demoFlow">View Demo Steps</a>
+            </div>
+          </div>
+          <aside class="architecture-card" aria-label="Architecture Summary">
+            <h3>Live Architecture Snapshot</h3>
+            <ul>
+              <li>Browser: encrypt + shard before upload</li>
+              <li>Portal API: auth, metadata, orchestration</li>
+              <li>Provider Nodes: encrypted chunk custody</li>
+              <li>Proof path: signed storage challenge/response</li>
+              <li>AI path: reliability score + placement ranking</li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel" id="investor">
+        <div class="panel-head">
+          <h2>Investor Snapshot</h2>
+          <p>What this product demonstrates right now.</p>
+        </div>
+        <div class="stats-grid">
           <article>
-            <h3>Client-Side Encryption</h3>
-            <p>AES-256-GCM with per-file random salt and nonce.</p>
+            <h3>Zero-Trust UX</h3>
+            <p>Browser uploads with strict client-side encryption pipeline.</p>
           </article>
           <article>
-            <h3>Decentralized Replication</h3>
-            <p>Configurable replica factor across multiple node peers.</p>
+            <h3>Decentralized Resilience</h3>
+            <p>Replica-based retrieval succeeds after a node goes offline.</p>
           </article>
           <article>
-            <h3>Failover Retrieval</h3>
-            <p>Recover files even if a node goes offline.</p>
+            <h3>Provider Economy Ready</h3>
+            <p>Windows MSI installer enables storage-provider onboarding.</p>
+          </article>
+          <article>
+            <h3>AI Operations Layer</h3>
+            <p>Node reliability scoring and placement optimization path exists.</p>
           </article>
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="demoFlow">
         <div class="panel-head">
-          <h2>How It Works</h2>
-          <p>Simple workflow for teams and demos.</p>
+          <h2>5-Min Investor Demo Flow</h2>
+          <p>Use this exact order during pitch.</p>
         </div>
         <ol class="steps">
-          <li>Install node software via the Windows MSI on provider laptops.</li>
-          <li>Collect each node's peer multiaddr and paste into upload form.</li>
-          <li>Create account and login in this portal.</li>
-          <li>Upload image/doc/pdf; browser encrypts before any network transfer.</li>
-          <li>Retrieve + decrypt with passphrase; plaintext stays client-side.</li>
+          <li>Show MSI download button and explain provider onboarding in 30 seconds.</li>
+          <li>Login to portal and upload image/PDF with passphrase.</li>
+          <li>Show upload status log: encryption happens before network upload.</li>
+          <li>Shut down one node laptop and explain failover scenario.</li>
+          <li>Retrieve + decrypt same file successfully from remaining nodes.</li>
+          <li>Close with roadmap: S3 gateway, billing, compliance, global testnet.</li>
         </ol>
       </section>
 
       <section class="grid two-up">
         <article class="panel">
           <div class="panel-head">
-            <h2>Why Teams Use Neurostore</h2>
+            <h2>Why It Matters</h2>
           </div>
           <ul class="checks">
-            <li>Zero-trust file handling in portal mode.</li>
-            <li>Node marketplace and decentralized redundancy.</li>
-            <li>Proof-based storage responses from nodes.</li>
-            <li>Built-in AI node risk and placement intelligence.</li>
+            <li>No plaintext trust in server-side app infrastructure.</li>
+            <li>Works in browser; uploader does not need local CLI tools.</li>
+            <li>Reduces single-cloud lock-in with decentralized providers.</li>
+            <li>Built for AI datasets, Web3 apps, and compliance backups.</li>
           </ul>
         </article>
 
-        <article class="panel">
+        <article class="panel" id="launchPlan">
           <div class="panel-head">
-            <h2>Download Provider Software</h2>
-            <p>Storage providers run this on Windows laptops/desktops.</p>
+            <h2>Launch Readiness Checklist</h2>
           </div>
-          <div class="download-actions">
-            <a
-              class="btn block"
-              href="https://github.com/janyshhh/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi"
-              target="_blank"
-              rel="noopener"
-              >Download Windows Installer (.msi)</a
-            >
-            <a
-              class="btn secondary block"
-              href="https://github.com/janyshhh/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip"
-              target="_blank"
-              rel="noopener"
-              >Download Portable Bundle (.zip)</a
-            >
-          </div>
+          <ol class="steps">
+            <li>Deploy API + portal on HTTPS domain (cloud VM or Kubernetes).</li>
+            <li>Enable payment credits and provider payout rails.</li>
+            <li>Publish uptime dashboard and retrieval latency benchmarks.</li>
+            <li>Run security review, key-management test, and abuse limits.</li>
+            <li>Open paid beta for 3 target customer verticals.</li>
+          </ol>
         </article>
       </section>
 
@@ -135,9 +161,7 @@
       </section>
 
       <section class="panel" data-auth-only>
-        <div class="auth-lock" id="authNotice">
-          Login is required before upload and retrieval.
-        </div>
+        <div class="auth-lock">Login is required before upload and retrieval.</div>
         <h2>Upload Encrypted File</h2>
         <p class="muted">Supported: image, PDF, DOC/DOCX, TXT, CSV, JSON and other binary files.</p>
 
@@ -195,7 +219,7 @@
       </section>
 
       <section class="panel">
-        <h2>Status</h2>
+        <h2>Status Log</h2>
         <pre id="statusLog">Ready.</pre>
       </section>
     </main>
