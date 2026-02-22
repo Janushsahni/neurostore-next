@@ -1,5 +1,6 @@
 mod p2p;
 mod store;
+mod ws_bridge;
 
 use anyhow::Context;
 use clap::Parser;
@@ -39,6 +40,9 @@ struct Args {
     interactive_setup: bool,
 
     #[arg(long)]
+    relay_url: Option<String>,
+
+    #[arg(long)]
     setup_config_path: Option<String>,
 
     #[arg(long, default_value_t = false, hide = true)]
@@ -55,6 +59,7 @@ struct Args {
 struct SetupConfig {
     storage_path: String,
     max_gb: u64,
+    relay_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +69,7 @@ struct RuntimeConfig {
     listen: String,
     bootstrap: Vec<String>,
     allow_peer: Vec<String>,
+    relay_url: Option<String>,
 }
 
 #[tokio::main]
@@ -123,6 +129,7 @@ fn build_runtime_config(args: &Args) -> anyhow::Result<RuntimeConfig> {
         listen: args.listen.clone(),
         bootstrap: args.bootstrap.clone(),
         allow_peer: args.allow_peer.clone(),
+        relay_url: setup.relay_url,
     })
 }
 
@@ -153,7 +160,25 @@ async fn run_node_with_shutdown(
         path = %runtime.storage_path,
         "Node storage allocation configured"
     );
+
+    let (bridge_tx, bridge_rx) = oneshot::channel();
+    if let Some(url) = runtime.relay_url.clone() {
+        let bridge = ws_bridge::WsBridge {
+            url,
+            peer_id: node.peer_id.to_string(),
+            store: store.clone(),
+            max_gb: runtime.max_gb,
+        };
+        tokio::spawn(async move {
+            if let Err(e) = bridge.run(bridge_rx).await {
+                tracing::error!("WS Bridge failed: {}", e);
+            }
+        });
+    }
+
     drive_node(node, listen_addr, shutdown_rx).await?;
+    let _ = bridge_tx.send(());
+
     Ok(())
 }
 
@@ -181,6 +206,7 @@ fn resolve_setup_config(
     let defaults = SetupConfig {
         storage_path: args.storage_path.clone(),
         max_gb: args.max_gb,
+        relay_url: args.relay_url.clone(),
     };
 
     if args.run_as_service {
@@ -205,25 +231,32 @@ fn run_interactive_setup(
     defaults: &SetupConfig,
     config_path: &Path,
 ) -> anyhow::Result<SetupConfig> {
-    println!("Neuro Node setup");
+    println!("===============================================");
+    println!("        Welcome to NeuroStore Node Setup       ");
+    println!("===============================================");
 
     let mut baseline = defaults.clone();
     if let Some(saved) = load_setup_config(config_path)? {
         println!(
-            "Found saved setup at {}. Press Enter to keep current values.",
+            "Found saved configuration at {}. Press Enter to keep current values.",
             config_path.to_string_lossy()
         );
         baseline = saved;
     } else {
-        println!("No saved setup found. A new setup profile will be created.");
+        println!("No saved setup found. Let's get you set up to earn by renting storage.");
     }
 
-    let storage_path = prompt_with_default("Storage path", &baseline.storage_path)?;
-    let max_gb = prompt_u64_with_default("Storage allocation (GB)", baseline.max_gb)?;
+    let storage_path = prompt_with_default("Where should we store your rented data? (path)", &baseline.storage_path)?;
+    let max_gb = prompt_u64_with_default("How much storage do you want to rent (in GB)?", baseline.max_gb)?;
+    
+    let default_relay = baseline.relay_url.clone().unwrap_or_else(|| "wss://demo.neurostore.network/v1/nodes/ws".to_string());
+    let relay_url_input = prompt_with_default("Control Plane WS Relay URL", &default_relay)?;
+    let relay_url = if relay_url_input.is_empty() { None } else { Some(relay_url_input) };
 
     let setup = SetupConfig {
         storage_path,
         max_gb,
+        relay_url,
     };
     save_setup_config(config_path, &setup)?;
     println!("Saved setup config to {}", config_path.to_string_lossy());

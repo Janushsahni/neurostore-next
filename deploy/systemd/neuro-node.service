@@ -1,0 +1,31 @@
+[Unit]
+Description=NeuroStore Node Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=neurostore
+Group=neurostore
+
+# Configure the node data directory and relay URL
+WorkingDirectory=/var/lib/neurostore
+ExecStart=/usr/local/bin/neuro-node --storage-path /var/lib/neurostore/data --max-gb 50 --relay-url wss://demo.neurostore.network/v1/nodes/ws
+
+# Restart policy for resilience
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=neuro-node
+
+[Install]
+WantedBy=multi-user.target

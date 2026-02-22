@@ -50,6 +50,10 @@ impl SecureBlockStore {
         }
         self.db.get(cid)
     }
+
+    pub fn get_used_bytes(&self) -> u64 {
+        read_used_bytes(&self.db).unwrap_or(0)
+    }
 }
 
 fn chunk_key(cid: &str) -> String {

@@ -1,0 +1,14 @@
+{
+    "name": "@neurostore/node-agent",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "NeuroStore lightweight storage node agent — connects to portal and stores encrypted shards",
+    "main": "node-agent.mjs",
+    "scripts": {
+        "start": "node node-agent.mjs"
+    },
+    "dependencies": {
+        "ws": "^8.16.0"
+    }
+}

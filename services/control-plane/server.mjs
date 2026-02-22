@@ -7,6 +7,7 @@
 import express from "express";
 import crypto from "node:crypto";
 import { randomUUID } from "node:crypto";
+import { WebSocketServer } from "ws";
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const MACAROON_SECRET = process.env.MACAROON_SECRET || crypto.randomBytes(32).toString("hex");
@@ -19,7 +20,24 @@ const state = {
     usage: new Map(),           // project_id → [{ timestamp, operation, bytes }]
     macaroons: new Map(),       // token → { project_id, scopes, expires_at }
     sigv4Keys: new Map(),       // access_key → { secret_key, project_id, revoked }
+    users: new Map(),           // username → { passwordHash, salt, objects: [] }
+    sessions: new Map(),        // token → username
+    wsClients: new Map(),       // peer_id → WebSocket
+    pendingRequests: new Map(), // req_id → { resolve, reject, timeout }
 };
+
+// ── End-User Auth Helpers ──────────────────────────────────────
+function hashPassword(password, salt) {
+    return crypto.pbkdf2Sync(password, salt, 150000, 32, "sha256").toString("hex");
+}
+function requireUserSession(req, res, next) {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token || !state.sessions.has(token)) {
+        return res.status(401).json({ error: "unauthorized" });
+    }
+    req.user = state.users.get(state.sessions.get(token));
+    next();
+}
 
 // ── Macaroon Helpers ───────────────────────────────────────────
 function issueMacaroon(projectId, scopes = ["read", "write"], ttlSecs = 86400) {
@@ -152,7 +170,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// ── Health ──────────────────────────────────────────────────────
+// ── Health & Topology ───────────────────────────────────────────
 app.get("/readyz", (_req, res) => {
     res.json({
         status: "ok",
@@ -162,7 +180,175 @@ app.get("/readyz", (_req, res) => {
         state_backend: STATE_BACKEND,
         nodes_registered: state.nodes.size,
         projects_count: state.projects.size,
+        active_ws_connections: state.wsClients.size,
     });
+});
+
+app.get("/v1/nodes", (_req, res) => {
+    // Return all active nodes for web UI placement
+    const active = [];
+    for (const [id, n] of state.nodes.entries()) {
+        if (n.status === "active") active.push(n);
+    }
+    res.json({ count: active.length, nodes: active });
+});
+
+app.get("/v1/nodes/earnings", (req, res) => {
+    const { peer_id } = req.query;
+    if (!peer_id) return res.status(400).json({ error: "peer_id required" });
+
+    const node = state.nodes.get(peer_id);
+    if (!node) return res.status(404).json({ error: "Node not found on the network. Make sure it is running." });
+
+    // Payment Simulation Logic (Prototype AI Engine)
+    // 1 GB stored for 1 month (approx) = $0.05
+    // For demo purposes, we will calculate based on used_bytes + uptime
+    const gbStored = (node.used_bytes || 0) / (1024 * 1024 * 1024);
+    const uptimeHours = (Date.now() - new Date(node.last_heartbeat).getTime()) / 3600000;
+
+    // Base rate + AI Reputation multiplier (simulated)
+    const baseRate = 0.05;
+    let scoreMultiplier = 1.0;
+    if (node.status === "active") scoreMultiplier = 1.25;
+
+    const estimatedEarnings = (gbStored * baseRate * scoreMultiplier).toFixed(4);
+
+    res.json({
+        peer_id: node.peer_id,
+        status: node.status,
+        used_bytes: node.used_bytes || 0,
+        estimated_earnings_usd: estimatedEarnings,
+        ai_reputation_score: (scoreMultiplier * 80).toFixed(0) // out of 100
+    });
+});
+
+// ── Web UI End-User Auth ────────────────────────────────────────
+app.post("/v1/auth/register", (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ error: "username and password required" });
+    if (state.users.has(username)) return res.status(400).json({ error: "username taken" });
+    const salt = crypto.randomBytes(16).toString("hex");
+    state.users.set(username, { username, salt, passwordHash: hashPassword(password, salt), objects: [] });
+    res.status(201).json({ success: true, username });
+});
+
+app.post("/v1/auth/login", (req, res) => {
+    const { username, password } = req.body;
+    const user = state.users.get(username);
+    if (!user || user.passwordHash !== hashPassword(password, user.salt)) {
+        return res.status(401).json({ error: "invalid credentials" });
+    }
+    const token = crypto.randomBytes(32).toString("hex");
+    state.sessions.set(token, username);
+    res.json({ success: true, username, token });
+});
+
+app.post("/v1/auth/logout", (req, res) => {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (token) state.sessions.delete(token);
+    res.json({ success: true });
+});
+
+app.get("/v1/objects", requireUserSession, (req, res) => {
+    res.json({ objects: req.user.objects });
+});
+
+// ── End-User Web Upload / Download (Proxies over WS) ────────────
+app.post("/v1/store", requireUserSession, async (req, res) => {
+    const { object_id, filename, total_bytes, root, shards } = req.body;
+    if (!shards || !Array.isArray(shards)) return res.status(400).json({ error: "shards required" });
+
+    let storedCount = 0;
+    const errors = [];
+
+    // Fan-out shards to connected WS clients matching the placements
+    const promises = shards.map(async (shard) => {
+        const targetPeer = shard.peer_id; // Web UI selects peer, or falls back
+        const ws = state.wsClients.get(targetPeer);
+        if (!ws) {
+            errors.push(`node ${targetPeer} not connected`);
+            return;
+        }
+
+        const reqId = randomUUID();
+        const payload = JSON.stringify({
+            type: "store:request",
+            request_id: reqId,
+            cid: shard.cid,
+            data_b64: shard.bytes_b64,
+        });
+
+        try {
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error("timeout")), 10000);
+                state.pendingRequests.set(reqId, { resolve, reject, timeout });
+                ws.send(payload, (err) => { if (err) reject(err); });
+            });
+            storedCount++;
+        } catch (err) {
+            errors.push(`shard ${shard.cid} failed: ${err.message}`);
+        } finally {
+            state.pendingRequests.delete(reqId);
+        }
+    });
+
+    await Promise.allSettled(promises);
+
+    // Record metadata if at least some succeeded
+    let obj = req.user.objects.find(o => o.object_id === object_id);
+    if (!obj) {
+        obj = {
+            object_id,
+            filename,
+            total_bytes,
+            root,
+            created_at: new Date().toISOString(),
+            shards: []
+        };
+        req.user.objects.push(obj);
+    }
+
+    obj.shards.push(...shards.map(s => ({
+        cid: s.cid,
+        peer_id: s.peer_id,
+        chunk_index: s.chunk_index,
+        shard_index: s.shard_index
+    })));
+
+    res.json({ success: true, stored_chunks: storedCount, requested: shards.length, errors });
+});
+
+app.post("/v1/retrieve", requireUserSession, async (req, res) => {
+    const { object_id } = req.body;
+    const obj = req.user.objects.find(o => o.object_id === object_id);
+    if (!obj) return res.status(404).json({ error: "object not found" });
+
+    const bundleLines = [`${obj.object_id}|${obj.filename}|${obj.total_bytes}|${obj.root}`];
+
+    const promises = obj.shards.map(async (shard) => {
+        const ws = state.wsClients.get(shard.peer_id);
+        if (!ws) return;
+
+        const reqId = randomUUID();
+        const payload = JSON.stringify({ type: "retrieve:request", request_id: reqId, cid: shard.cid });
+
+        try {
+            const resp = await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error("timeout")), 8000);
+                state.pendingRequests.set(reqId, { resolve, reject, timeout });
+                ws.send(payload, (err) => { if (err) reject(err); });
+            });
+            if (resp.success && resp.data_b64) {
+                bundleLines.push(`${shard.cid}|${shard.chunk_index}|${shard.shard_index}|${resp.data_b64}`);
+            }
+        } catch (e) { /* ignore single shard fail, erasure code handles it */ }
+        finally { state.pendingRequests.delete(reqId); }
+    });
+
+    await Promise.allSettled(promises);
+
+    // We send back the bundle for the web UI to reconstruct/decrypt
+    res.json({ success: true, encrypted_bundle: bundleLines.join("\n") });
 });
 
 // ── Projects ────────────────────────────────────────────────────
@@ -358,9 +544,68 @@ app.get("/v1/dashboard/summary", (_req, res) => {
     });
 });
 
-// ── Start ───────────────────────────────────────────────────────
+// ── Start & WebSocket Relay ─────────────────────────────────────
 const server = app.listen(PORT, () => {
-    console.log(`[control-plane] listening on :${PORT} (state=${STATE_BACKEND})`);
+    console.log(`[control-plane] HTTP API listening on :${PORT} (state=${STATE_BACKEND})`);
 });
 
-export { app, server, state };
+const wss = new WebSocketServer({ server, path: "/v1/nodes/ws" });
+wss.on("connection", (ws) => {
+    let peerId = null;
+
+    ws.on("message", (raw) => {
+        try {
+            const msg = JSON.parse(raw.toString());
+            if (msg.type === "node:register") {
+                peerId = msg.node_id;
+                state.wsClients.set(peerId, ws);
+
+                // Also insert into nodes registry
+                state.nodes.set(peerId, {
+                    peer_id: peerId,
+                    addr: "websocket",
+                    max_gb: +(msg.capacity_bytes / 1024 ** 3).toFixed(4),
+                    used_gb: +(msg.used_bytes / 1024 ** 3).toFixed(4),
+                    score: 50.0,
+                    last_heartbeat: new Date().toISOString(),
+                    status: "active",
+                    registered_at: new Date().toISOString(),
+                });
+
+                ws.send(JSON.stringify({ type: "registered", node_id: peerId }));
+                console.log(`[ws] Node registered: ${peerId}`);
+            }
+            else if (msg.type === "heartbeat") {
+                if (peerId) {
+                    const node = state.nodes.get(peerId);
+                    if (node) {
+                        node.last_heartbeat = new Date().toISOString();
+                        node.used_gb = +(msg.used_bytes / 1024 ** 3).toFixed(4);
+                    }
+                }
+            }
+            else if (msg.type === "store:response" || msg.type === "retrieve:response") {
+                const pending = state.pendingRequests.get(msg.request_id);
+                if (pending) {
+                    clearTimeout(pending.timeout);
+                    if (msg.success) pending.resolve(msg);
+                    else pending.reject(new Error(msg.error || "unknown fail"));
+                    state.pendingRequests.delete(msg.request_id);
+                }
+            }
+        } catch (e) {
+            console.error("[ws] message error:", e.message);
+        }
+    });
+
+    ws.on("close", () => {
+        if (peerId) {
+            state.wsClients.delete(peerId);
+            const node = state.nodes.get(peerId);
+            if (node) node.status = "offline";
+            console.log(`[ws] Node disconnected: ${peerId}`);
+        }
+    });
+});
+
+export { app, server, state, wss };

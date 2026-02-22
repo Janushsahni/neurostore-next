@@ -1,0 +1,63 @@
+[control-plane] HTTP API listening on :0 (state=memory)
+▶ Health
+  ✔ GET /readyz returns ok (45.8368ms)
+✔ Health (47.3167ms)
+▶ Projects
+  ✔ POST /v1/projects creates a project (19.8608ms)
+  ✔ GET /v1/projects/:id returns the project (3.7646ms)
+  ✔ GET /v1/projects/:id returns 404 for missing (2.1682ms)
+  ✔ rejects invalid tier (2.6411ms)
+✔ Projects (28.8523ms)
+▶ Macaroons
+  ✔ POST /v1/tokens/macaroon issues a token (5.1876ms)
+  ✔ rejects missing project_id (7.6888ms)
+✔ Macaroons (16.4164ms)
+▶ SigV4 Keys
+  ✔ generates and revokes keys (6.5159ms)
+✔ SigV4 Keys (10.4172ms)
+▶ Node Registry
+  ✔ registers a node and receives heartbeat (4.8949ms)
+  ✖ GET /v1/nodes lists all nodes (7.8585ms)
+  ✔ heartbeat rejects unregistered node (3.6404ms)
+✖ Node Registry (16.7532ms)
+▶ Placement
+  ✔ recommends placement for shards (1.913ms)
+✔ Placement (15.8963ms)
+▶ Billing & Usage
+  ✔ ingests usage and returns summary (3.8422ms)
+✔ Billing & Usage (5.5115ms)
+▶ Pricing & Payouts
+  ✔ GET /v1/pricing/quote returns quote (2.4796ms)
+  ✔ GET /v1/payouts/preview returns payout preview (1.4129ms)
+✔ Pricing & Payouts (4.0395ms)
+▶ Dashboard
+  ✔ GET /v1/dashboard/summary returns summary (1.8283ms)
+✔ Dashboard (1.9878ms)
+ℹ tests 16
+ℹ suites 9
+ℹ pass 15
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 396.5405
+
+✖ failing tests:
+
+test at test\api.test.mjs:127:5
+✖ GET /v1/nodes lists all nodes (7.8585ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(json.count >= 1)
+  
+      at TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:129:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1110:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:785:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

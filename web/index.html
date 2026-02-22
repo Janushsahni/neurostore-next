@@ -512,92 +512,235 @@
     <hr />
   </div>
 
-  <!-- ═══ DOWNLOAD / GET STARTED ═══ -->
-  <section class="section download-section" id="download">
-    <div class="section-label reveal">Get Started</div>
-    <h2 class="section-title reveal reveal-delay-1">Run a Node</h2>
+  <section class="section earn-section" id="earn">
+    <div class="section-label reveal">Earn Crypto</div>
+    <h2 class="section-title reveal reveal-delay-1">Earn by Being a Node</h2>
     <p class="section-desc reveal reveal-delay-2">
-      Download the Windows installer, allocate disk space, and join the network in minutes.
+      Turn your unused hard drive space into passive income. Download the node software,
+      choose how much space to rent out, and start earning automatically based on AI reputation scores.
     </p>
-    <div class="download-wrapper reveal">
-      <div class="download-actions">
-        <a class="download-btn"
-          href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi"
-          target="_blank" rel="noopener">
-          ⬇ Windows Installer (.msi)
-        </a>
-        <a class="download-btn secondary"
-          href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip"
-          target="_blank" rel="noopener">
-          📦 Portable Bundle (.zip)
-        </a>
+
+    <div class="os-selector reveal">
+      <div class="os-tabs">
+        <button class="os-tab active" onclick="switchOS('windows')">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.801" />
+          </svg>
+          Windows
+        </button>
+        <button class="os-tab" onclick="switchOS('mac')">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 2a8 8 0 1 1-8 8 8 8 0 0 1 8-8m-3 5v6l5-3z" />
+          </svg>
+          macOS
+        </button>
+        <button class="os-tab" onclick="switchOS('linux')">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" />
+          </svg>
+          Linux
+        </button>
       </div>
-      <ol class="download-steps">
-        <li>Install via <code>.msi</code> for one-click setup.</li>
-        <li>Enter storage path and allocated disk size in GB.</li>
-        <li>Use <code>install-service.bat</code> to auto-start as a Windows service.</li>
-        <li>Use <code>show-node-address.bat</code> to share your node address.</li>
-        <li>Use <code>upload-image.bat</code> and <code>retrieve-image.bat</code> for guided failover demo.</li>
-        <li>Use <code>install-updater-task.bat</code> for automatic secure updates.</li>
-        <li>Optional browser portal: run <code>node apps/demo-portal/server.mjs</code> then open
-          <code>http://127.0.0.1:7070</code>.
-        </li>
-      </ol>
+
+      <div class="os-content active" id="os-windows">
+        <h3>Windows Desktop or Server</h3>
+        <p>1. Download the Windows EXE</p>
+        <a class="download-btn"
+          href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe">⬇ Download
+          neuro-node.exe</a>
+        <p>2. Double click the `.exe` file. The terminal will ask you how much storage to rent in GB.</p>
+        <p>3. Keep it running in the background to earn!</p>
+      </div>
+
+      <div class="os-content" id="os-mac">
+        <h3>macOS (Intel & Apple Silicon)</h3>
+        <p>1. Download the macOS Executable</p>
+        <a class="download-btn"
+          href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos">⬇ Download
+          neuro-node (macOS)</a>
+        <p>2. Open your Terminal and run the downloaded file.</p>
+        <div class="code-block">
+          <code>cd ~/Downloads<br>chmod +x neuro-node-macos<br>./neuro-node-macos</code>
+        </div>
+        <p>3. Enter your storage amount when prompted.</p>
+      </div>
+
+      <div class="os-content" id="os-linux">
+        <h3>Linux (Ubuntu, Debian, CentOS)</h3>
+        <p>1. Run this one-line installer in your terminal:</p>
+        <div class="code-block">
+          <code>curl -sL https://neurostore.network/install.sh | bash</code>
+        </div>
+        <p>2. Run the node directly:</p>
+        <div class="code-block">
+          <code>neuro-node</code>
+        </div>
+        <p>3. The CLI will ask you how much storage to rent. To daemonize it, we provide a <code>systemd</code>
+          template.</p>
+      </div>
     </div>
   </section>
 
-  <!-- ═══ ADVANCED: NATIVE BRIDGE + NODE UPLOAD + AI METRICS ═══ -->
-  <section class="section advanced-section" id="advanced">
-    <div class="advanced-grid">
-      <!-- Node Upload -->
-      <div class="advanced-card reveal">
-        <h3>🚀 Secure Node Upload</h3>
-        <label class="field">
-          <span>Node API Endpoint</span>
-          <input id="nodeApiInput" type="text" value="http://127.0.0.1:8787" />
-        </label>
-        <button id="uploadNodeBtn">Upload Encrypted Shards to Node</button>
-        <div style="margin-top:16px;">
-          <h4 style="font-family:var(--font-head);font-size:0.88rem;font-weight:600;margin-bottom:8px;">AI Node Health
-          </h4>
-          <div id="aiMetrics" class="trace-log"></div>
-        </div>
-      </div>
+  <!-- ═══ DRIVE PORTAL & DASHBOARD ═══ -->
+  <section class="section portal-section" id="portal">
+    <div class="section-label reveal">Web Portal</div>
+    <h2 class="section-title reveal reveal-delay-1">NeuroDrive</h2>
+    <p class="section-desc reveal reveal-delay-2">
+      Encrypted client-side, stored globally. Access your files or manage your node earnings.
+    </p>
 
-      <!-- Native Bridge -->
-      <div class="advanced-card reveal reveal-delay-1">
-        <h3>🖥️ Native Bridge</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px;">Desktop/mobile shell commands: picker,
-          secure key storage, background sync.</p>
-        <div class="trace-grid" style="margin-top:0;">
-          <div class="trace-box">
-            <h4>File + Keys</h4>
-            <div class="native-controls">
-              <button id="nativePickBtn">Pick File (Native)</button>
-              <button id="saveKeyBtn">Save Vault Key</button>
-              <button id="loadKeyBtn">Load Vault Key</button>
-              <button id="deleteKeyBtn">Delete Vault Key</button>
-            </div>
-          </div>
-          <div class="trace-box">
-            <h4>Background Sync</h4>
-            <div class="native-controls">
-              <button id="syncStartBtn">Start Sync</button>
-              <button id="syncStopBtn">Stop Sync</button>
-              <button id="syncStatusBtn">Sync Status</button>
-            </div>
-          </div>
-        </div>
-        <div id="nativeLog" class="trace-log" style="margin-top:12px;"></div>
+    <!-- Auth Gateway (Shown if not logged in) -->
+    <div class="portal-card reveal" style="max-width:400px; margin:0 auto;" id="authBlock">
+      <h3>Access NeuroDrive</h3>
+      <div id="unauthView">
+        <label class="field"><span>Username</span><input id="loginUsername" type="text"
+            placeholder="demo_user" /></label>
+        <label class="field"><span>Password</span><input id="loginPassword" type="password"
+            placeholder="password" /></label>
+        <button id="loginBtn" class="btn-primary block" style="margin-top:12px;">Login</button>
+        <button id="registerBtn" class="btn-secondary block" style="margin-top:8px;">Create Account</button>
       </div>
+      <div id="authView" style="display:none;">
+        <p style="margin-top:12px;">Welcome back, <strong id="sessionUser" style="color:var(--cyan);"></strong></p>
+        <button id="enterDriveBtn" class="btn-primary block" style="margin-top:16px;"
+          onclick="document.getElementById('driveApp').style.display='flex'; document.getElementById('authBlock').style.display='none';">Enter
+          Drive</button>
+        <button id="logoutBtn" class="btn-secondary block" style="margin-top:8px;">Logout</button>
+      </div>
+      <div class="status" id="authStatus" style="margin-top:16px;"></div>
     </div>
 
-    <!-- Shard Output -->
-    <div class="advanced-card reveal" style="margin-top:20px;">
-      <h3>📦 Shard Output</h3>
-      <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px;">SHA-256 CIDs and sizes for each shard.
-      </p>
-      <div id="output" class="output"></div>
+    <!-- Drive Application (Shown after login) -->
+    <div class="drive-app reveal" id="driveApp" style="display:none;">
+
+      <!-- Sidebar Navigation -->
+      <nav class="drive-sidebar">
+        <div class="drive-nav-item active" onclick="switchDriveTab('my-drive')">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2z" />
+          </svg>
+          My Drive
+        </div>
+        <div class="drive-nav-item" onclick="switchDriveTab('node-dash')">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M21 18v1c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+          </svg>
+          Node Earnings
+        </div>
+        <div class="drive-nav-item" onclick="switchDriveTab('billing')">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path
+              d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
+          </svg>
+          Storage Plans
+        </div>
+      </nav>
+
+      <!-- Main Content Area -->
+      <main class="drive-main">
+
+        <!-- Tab 1: My Drive -->
+        <div class="drive-tab active" id="tab-my-drive">
+          <div class="drive-header">
+            <h3>My Drive</h3>
+            <div class="drive-upload-zone">
+              <label class="btn-primary" style="cursor:pointer; display:inline-block;">
+                + New Upload
+                <input type="file" id="fileUploadInput" style="display:none;" />
+              </label>
+              <input type="password" id="uploadPassword" placeholder="Vault Passphrase (Required)"
+                style="margin-left:12px; padding:10px; border-radius:6px; background:var(--bg); border:1px solid var(--border); color:#fff;" />
+              <button id="uploadBtn" class="btn-secondary" style="margin-left:8px;">Encrypt & Sync</button>
+            </div>
+            <div id="uploadStatus" style="font-size:0.85rem; color:var(--text-muted); margin-top:12px;">Waiting for
+              file...</div>
+          </div>
+
+          <div class="drive-content">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Filename</th>
+                  <th>Size</th>
+                  <th>Shards</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="objectsBody">
+                <!-- Populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Node Dashboard -->
+        <div class="drive-tab" id="tab-node-dash">
+          <div class="drive-header">
+            <h3>Node Earnings Dashboard</h3>
+            <p style="color:var(--text-muted); margin-top:8px;">Enter your Node Address (Peer ID) to view your live
+              AI-calculated payouts.</p>
+          </div>
+          <div class="drive-content">
+            <div style="display:flex; gap:12px; align-items:center; margin-bottom:24px;">
+              <input type="text" id="nodeIdInput" placeholder="12D3KooW..."
+                style="flex:1; padding:12px; border-radius:6px; background:var(--bg); border:1px solid var(--border); color:#fff;" />
+              <button class="btn-primary" onclick="checkEarnings()">Check Earnings</button>
+            </div>
+
+            <div class="edge-grid" id="earningsResults"
+              style="display:none; grid-template-columns: repeat(3, 1fr) !important;">
+              <div class="edge-card">
+                <h4 style="color:var(--text-muted);">Total Stored</h4>
+                <div id="earnBytes" style="font-size:2rem; color:var(--cyan); margin-top:8px;">0 GB</div>
+              </div>
+              <div class="edge-card">
+                <h4 style="color:var(--text-muted);">AI Reputation</h4>
+                <div id="earnRep" style="font-size:2rem; color:var(--emerald); margin-top:8px;">0/100</div>
+              </div>
+              <div class="edge-card">
+                <h4 style="color:var(--text-muted);">Estimated Payout</h4>
+                <div id="earnUsd" style="font-size:2rem; color:var(--gold); margin-top:8px;">$0.00</div>
+              </div>
+            </div>
+            <div id="earnError" style="color:var(--red); margin-top:16px;"></div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Billing & Plans -->
+        <div class="drive-tab" id="tab-billing">
+          <div class="drive-header">
+            <h3>Storage Plans</h3>
+            <p style="color:var(--text-muted); margin-top:8px;">Upgrade your consumer tier to store more files safely.
+            </p>
+          </div>
+          <div class="pricing-grid" style="margin-top:24px;">
+            <div class="pricing-card" style="margin:0;">
+              <div class="pricing-tier">Free Tier</div>
+              <div class="pricing-price">$0<span>/mo</span></div>
+              <ul class="pricing-features">
+                <li>5 GB storage</li>
+                <li>10 GB/mo retrieval</li>
+              </ul>
+              <button class="pricing-cta" disabled>Current Plan</button>
+            </div>
+            <div class="pricing-card featured" style="margin:0;">
+              <div class="pricing-tier">Pro Tier</div>
+              <div class="pricing-price">$4.99<span>/mo</span></div>
+              <ul class="pricing-features">
+                <li>100 GB storage</li>
+                <li>500 GB/mo retrieval</li>
+              </ul>
+              <button class="pricing-cta featured-cta" onclick="alert('Stripe Integration Pending')">Upgrade
+                Now</button>
+            </div>
+          </div>
+        </div>
+
+      </main>
     </div>
   </section>
 

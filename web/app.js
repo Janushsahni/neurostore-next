@@ -4,39 +4,78 @@
    ═══════════════════════════════════════════════════════ */
 
 /* ── DOM References ── */
-const fileInput     = document.getElementById("fileInput");
-const passwordInput = document.getElementById("passwordInput");
-const runBtn        = document.getElementById("runBtn");
-const profileInput  = document.getElementById("profileInput");
-const status        = document.getElementById("status");
-const output        = document.getElementById("output");
-const manifestRoot  = document.getElementById("manifestRoot");
-const totalBytes    = document.getElementById("totalBytes");
-const chunkCount    = document.getElementById("chunkCount");
-const shardCount    = document.getElementById("shardCount");
-const codingRatio   = document.getElementById("codingRatio");
-const nodeMap       = document.getElementById("nodeMap");
-const placementLog  = document.getElementById("placementLog");
-const retryLog      = document.getElementById("retryLog");
-const nativePickBtn = document.getElementById("nativePickBtn");
-const saveKeyBtn    = document.getElementById("saveKeyBtn");
-const loadKeyBtn    = document.getElementById("loadKeyBtn");
-const deleteKeyBtn  = document.getElementById("deleteKeyBtn");
-const syncStartBtn  = document.getElementById("syncStartBtn");
-const syncStopBtn   = document.getElementById("syncStopBtn");
-const syncStatusBtn = document.getElementById("syncStatusBtn");
-const nativeLog     = document.getElementById("nativeLog");
-const nodeApiInput  = document.getElementById("nodeApiInput");
-const uploadNodeBtn = document.getElementById("uploadNodeBtn");
-const aiMetrics     = document.getElementById("aiMetrics");
-const mainNav       = document.getElementById("mainNav");
-const navLinks      = document.getElementById("navLinks");
+const fileUploadInput = document.getElementById("fileUploadInput");
+const uploadPassword = document.getElementById("uploadPassword");
+const uploadBtn = document.getElementById("uploadBtn");
+const uploadStatus = document.getElementById("uploadStatus");
 
-let wasmReady    = false;
-let useFallback  = false;
-let isTauri      = !!(typeof window !== "undefined" && window.__TAURI__);
+const registerUsername = document.getElementById("registerUsername");
+const registerPassword = document.getElementById("registerPassword");
+const registerBtn = document.getElementById("registerBtn");
+
+const loginUsername = document.getElementById("loginUsername");
+const loginPassword = document.getElementById("loginPassword");
+const loginBtn = document.getElementById("loginBtn");
+
+const unauthView = document.getElementById("unauthView");
+const authView = document.getElementById("authView");
+const sessionUser = document.getElementById("sessionUser");
+const logoutBtn = document.getElementById("logoutBtn");
+const authStatus = document.getElementById("authStatus");
+
+const refreshBtn = document.getElementById("refreshBtn");
+const objectsBody = document.getElementById("objectsBody");
+
+const nodeMap = document.getElementById("nodeMap");
+const placementLog = document.getElementById("placementLog");
+const retryLog = document.getElementById("retryLog");
+
+const mainNav = document.getElementById("mainNav");
+const navLinks = document.getElementById("navLinks");
+
+let sessionToken = localStorage.getItem("ns_token") || "";
+let sessionUsername = localStorage.getItem("ns_username") || "";
+const API_BASE = "http://127.0.0.1:8080";
+
+let workerReady = false;
+let useFallback = false;
+let isTauri = !!(typeof window !== "undefined" && window.__TAURI__);
 let latestResult = null;
-let process_bytes_wasm = null;
+let cryptoWorker = null;
+
+function setSession(username, token) {
+  sessionUsername = username;
+  sessionToken = token;
+  if (token) {
+    localStorage.setItem("ns_token", token);
+    localStorage.setItem("ns_username", username);
+    if (unauthView) unauthView.style.display = "none";
+    if (authView) authView.style.display = "block";
+    if (sessionUser) sessionUser.textContent = username;
+  } else {
+    localStorage.removeItem("ns_token");
+    localStorage.removeItem("ns_username");
+    if (unauthView) unauthView.style.display = "block";
+    if (authView) authView.style.display = "none";
+    if (sessionUser) sessionUser.textContent = "";
+  }
+}
+
+async function api(path, options = {}) {
+  const headers = { ...options.headers };
+  if (sessionToken) headers.authorization = `Bearer ${sessionToken}`;
+  if (options.body) {
+    headers["content-type"] = "application/json";
+    options.body = JSON.stringify(options.body);
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
 
 /* ═══════════════════════════════════════════
    1. SCROLL REVEAL ANIMATIONS
@@ -100,6 +139,68 @@ function initNav() {
 }
 
 /* ═══════════════════════════════════════════
+   2.5 OS TAB SELECTOR
+   ═══════════════════════════════════════════ */
+window.switchOS = function (os) {
+  document.querySelectorAll(".os-tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".os-content").forEach(c => c.classList.remove("active"));
+
+  const targetTab = Array.from(document.querySelectorAll(".os-tab")).find(t => t.getAttribute("onclick").includes(os));
+  if (targetTab) targetTab.classList.add("active");
+
+  const content = document.getElementById(`os-${os}`);
+  if (content) content.classList.add("active");
+};
+
+/* ═══════════════════════════════════════════
+   2.6 DRIVE UI INTERACTIONS
+   ═══════════════════════════════════════════ */
+window.switchDriveTab = function (tabId) {
+  document.querySelectorAll('.drive-nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.drive-tab').forEach(el => el.classList.remove('active'));
+
+  const targetNav = Array.from(document.querySelectorAll('.drive-nav-item')).find(el => el.getAttribute('onclick').includes(tabId));
+  if (targetNav) targetNav.classList.add('active');
+
+  const targetTab = document.getElementById(`tab-${tabId}`);
+  if (targetTab) targetTab.classList.add('active');
+};
+
+window.checkEarnings = async function () {
+  const peerId = document.getElementById("nodeIdInput").value.trim();
+  const errorDiv = document.getElementById("earnError");
+  const resultsDiv = document.getElementById("earningsResults");
+
+  if (!peerId) {
+    errorDiv.textContent = "Please enter a valid Peer ID.";
+    return;
+  }
+
+  errorDiv.textContent = "Calculating...";
+  resultsDiv.style.display = "none";
+
+  try {
+    const res = await fetch(`/v1/nodes/earnings?peer_id=${encodeURIComponent(peerId)}`);
+    const data = await res.json();
+
+    if (res.ok) {
+      errorDiv.textContent = "";
+
+      const gbStored = (data.used_bytes / (1024 * 1024 * 1024)).toFixed(2);
+      document.getElementById("earnBytes").textContent = `${gbStored} GB`;
+      document.getElementById("earnRep").textContent = `${data.ai_reputation_score}/100`;
+      document.getElementById("earnUsd").textContent = `$${data.estimated_earnings_usd}`;
+
+      resultsDiv.style.display = "grid";
+    } else {
+      errorDiv.textContent = data.error || "Failed to fetch earnings.";
+    }
+  } catch (e) {
+    errorDiv.textContent = "Network error. Control plane might be down.";
+  }
+};
+
+/* ═══════════════════════════════════════════
    3. ANIMATED COUNTERS
    ═══════════════════════════════════════════ */
 function initCounters() {
@@ -119,16 +220,16 @@ function initCounters() {
 }
 
 function animateCounter(el) {
-  const target   = parseFloat(el.dataset.target);
+  const target = parseFloat(el.dataset.target);
   const decimals = parseInt(el.dataset.decimals || "0", 10);
-  const prefix   = el.dataset.prefix || "";
-  const suffix   = el.dataset.suffix || "";
+  const prefix = el.dataset.prefix || "";
+  const suffix = el.dataset.suffix || "";
   const duration = 2000;
-  const start    = performance.now();
+  const start = performance.now();
 
   function tick(now) {
     const elapsed = Math.min((now - start) / duration, 1);
-    const eased   = 1 - Math.pow(1 - elapsed, 4); // ease-out quart
+    const eased = 1 - Math.pow(1 - elapsed, 4); // ease-out quart
     const current = (target * eased).toFixed(decimals);
     el.textContent = `${prefix}${current}${suffix}`;
     if (elapsed < 1) requestAnimationFrame(tick);
@@ -308,7 +409,7 @@ function mockProcessFile(bytes, password, profile) {
     chunks.push(bytes.subarray(i, i + CHUNK_SIZE));
   }
 
-  const dataShards   = profile === "mobile" ? 4 : profile === "resilient" ? 6 : 5;
+  const dataShards = profile === "mobile" ? 4 : profile === "resilient" ? 6 : 5;
   const parityShards = profile === "mobile" ? 2 : profile === "resilient" ? 4 : 3;
 
   const shards = [];
@@ -363,9 +464,9 @@ function renderProtocolTrace(shards) {
   retryLog.innerHTML = "";
   const nodeCount = graph.nodes.length || 1;
   for (const shard of shards.slice(0, 18)) {
-    const primary   = hashToNodeIndex(shard.cid, nodeCount);
+    const primary = hashToNodeIndex(shard.cid, nodeCount);
     const secondary = (primary + 3) % nodeCount;
-    const tertiary  = (primary + 7) % nodeCount;
+    const tertiary = (primary + 7) % nodeCount;
 
     const line = document.createElement("div");
     line.textContent = `cid:${shard.cid.slice(0, 10)}… → n${primary},n${secondary},n${tertiary}`;
@@ -381,98 +482,162 @@ function renderProtocolTrace(shards) {
 }
 
 /* ═══════════════════════════════════════════
-   7. UPLOAD TO NODE
+   7. WEB PORTAL AUTH & ORCHESTRATION 
    ═══════════════════════════════════════════ */
-async function uploadShardsToNode() {
-  if (!latestResult?.shards?.length) {
-    status.textContent = "Run Encrypt + Shard first.";
-    return;
-  }
-  const endpoint = nodeApiInput?.value?.trim().replace(/\/+$/, "");
-  if (!endpoint) {
-    status.textContent = "Node API endpoint is required.";
-    return;
-  }
-
-  uploadNodeBtn.disabled = true;
+registerBtn?.addEventListener("click", async () => {
+  const username = registerUsername.value.trim();
+  const password = registerPassword.value;
   try {
-    const total = latestResult.shards.length;
-    let sent = 0;
-    for (let i = 0; i < total; i += 12) {
-      const batch = latestResult.shards.slice(i, i + 12).map((s) => ({
-        cid: s.cid,
-        bytes_b64: bytesToBase64(s.bytes),
-        chunk_index: s.chunk_index,
-        shard_index: s.shard_index,
-      }));
+    await api("/v1/auth/register", { method: "POST", body: { username, password } });
+    if (authStatus) authStatus.textContent = "Account created. Please login.";
+    loginUsername.value = username;
+  } catch (e) {
+    if (authStatus) authStatus.textContent = String(e);
+  }
+});
 
-      const resp = await fetch(`${endpoint}/api/batch-store`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ shards: batch }),
+loginBtn?.addEventListener("click", async () => {
+  const username = loginUsername.value.trim();
+  const password = loginPassword.value;
+  try {
+    const res = await api("/v1/auth/login", { method: "POST", body: { username, password } });
+    setSession(res.username, res.token);
+    if (authStatus) authStatus.textContent = "Logged in.";
+    refreshObjects();
+  } catch (e) {
+    if (authStatus) authStatus.textContent = String(e);
+  }
+});
+
+logoutBtn?.addEventListener("click", async () => {
+  try { await api("/v1/auth/logout", { method: "POST" }); } catch (e) { }
+  setSession("", "");
+  if (objectsBody) objectsBody.innerHTML = "";
+  if (authStatus) authStatus.textContent = "Logged out.";
+});
+
+refreshBtn?.addEventListener("click", refreshObjects);
+
+async function refreshObjects() {
+  if (!sessionToken || !objectsBody) return;
+  try {
+    const { objects } = await api("/v1/objects");
+    objectsBody.innerHTML = "";
+    for (const obj of objects) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${obj.filename}</td>
+        <td>${formatBytes(obj.total_bytes)}</td>
+        <td>${obj.shards?.length || 0}</td>
+        <td><button class="btn-secondary" style="padding:4px 8px;" onclick="window.alert('Download not implemented in UI stub yet')">Download</button></td>
+      `;
+      objectsBody.appendChild(tr);
+    }
+  } catch (e) { console.error(e); }
+}
+
+uploadBtn?.addEventListener("click", async () => {
+  if (!sessionToken) {
+    uploadStatus.textContent = "Please login first.";
+    return;
+  }
+  const file = fileUploadInput?.files?.[0];
+  const password = uploadPassword?.value.trim();
+  if (!file || !password) {
+    uploadStatus.textContent = "Select a file and enter a passphrase.";
+    return;
+  }
+
+  uploadBtn.disabled = true;
+  uploadStatus.textContent = "Fetching active nodes...";
+
+  try {
+    const nodesRes = await api("/v1/nodes");
+    const activeNodes = nodesRes.nodes;
+    if (activeNodes.length === 0) {
+      throw new Error("No active storage nodes available on the network.");
+    }
+
+    uploadStatus.textContent = "Encrypting and sharding locally...";
+    const bytes = new Uint8Array(await file.arrayBuffer());
+
+    let result;
+    if (workerReady && cryptoWorker) {
+      result = await new Promise((resolve, reject) => {
+        const tempListener = (e) => {
+          if (e.data.type === "PROCESS_RESULT") {
+            cryptoWorker.removeEventListener("message", tempListener);
+            resolve(e.data.payload);
+          } else if (e.data.type === "ERROR") {
+            cryptoWorker.removeEventListener("message", tempListener);
+            reject(new Error(e.data.error));
+          }
+        };
+        cryptoWorker.addEventListener("message", tempListener);
+        cryptoWorker.postMessage({
+          type: "PROCESS_BYTES",
+          payload: { bytes, password, profile: "balanced" }
+        });
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      sent += batch.length;
-      status.textContent = `Uploading encrypted shards ${sent}/${total}…`;
+    } else {
+      await new Promise((r) => setTimeout(r, 600)); // Demo delay
+      result = mockProcessFile(bytes, password, "balanced");
     }
-    status.textContent = `Upload complete. Stored ${latestResult.shards.length} encrypted shards.`;
+
+    latestResult = result;
+    startMap(result.shards);
+    renderProtocolTrace(result.shards);
+
+    uploadStatus.textContent = `Pushing ${result.shards.length} shards to Control Plane (in batches)...`;
+
+    // Assign peers sequentially from active list
+    const shardsWithPeers = result.shards.map((s, idx) => ({
+      cid: s.cid,
+      bytes_b64: bytesToBase64(s.bytes),
+      chunk_index: s.chunk_index,
+      shard_index: s.shard_index,
+      peer_id: activeNodes[idx % activeNodes.length].peer_id
+    }));
+
+    const object_id = "obj_" + Math.random().toString(36).substring(2, 10);
+    const BATCH_SIZE = 10;
+    let storedCount = 0;
+
+    for (let i = 0; i < shardsWithPeers.length; i += BATCH_SIZE) {
+      const batch = shardsWithPeers.slice(i, i + BATCH_SIZE);
+
+      uploadStatus.textContent = `Uploading batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(shardsWithPeers.length / BATCH_SIZE)}...`;
+
+      const storeRes = await api("/v1/store", {
+        method: "POST",
+        body: {
+          object_id,
+          filename: file.name,
+          total_bytes: bytes.length,
+          root: result.manifest_root,
+          shards: batch
+        }
+      });
+
+      if (storeRes.errors && storeRes.errors.length > 0) {
+        console.warn("Upload warnings:", storeRes.errors);
+      }
+      storedCount += storeRes.stored_chunks || 0;
+    }
+
+    uploadStatus.textContent = `Success! Stored ${storedCount} encrypted shards across ${activeNodes.length} nodes.`;
+
+    refreshObjects();
+
   } catch (err) {
-    status.textContent = `Node upload failed: ${err}`;
+    uploadStatus.textContent = `Error: ${err.message}`;
   } finally {
-    uploadNodeBtn.disabled = false;
+    uploadBtn.disabled = false;
   }
-}
+});
 
 /* ═══════════════════════════════════════════
-   8. AI METRICS POLLING
-   ═══════════════════════════════════════════ */
-async function refreshAiMetrics() {
-  if (!aiMetrics || !nodeApiInput) return;
-  const endpoint = nodeApiInput.value.trim().replace(/\/+$/, "");
-  if (!endpoint) return;
-
-  try {
-    const resp = await fetch(`${endpoint}/api/metrics`);
-    if (!resp.ok) return;
-    const m = await resp.json();
-    const rows = [
-      `uptime_secs=${m.uptime_secs}`,
-      `avg_latency_ms=${m.avg_latency_ms}`,
-      `bandwidth_mbps=${m.bandwidth_mbps}`,
-      `stored_chunks=${m.stored_chunks}`,
-      `stored_bytes=${formatBytes(m.stored_bytes_total)}`,
-      `ai_score=${m.ai_score}`,
-      `recommendation=${m.recommendation}`,
-    ];
-    aiMetrics.innerHTML = "";
-    for (const line of rows) {
-      const row = document.createElement("div");
-      row.textContent = line;
-      aiMetrics.appendChild(row);
-    }
-  } catch (_) {
-    // ignore polling failures
-  }
-}
-
-/* ═══════════════════════════════════════════
-   9. NATIVE BRIDGE
-   ═══════════════════════════════════════════ */
-function nativeInvoke(cmd, args = {}) {
-  const invoke = window.__TAURI__?.core?.invoke;
-  if (!invoke) throw new Error("Native bridge unavailable in browser mode");
-  return invoke(cmd, args);
-}
-
-function logNative(msg) {
-  if (!nativeLog) return;
-  const row = document.createElement("div");
-  row.textContent = msg;
-  nativeLog.prepend(row);
-}
-
-/* ═══════════════════════════════════════════
-   10. BOOT SEQUENCE
+   8. BOOT SEQUENCE
    ═══════════════════════════════════════════ */
 async function boot() {
   // Initialize UI features immediately
@@ -492,17 +657,22 @@ async function boot() {
   }
   startMap(idleShards);
 
-  // Try WASM, fallback gracefully
+  // Try Worker, fallback gracefully
   try {
-    const wasmModule = await import("./pkg/neuro_client_wasm.js");
-    await wasmModule.default();
-    process_bytes_wasm = wasmModule.process_bytes_wasm;
-    wasmReady = true;
-    status.textContent = "WASM pipeline ready — select a file to begin.";
+    cryptoWorker = new Worker("worker.js", { type: "module" });
+    cryptoWorker.onmessage = (e) => {
+      const { type, error } = e.data;
+      if (type === "READY") {
+        workerReady = true;
+        status.textContent = "WASM pipeline ready — select a file to begin.";
+      } else if (type === "ERROR") {
+        console.error("Worker error:", error);
+      }
+    };
   } catch (err) {
-    console.warn("WASM unavailable, using demo fallback:", err.message);
+    console.warn("WASM Worker unavailable, using demo fallback:", err.message);
     useFallback = true;
-    status.textContent = "Demo mode — WASM unavailable, using simulated pipeline.";
+    status.textContent = "Demo mode active (WASM load failed).";
   }
 
   if (!isTauri) {
@@ -511,136 +681,8 @@ async function boot() {
     logNative("Native bridge ready.");
   }
 
-  refreshAiMetrics();
-  setInterval(refreshAiMetrics, 3000);
-}
-
-/* ═══════════════════════════════════════════
-   11. EVENT LISTENERS
-   ═══════════════════════════════════════════ */
-window.addEventListener("resize", resizeCanvas);
-
-runBtn?.addEventListener("click", async () => {
-  if (!wasmReady && !useFallback) {
-    status.textContent = "Pipeline not ready yet…";
-    return;
-  }
-  const file = fileInput.files?.[0];
-  const password = passwordInput.value.trim();
-  const profile = profileInput.value;
-  if (!file || !password) {
-    status.textContent = "Select a file and enter a passphrase.";
-    return;
-  }
-
-  status.textContent = "Processing…";
-  const bytes = new Uint8Array(await file.arrayBuffer());
-
-  try {
-    let result;
-    if (wasmReady && process_bytes_wasm) {
-      result = process_bytes_wasm(bytes, password, profile);
-    } else {
-      // Simulate processing delay for realism
-      await new Promise((r) => setTimeout(r, 800 + Math.random() * 600));
-      result = mockProcessFile(bytes, password, profile);
-    }
-    latestResult = result;
-    renderShards(result.shards);
-    manifestRoot.textContent = result.manifest_root;
-    totalBytes.textContent = formatBytes(result.total_bytes);
-    chunkCount.textContent = result.chunk_count;
-    shardCount.textContent = result.shards.length;
-
-    const first = result.shards[0];
-    if (first) {
-      const total = first.data_shards + first.parity_shards;
-      codingRatio.textContent = `${first.data_shards}:${first.parity_shards} (${total})`;
-    } else {
-      codingRatio.textContent = "—";
-    }
-
-    startMap(result.shards);
-    renderProtocolTrace(result.shards);
-    status.textContent = `Generated ${result.shards.length} shards${useFallback ? " (demo mode)" : ""}.`;
-  } catch (err) {
-    status.textContent = `Error: ${err}`;
-  }
-});
-
-uploadNodeBtn?.addEventListener("click", uploadShardsToNode);
-
-nativePickBtn?.addEventListener("click", async () => {
-  try {
-    const picked = await nativeInvoke("pick_file");
-    logNative(`pick_file → ${picked || "none"}`);
-  } catch (e) {
-    logNative(`pick_file error → ${e}`);
-  }
-});
-
-saveKeyBtn?.addEventListener("click", async () => {
-  try {
-    const key = passwordInput.value.trim();
-    if (!key) { logNative("save key skipped: passphrase empty"); return; }
-    await nativeInvoke("set_secret", { key: "vault_passphrase", value: key });
-    logNative("set_secret → ok");
-  } catch (e) {
-    logNative(`set_secret error → ${e}`);
-  }
-});
-
-loadKeyBtn?.addEventListener("click", async () => {
-  try {
-    const value = await nativeInvoke("get_secret", { key: "vault_passphrase" });
-    if (value) passwordInput.value = value;
-    logNative(`get_secret → ${value ? "loaded" : "empty"}`);
-  } catch (e) {
-    logNative(`get_secret error → ${e}`);
-  }
-});
-
-deleteKeyBtn?.addEventListener("click", async () => {
-  try {
-    await nativeInvoke("delete_secret", { key: "vault_passphrase" });
-    logNative("delete_secret → ok");
-  } catch (e) {
-    logNative(`delete_secret error → ${e}`);
-  }
-});
-
-syncStartBtn?.addEventListener("click", async () => {
-  try {
-    const s = await nativeInvoke("start_background_sync", { interval_secs: 5 });
-    logNative(`start_sync → running=${s.running}`);
-  } catch (e) {
-    logNative(`start_sync error → ${e}`);
-  }
-});
-
-syncStopBtn?.addEventListener("click", async () => {
-  try {
-    await nativeInvoke("stop_background_sync");
-    logNative("stop_sync → ok");
-  } catch (e) {
-    logNative(`stop_sync error → ${e}`);
-  }
-});
-
-syncStatusBtn?.addEventListener("click", async () => {
-  try {
-    const s = await nativeInvoke("sync_status");
-    logNative(`sync_status → running=${s.running} ticks=${s.ticks} interval=${s.interval_secs}s`);
-  } catch (e) {
-    logNative(`sync_status error → ${e}`);
-  }
-});
-
-if (window.__TAURI__?.event?.listen) {
-  window.__TAURI__.event.listen("sync_tick", (event) => {
-    const p = event.payload || {};
-    logNative(`sync_tick → ticks=${p.ticks ?? "?"} running=${p.running ?? "?"} last=${p.last_tick_ms ?? "?"}`);
-  });
+  setSession(sessionUsername, sessionToken);
+  if (sessionToken) refreshObjects();
 }
 
 /* ── Boot ── */
