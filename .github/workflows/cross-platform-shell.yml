@@ -1,0 +1,42 @@
+name: Cross Platform Shell
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'apps/tauri-shell/**'
+      - 'web/**'
+      - '.github/workflows/cross-platform-shell.yml'
+
+jobs:
+  desktop-check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install shell deps
+        working-directory: apps/tauri-shell
+        run: npm install
+      - name: Validate shell project
+        working-directory: apps/tauri-shell
+        run: npm run build --if-present
+
+  mobile-config-check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install shell deps
+        working-directory: apps/tauri-shell
+        run: npm install
+      - name: Show mobile init commands
+        working-directory: apps/tauri-shell
+        run: |
+          echo "Run locally with SDKs: npm run ios:init && npm run android:init"

@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Neurostore | Secure Decentralized Storage</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="site-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <span class="brand-mark">NS</span>
+          <div>
+            <p class="eyebrow">Neurostore</p>
+            <h1>Decentralized Cloud Storage for Real Workloads</h1>
+          </div>
+        </div>
+        <div class="top-actions">
+          <a
+            class="btn"
+            href="https://github.com/janyshhh/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi"
+            target="_blank"
+            rel="noopener"
+            >Download Node MSI</a
+          >
+          <a class="btn secondary" href="#authBlock">Login to Upload</a>
+        </div>
+      </header>
+
+      <section class="panel hero">
+        <p class="kicker">Enterprise Security • Browser Upload • Edge-Ready</p>
+        <h2>Server never sees your plaintext files.</h2>
+        <p>
+          Files are encrypted in your browser before upload, then distributed across independent storage nodes.
+          You keep the passphrase. Retrieval and decryption happen client-side.
+        </p>
+        <div class="hero-metrics">
+          <article>
+            <h3>Client-Side Encryption</h3>
+            <p>AES-256-GCM with per-file random salt and nonce.</p>
+          </article>
+          <article>
+            <h3>Decentralized Replication</h3>
+            <p>Configurable replica factor across multiple node peers.</p>
+          </article>
+          <article>
+            <h3>Failover Retrieval</h3>
+            <p>Recover files even if a node goes offline.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>How It Works</h2>
+          <p>Simple workflow for teams and demos.</p>
+        </div>
+        <ol class="steps">
+          <li>Install node software via the Windows MSI on provider laptops.</li>
+          <li>Collect each node's peer multiaddr and paste into upload form.</li>
+          <li>Create account and login in this portal.</li>
+          <li>Upload image/doc/pdf; browser encrypts before any network transfer.</li>
+          <li>Retrieve + decrypt with passphrase; plaintext stays client-side.</li>
+        </ol>
+      </section>
+
+      <section class="grid two-up">
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Why Teams Use Neurostore</h2>
+          </div>
+          <ul class="checks">
+            <li>Zero-trust file handling in portal mode.</li>
+            <li>Node marketplace and decentralized redundancy.</li>
+            <li>Proof-based storage responses from nodes.</li>
+            <li>Built-in AI node risk and placement intelligence.</li>
+          </ul>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Download Provider Software</h2>
+            <p>Storage providers run this on Windows laptops/desktops.</p>
+          </div>
+          <div class="download-actions">
+            <a
+              class="btn block"
+              href="https://github.com/janyshhh/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi"
+              target="_blank"
+              rel="noopener"
+              >Download Windows Installer (.msi)</a
+            >
+            <a
+              class="btn secondary block"
+              href="https://github.com/janyshhh/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip"
+              target="_blank"
+              rel="noopener"
+              >Download Portable Bundle (.zip)</a
+            >
+          </div>
+        </article>
+      </section>
+
+      <section class="grid" id="authBlock">
+        <div class="panel">
+          <h2>Create Account</h2>
+          <label>
+            Username
+            <input id="registerUsername" type="text" placeholder="demo_user" />
+          </label>
+          <label>
+            Password
+            <input id="registerPassword" type="password" placeholder="min 8 chars" />
+          </label>
+          <button id="registerBtn" class="btn block">Create Account</button>
+        </div>
+
+        <div class="panel">
+          <h2>Sign In</h2>
+          <label>
+            Username
+            <input id="loginUsername" type="text" placeholder="demo_user" />
+          </label>
+          <label>
+            Password
+            <input id="loginPassword" type="password" placeholder="password" />
+          </label>
+          <button id="loginBtn" class="btn block">Login</button>
+          <div class="session">
+            <span id="sessionUser">Not logged in</span>
+            <button id="logoutBtn" class="btn secondary">Logout</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" data-auth-only>
+        <div class="auth-lock" id="authNotice">
+          Login is required before upload and retrieval.
+        </div>
+        <h2>Upload Encrypted File</h2>
+        <p class="muted">Supported: image, PDF, DOC/DOCX, TXT, CSV, JSON and other binary files.</p>
+
+        <label>
+          Node Peer Multiaddrs (one per line)
+          <textarea id="peersInput" rows="5" placeholder="/ip4/192.168.1.10/tcp/9000/p2p/...\n/ip4/192.168.1.11/tcp/9000/p2p/...\n/ip4/192.168.1.12/tcp/9000/p2p/..."></textarea>
+        </label>
+
+        <div class="grid two-up compact">
+          <label>
+            File (doc/pdf/image)
+            <input id="fileInput" type="file" accept="image/*,.pdf,.doc,.docx,.txt,.csv,.json,.zip" />
+          </label>
+
+          <label>
+            Passphrase
+            <input id="uploadPassword" type="password" placeholder="required for retrieve" />
+          </label>
+
+          <label>
+            Replica Factor
+            <input id="replicaInput" type="number" min="1" max="10" value="2" />
+          </label>
+
+          <label>
+            Profile
+            <select id="profileInput">
+              <option value="mobile">mobile</option>
+              <option value="balanced" selected>balanced</option>
+              <option value="resilient">resilient</option>
+            </select>
+          </label>
+        </div>
+
+        <button id="uploadBtn" class="btn">Encrypt + Upload</button>
+      </section>
+
+      <section class="panel" data-auth-only>
+        <div class="panel-head">
+          <h2>Your Objects</h2>
+          <button id="refreshBtn" class="btn secondary">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Object ID</th>
+              <th>File</th>
+              <th>Replicas</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="objectsBody"></tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Status</h2>
+        <pre id="statusLog">Ready.</pre>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,34 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/protocol",
+  "crates/node",
+  "crates/client-sdk",
+  "crates/client-wasm",
+  "crates/sentinel",
+  "crates/uploader",
+]
+exclude = ["apps/tauri-shell/src-tauri"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "1"
+anyhow = "1"
+rand = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+bytes = "1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+[profile.dev.package."*"]
+opt-level = 1

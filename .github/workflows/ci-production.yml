@@ -1,0 +1,71 @@
+name: CI Production
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  rust-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust fmt check
+        run: cargo fmt --all -- --check
+      - name: Rust tests
+        run: cargo test --workspace
+
+  control-plane-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run control-plane tests
+        working-directory: services/control-plane
+        run: node --test test/*.test.mjs
+
+  s3-gateway-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run s3-gateway tests
+        working-directory: services/s3-gateway
+        run: node --test test/*.test.mjs
+
+  smoke-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose file
+        run: docker compose -f deploy/docker-compose.option-a.yml config > /dev/null
+
+  perf-kpi-gate:
+    runs-on: ubuntu-latest
+    needs: [control-plane-test, s3-gateway-test]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start Option A stack
+        run: docker compose -f deploy/docker-compose.option-a.yml up --build -d
+      - name: Wait for services
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sS http://127.0.0.1:8080/readyz >/dev/null && curl -sS http://127.0.0.1:9009/readyz >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "services did not become ready in time" >&2
+          docker compose -f deploy/docker-compose.option-a.yml ps >&2
+          exit 1
+      - name: Run KPI gate
+        run: scripts/perf-kpi-gate.sh --samples 10 --payload-kb 128 --strict
+      - name: Stop Option A stack
+        if: always()
+        run: docker compose -f deploy/docker-compose.option-a.yml down -v

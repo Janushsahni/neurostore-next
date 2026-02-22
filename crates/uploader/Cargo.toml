@@ -1,0 +1,30 @@
+[package]
+name = "neuro-uploader"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+libp2p = { version = "0.53", features = [
+  "tcp",
+  "dns",
+  "noise",
+  "yamux",
+  "request-response",
+  "tokio",
+  "macros"
+] }
+futures = "0.3"
+neuro-client-sdk = { path = "../client-sdk" }
+neuro-protocol = { path = "../protocol" }
+async-trait = "0.1"
+base64 = "0.22"
+bincode = "1"
+serde = { workspace = true }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+sha2 = { workspace = true }
+hex = { workspace = true }
+rand = { workspace = true }
+chrono = { version = "0.4", features = ["clock"] }

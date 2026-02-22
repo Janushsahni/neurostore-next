@@ -1,0 +1,602 @@
+openapi: 3.0.3
+info:
+  title: Neurostore Option A Control Plane API
+  version: 0.1.0
+  description: No-token SaaS control-plane APIs for project, node, pricing, and payouts.
+servers:
+  - url: https://api.neurostore.example
+  - url: https://s3.neurostore.example
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Service is alive
+  /readyz:
+    get:
+      summary: Readiness probe
+      responses:
+        '200':
+          description: Service is ready
+  /v1/projects:
+    post:
+      summary: Create project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Created
+    get:
+      summary: List projects
+      responses:
+        '200':
+          description: Project list
+  /v1/tokens/macaroon:
+    post:
+      summary: Issue macaroon token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MintMacaroonRequest'
+      responses:
+        '201':
+          description: Token issued
+  /v1/tokens/verify:
+    post:
+      summary: Verify macaroon token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Verified
+  /v1/sigv4/keys:
+    post:
+      summary: Issue SigV4 access key for a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSigV4KeyRequest'
+      responses:
+        '201':
+          description: Key issued
+    get:
+      summary: List SigV4 keys
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key list
+  /v1/sigv4/keys/{access_key}:
+    get:
+      summary: Get SigV4 key metadata
+      parameters:
+        - name: access_key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Key metadata
+        '404':
+          description: Key not found
+  /v1/sigv4/keys/revoke:
+    post:
+      summary: Revoke SigV4 key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [access_key]
+              properties:
+                access_key:
+                  type: string
+      responses:
+        '200':
+          description: Key revoked
+  /v1/sigv4/resolve:
+    post:
+      summary: Resolve SigV4 key to secret and policy (internal service use)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [access_key]
+              properties:
+                access_key:
+                  type: string
+      responses:
+        '200':
+          description: Credential resolved
+  /v1/nodes/register:
+    post:
+      summary: Register provider node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterNodeRequest'
+      responses:
+        '201':
+          description: Registered
+  /v1/nodes/heartbeat:
+    post:
+      summary: Submit node heartbeat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeHeartbeatRequest'
+      responses:
+        '200':
+          description: Node health updated
+  /v1/nodes:
+    get:
+      summary: List nodes
+      responses:
+        '200':
+          description: Nodes sorted by score
+  /v1/nodes/{node_id}:
+    get:
+      summary: Get node details
+      parameters:
+        - name: node_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Node details
+        '404':
+          description: Node not found
+  /v1/proofs/submit:
+    post:
+      summary: Submit proof result
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProofSubmitRequest'
+      responses:
+        '200':
+          description: Proof accepted
+  /v1/nodes/usage:
+    post:
+      summary: Submit node usage for payout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeUsageRequest'
+      responses:
+        '200':
+          description: Usage recorded
+  /v1/placement/suggest:
+    post:
+      summary: Suggest placement targets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlacementSuggestRequest'
+      responses:
+        '200':
+          description: Candidate list
+  /v1/usage/ingest:
+    post:
+      summary: Ingest tenant usage counters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsageIngestRequest'
+      responses:
+        '200':
+          description: Usage ingested
+  /v1/usage/{project_id}:
+    get:
+      summary: Read project usage and bill estimate
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: period
+          in: query
+          required: false
+          schema:
+            type: string
+            example: 2026-02
+      responses:
+        '200':
+          description: Usage and bill
+  /v1/pricing/quote:
+    get:
+      summary: Get list-price estimate
+      parameters:
+        - name: tier
+          in: query
+          schema:
+            type: string
+            enum: [archive, active]
+        - name: storage_tb
+          in: query
+          schema:
+            type: number
+        - name: egress_tb
+          in: query
+          schema:
+            type: number
+        - name: api_million_ops
+          in: query
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Pricing quote
+  /v1/payouts/preview:
+    get:
+      summary: Preview node payouts for period
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            example: 2026-02
+      responses:
+        '200':
+          description: Payout list
+  /v1/dashboard/summary:
+    get:
+      summary: Dashboard summary
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Summary payload
+  /v1/presign:
+    post:
+      summary: Generate presigned URL for S3 gateway object operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [method, bucket, key]
+              properties:
+                method:
+                  type: string
+                  example: GET
+                bucket:
+                  type: string
+                key:
+                  type: string
+                ttl_seconds:
+                  type: integer
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Presigned URL
+  /s3/{bucket}:
+    get:
+      summary: List bucket objects (path-style S3)
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: list-type
+          in: query
+          schema:
+            type: integer
+        - name: prefix
+          in: query
+          schema:
+            type: string
+        - name: max-keys
+          in: query
+          schema:
+            type: integer
+        - name: continuation-token
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: XML ListBucketResult
+  /s3/{bucket}/{key}:
+    put:
+      summary: Upload object or upload multipart part
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: uploadId
+          in: query
+          schema:
+            type: string
+        - name: partNumber
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Object/part accepted
+    get:
+      summary: Download object or list multipart parts
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: uploadId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Object bytes or XML ListPartsResult
+    head:
+      summary: Read object metadata
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Object metadata headers
+    delete:
+      summary: Delete object or abort multipart upload
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: uploadId
+          in: query
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+    post:
+      summary: Initiate or complete multipart upload
+      parameters:
+        - name: bucket
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: uploads
+          in: query
+          schema:
+            type: string
+        - name: uploadId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: XML Initiate/Complete result
+components:
+  securitySchemes:
+    BearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: Macaroon
+    AwsSigV4:
+      type: apiKey
+      in: header
+      name: Authorization
+  schemas:
+    CreateProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        billing_email:
+          type: string
+        tier:
+          type: string
+          enum: [archive, active]
+        credit_balance_usd:
+          type: number
+    MintMacaroonRequest:
+      type: object
+      required: [project_id]
+      properties:
+        project_id:
+          type: string
+        ttl_seconds:
+          type: integer
+        bucket:
+          type: string
+        prefix:
+          type: string
+        ops:
+          type: array
+          items:
+            type: string
+        ip_cidr:
+          type: string
+    CreateSigV4KeyRequest:
+      type: object
+      required: [project_id]
+      properties:
+        project_id:
+          type: string
+        label:
+          type: string
+        token:
+          type: string
+        bucket:
+          type: string
+        prefix:
+          type: string
+        ops:
+          type: array
+          items:
+            type: string
+        region:
+          type: string
+        service:
+          type: string
+        ttl_seconds:
+          type: integer
+    RegisterNodeRequest:
+      type: object
+      required: [node_id, wallet]
+      properties:
+        node_id:
+          type: string
+        wallet:
+          type: string
+        region:
+          type: string
+        asn:
+          type: string
+        capacity_gb:
+          type: number
+        available_gb:
+          type: number
+        bandwidth_mbps:
+          type: number
+    NodeHeartbeatRequest:
+      type: object
+      required: [node_id]
+      properties:
+        node_id:
+          type: string
+        uptime_pct:
+          type: number
+        latency_ms:
+          type: number
+        proof_success_pct:
+          type: number
+        available_gb:
+          type: number
+    ProofSubmitRequest:
+      type: object
+      required: [node_id, ok]
+      properties:
+        node_id:
+          type: string
+        ok:
+          type: boolean
+        proof_latency_ms:
+          type: number
+        bytes_proven:
+          type: number
+    NodeUsageRequest:
+      type: object
+      required: [node_id]
+      properties:
+        node_id:
+          type: string
+        period:
+          type: string
+        stored_gb_hours:
+          type: number
+        egress_gb:
+          type: number
+        proofs_ok:
+          type: number
+        proofs_failed:
+          type: number
+    PlacementSuggestRequest:
+      type: object
+      properties:
+        replica_count:
+          type: integer
+        min_score:
+          type: number
+        region:
+          type: string
+    UsageIngestRequest:
+      type: object
+      required: [project_id]
+      properties:
+        project_id:
+          type: string
+        period:
+          type: string
+        storage_gb_hours:
+          type: number
+        egress_gb:
+          type: number
+        api_ops:
+          type: number

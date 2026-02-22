@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Neurostore Next",
+  "version": "0.1.0",
+  "identifier": "com.neurostore.next",
+  "build": {
+    "beforeDevCommand": "python3 -m http.server 5173 -d ../../web",
+    "beforeBuildCommand": "echo Building static web shell",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../../web"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Neurostore Next",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 360,
+        "minHeight": 640,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": []
+  }
+}

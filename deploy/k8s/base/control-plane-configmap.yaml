@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: control-plane-config
+  namespace: neurostore
+data:
+  PORT: "8080"
+  CONTROL_PLANE_DATA_DIR: "/var/lib/neurostore/control-plane"
+  STATE_BACKEND: "postgres"
+  STATE_REDIS_KEY: "neurostore:control-plane:state"
+  STATE_PG_TABLE: "control_plane_state"
+  STATE_MIRROR_FILE: "true"
+  STATE_BACKEND_FALLBACK_TO_FILE: "true"
+  DATABASE_URL: "postgres://neurostore:neurostore@postgres.neurostore.svc.cluster.local:5432/neurostore"
+  REDIS_URL: "redis://redis.neurostore.svc.cluster.local:6379"
+  NATS_URL: "nats://nats.neurostore.svc.cluster.local:4222"
+  KAFKA_BROKERS: "redpanda.neurostore.svc.cluster.local:9092"

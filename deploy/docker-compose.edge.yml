@@ -1,0 +1,16 @@
+services:
+  edge-proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - control-plane
+      - s3-gateway
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CONTROL_PLANE_HOST: "${CONTROL_PLANE_HOST:-api.neurostore.example.com}"
+      S3_HOST: "${S3_HOST:-s3.neurostore.example.com}"
+    volumes:
+      - ./nginx/neurostore.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./certs:/etc/nginx/tls:ro

@@ -1,0 +1,16 @@
+[
+  {
+    "peer": "/ip4/127.0.0.1/tcp/9000/p2p/12D3KooWExamplePeerId",
+    "reputation": 92.4,
+    "confidence": 0.87,
+    "anomaly": false,
+    "recommendation": "accept"
+  },
+  {
+    "peer": "/ip4/127.0.0.1/tcp/9001/p2p/12D3KooWExamplePeerIdTwo",
+    "reputation": 68.2,
+    "confidence": 0.61,
+    "anomaly": true,
+    "recommendation": "quarantine"
+  }
+]

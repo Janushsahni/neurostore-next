@@ -1,0 +1,16 @@
+[package]
+name = "neuro-client-sdk"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+bytes = { workspace = true }
+aes-gcm = "0.10"
+argon2 = "0.5"
+reed-solomon-erasure = "6"

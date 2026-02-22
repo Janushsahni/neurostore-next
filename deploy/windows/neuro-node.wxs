@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Neurostore Node"
+    Manufacturer="Neurostore"
+    Version="$(var.Version)"
+    UpgradeCode="b57e7e58-9991-4a80-90e9-32f71eb67f07"
+    Language="1033"
+    Scope="perMachine"
+    InstallerVersion="500">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Neurostore Node">
+        <Component Id="cmpNodeExe" Guid="2354c869-74d5-4d6f-a78a-4d49d19f3892">
+          <File Id="filNodeExe" Source="$(var.SourceDir)\neuro-node.exe" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpUploaderExe" Guid="f509ec7e-e68a-4b5f-b124-7afc6ef72b4c">
+          <File Id="filUploaderExe" Source="$(var.SourceDir)\neuro-uploader.exe" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpStartBat" Guid="2ea444f4-8169-4d6d-9385-e45f28707df6">
+          <File Id="filStartBat" Source="$(var.SourceDir)\start-node.bat" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpShowNodeAddressPs1" Guid="7c767f56-a2fd-48e7-a61e-e9010553df4b">
+          <File Id="filShowNodeAddressPs1" Source="$(var.SourceDir)\show-node-address.ps1" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpShowNodeAddressBat" Guid="359731fa-2bfa-4ab2-ac95-a69c605f0f20">
+          <File Id="filShowNodeAddressBat" Source="$(var.SourceDir)\show-node-address.bat" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpUploadImagePs1" Guid="ad7e73fe-2779-4ed7-98d8-c4fca95b1602">
+          <File Id="filUploadImagePs1" Source="$(var.SourceDir)\upload-image.ps1" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpUploadImageBat" Guid="4c1f5c0f-4bc8-49dd-ad14-7f78e6082166">
+          <File Id="filUploadImageBat" Source="$(var.SourceDir)\upload-image.bat" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpRetrieveImagePs1" Guid="88d43024-c96f-4334-a1d1-91fed824ec67">
+          <File Id="filRetrieveImagePs1" Source="$(var.SourceDir)\retrieve-image.ps1" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpRetrieveImageBat" Guid="f99d55af-d78d-4e17-84bb-bf2856f706e1">
+          <File Id="filRetrieveImageBat" Source="$(var.SourceDir)\retrieve-image.bat" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpStartDemoPortalPs1" Guid="7076f6e2-ebc6-47f7-81f8-f82bf0e1bc02">
+          <File Id="filStartDemoPortalPs1" Source="$(var.SourceDir)\start-demo-portal.ps1" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpStartDemoPortalBat" Guid="72fd8bc2-6f16-4f85-9c22-66de58954d25">
+          <File Id="filStartDemoPortalBat" Source="$(var.SourceDir)\start-demo-portal.bat" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpInstallServicePs1" Guid="c0f6d79f-bc2c-46f3-b74e-bf2ba5f23ae6">
+          <File Id="filInstallServicePs1" Source="$(var.SourceDir)\install-service.ps1" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpUninstallServicePs1" Guid="f4f0f6ea-f93e-4b1f-a0d0-00fdf43f5f8e">
+          <File Id="filUninstallServicePs1" Source="$(var.SourceDir)\uninstall-service.ps1" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpInstallServiceBat" Guid="e75522f3-1c27-4ff9-8eb5-4383a6c4bc45">
+          <File Id="filInstallServiceBat" Source="$(var.SourceDir)\install-service.bat" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpUpdateNodePs1" Guid="ce84f0ef-e4d8-4ec8-bf22-2067c676236a">
+          <File Id="filUpdateNodePs1" Source="$(var.SourceDir)\update-node.ps1" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpInstallUpdaterTaskPs1" Guid="9f0f88ea-2cf4-44ec-a972-4ff52f3865de">
+          <File Id="filInstallUpdaterTaskPs1" Source="$(var.SourceDir)\install-updater-task.ps1" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpUninstallUpdaterTaskPs1" Guid="6a0fb457-11f0-4bfb-8b4c-661656f74ff5">
+          <File Id="filUninstallUpdaterTaskPs1" Source="$(var.SourceDir)\uninstall-updater-task.ps1" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpInstallUpdaterTaskBat" Guid="b970915f-1943-4e9f-8515-14955fcf1a5b">
+          <File Id="filInstallUpdaterTaskBat" Source="$(var.SourceDir)\install-updater-task.bat" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpUninstallUpdaterTaskBat" Guid="4b7ce8c8-ff4f-4f74-a2b8-e7fba2706cc6">
+          <File Id="filUninstallUpdaterTaskBat" Source="$(var.SourceDir)\uninstall-updater-task.bat" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpVersionFile" Guid="953637fc-2705-4c32-87db-e5634b89b182">
+          <File Id="filVersionFile" Source="$(var.SourceDir)\version.txt" KeyPath="yes" />
+        </Component>
+        <Component Id="cmpReadme" Guid="65776209-7275-47f8-a87b-8f8d4ee41e82">
+          <File Id="filReadme" Source="$(var.SourceDir)\README.txt" KeyPath="yes" />
+        </Component>
+        <Directory Id="DemoPortalDir" Name="demo-portal">
+          <Component Id="cmpDemoPortalServer" Guid="1b8418f2-c8aa-4a66-8f8a-4793f270f431">
+            <File Id="filDemoPortalServer" Source="$(var.SourceDir)\demo-portal\server.mjs" KeyPath="yes" />
+          </Component>
+          <Directory Id="DemoPortalPublicDir" Name="public">
+            <Component Id="cmpDemoPortalIndex" Guid="573fefe0-9023-4a73-afe1-58a774d38d15">
+              <File Id="filDemoPortalIndex" Source="$(var.SourceDir)\demo-portal\public\index.html" KeyPath="yes" />
+            </Component>
+            <Component Id="cmpDemoPortalAppJs" Guid="67bf6f7c-2332-42a2-bd6e-f7c8df429e18">
+              <File Id="filDemoPortalAppJs" Source="$(var.SourceDir)\demo-portal\public\app.js" KeyPath="yes" />
+            </Component>
+            <Component Id="cmpDemoPortalStyleCss" Guid="42fbc69e-b28f-45cc-93e4-4f9725954672">
+              <File Id="filDemoPortalStyleCss" Source="$(var.SourceDir)\demo-portal\public\style.css" KeyPath="yes" />
+            </Component>
+          </Directory>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ProgramMenuNeurostoreFolder" Name="Neurostore Node">
+        <Component Id="cmpStartMenuShortcuts" Guid="4f9455f0-c95d-4bd4-9c7d-8d0736f80852">
+          <Shortcut
+            Id="shortcutStartNode"
+            Name="Start Neurostore Node"
+            Description="Run Neurostore node setup and foreground process"
+            Target="[INSTALLFOLDER]start-node.bat"
+            WorkingDirectory="INSTALLFOLDER" />
+          <Shortcut
+            Id="shortcutInstallService"
+            Name="Install Neurostore Node Service"
+            Description="Configure and install Neurostore node as a Windows service"
+            Target="[INSTALLFOLDER]install-service.bat"
+            WorkingDirectory="INSTALLFOLDER" />
+          <Shortcut
+            Id="shortcutShowNodeAddress"
+            Name="Show Node Share Address"
+            Description="Print and copy the node multiaddr for uploader peers"
+            Target="[INSTALLFOLDER]show-node-address.bat"
+            WorkingDirectory="INSTALLFOLDER" />
+          <Shortcut
+            Id="shortcutUploadImage"
+            Name="Upload Image to Nodes"
+            Description="Encrypt, shard, and upload an image with replicas"
+            Target="[INSTALLFOLDER]upload-image.bat"
+            WorkingDirectory="INSTALLFOLDER" />
+          <Shortcut
+            Id="shortcutRetrieveImage"
+            Name="Retrieve Image from Nodes"
+            Description="Retrieve and reconstruct an uploaded image from manifest"
+            Target="[INSTALLFOLDER]retrieve-image.bat"
+            WorkingDirectory="INSTALLFOLDER" />
+          <Shortcut
+            Id="shortcutStartDemoPortal"
+            Name="Start Demo Web Portal"
+            Description="Launch localhost login/upload/retrieve portal"
+            Target="[INSTALLFOLDER]start-demo-portal.bat"
+            WorkingDirectory="INSTALLFOLDER" />
+          <Shortcut
+            Id="shortcutInstallAutoUpdateTask"
+            Name="Install Auto-Update Task"
+            Description="Install scheduled task for background node updates"
+            Target="[INSTALLFOLDER]install-updater-task.bat"
+            WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveProgramMenuNeurostoreFolder" On="uninstall" />
+          <RegistryValue Root="HKLM" Key="Software\Neurostore\Node" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="Neurostore Node" Level="1">
+      <ComponentRef Id="cmpNodeExe" />
+      <ComponentRef Id="cmpUploaderExe" />
+      <ComponentRef Id="cmpStartBat" />
+      <ComponentRef Id="cmpShowNodeAddressPs1" />
+      <ComponentRef Id="cmpShowNodeAddressBat" />
+      <ComponentRef Id="cmpUploadImagePs1" />
+      <ComponentRef Id="cmpUploadImageBat" />
+      <ComponentRef Id="cmpRetrieveImagePs1" />
+      <ComponentRef Id="cmpRetrieveImageBat" />
+      <ComponentRef Id="cmpStartDemoPortalPs1" />
+      <ComponentRef Id="cmpStartDemoPortalBat" />
+      <ComponentRef Id="cmpInstallServicePs1" />
+      <ComponentRef Id="cmpUninstallServicePs1" />
+      <ComponentRef Id="cmpInstallServiceBat" />
+      <ComponentRef Id="cmpUpdateNodePs1" />
+      <ComponentRef Id="cmpInstallUpdaterTaskPs1" />
+      <ComponentRef Id="cmpUninstallUpdaterTaskPs1" />
+      <ComponentRef Id="cmpInstallUpdaterTaskBat" />
+      <ComponentRef Id="cmpUninstallUpdaterTaskBat" />
+      <ComponentRef Id="cmpVersionFile" />
+      <ComponentRef Id="cmpReadme" />
+      <ComponentRef Id="cmpDemoPortalServer" />
+      <ComponentRef Id="cmpDemoPortalIndex" />
+      <ComponentRef Id="cmpDemoPortalAppJs" />
+      <ComponentRef Id="cmpDemoPortalStyleCss" />
+      <ComponentRef Id="cmpStartMenuShortcuts" />
+    </Feature>
+  </Package>
+</Wix>

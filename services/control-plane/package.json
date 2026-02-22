@@ -1,0 +1,11 @@
+{
+  "name": "neurostore-control-plane",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Option A control-plane for Neurostore (no-token SaaS billing and node payouts)",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

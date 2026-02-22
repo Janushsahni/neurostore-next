@@ -1,0 +1,47 @@
+[
+  {
+    "node_id": "laptop-node-1",
+    "wallet": "wallet-laptop-1",
+    "region": "us-east",
+    "asn": "as-65001",
+    "capacity_gb": 500,
+    "available_gb": 470,
+    "bandwidth_mbps": 800,
+    "heartbeat": {
+      "uptime_pct": 99.8,
+      "latency_ms": 42,
+      "proof_success_pct": 99.7,
+      "available_gb": 470
+    }
+  },
+  {
+    "node_id": "laptop-node-2",
+    "wallet": "wallet-laptop-2",
+    "region": "us-west",
+    "asn": "as-65002",
+    "capacity_gb": 750,
+    "available_gb": 700,
+    "bandwidth_mbps": 650,
+    "heartbeat": {
+      "uptime_pct": 99.4,
+      "latency_ms": 68,
+      "proof_success_pct": 99.2,
+      "available_gb": 700
+    }
+  },
+  {
+    "node_id": "laptop-node-3",
+    "wallet": "wallet-laptop-3",
+    "region": "eu-central",
+    "asn": "as-65003",
+    "capacity_gb": 600,
+    "available_gb": 560,
+    "bandwidth_mbps": 500,
+    "heartbeat": {
+      "uptime_pct": 99.1,
+      "latency_ms": 95,
+      "proof_success_pct": 98.9,
+      "available_gb": 560
+    }
+  }
+]

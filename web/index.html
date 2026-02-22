@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Neurostore Next</title>
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="dot"></span>
+          <div>
+            <p class="eyebrow">Neurostore Next</p>
+            <h1>Zero-Trust Storage, Built for Signal</h1>
+          </div>
+        </div>
+        <div class="tagline">Client-side crypto + verifiable receipts + shard intelligence.</div>
+      </header>
+
+      <section class="panel download-panel">
+        <div class="panel-header">
+          <h3>Run a Node on Windows</h3>
+          <p>Direct installer + portable bundle with guided setup.</p>
+        </div>
+        <div class="download-grid">
+          <div class="download-actions">
+            <a
+              class="download-btn"
+              href="https://github.com/janyshhh/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi"
+              target="_blank"
+              rel="noopener"
+              >Download Windows Installer (.msi)</a
+            >
+            <a
+              class="download-btn secondary"
+              href="https://github.com/janyshhh/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip"
+              target="_blank"
+              rel="noopener"
+              >Download Portable Bundle (.zip)</a
+            >
+          </div>
+          <ol class="download-steps">
+            <li>Install via <code>.msi</code> for one-click setup.</li>
+            <li>Enter storage path and allocated disk size in GB.</li>
+            <li>Use <code>install-service.bat</code> to auto-start as a Windows service.</li>
+            <li>Use <code>show-node-address.bat</code> to share your node address.</li>
+            <li>Use <code>upload-image.bat</code> and <code>retrieve-image.bat</code> for guided failover demo.</li>
+            <li>Use <code>install-updater-task.bat</code> for automatic secure updates.</li>
+            <li>Optional browser portal: run <code>node apps/demo-portal/server.mjs</code> then open <code>http://127.0.0.1:7070</code>.</li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="card flow">
+          <h2>Protocol Mechanics</h2>
+          <p>Adaptive erasure profile tunes redundancy for mobile, balanced, or resilient operation.</p>
+          <div class="steps">
+            <div class="step">Chunking (128-256KB adaptive)</div>
+            <div class="step">Argon2id + AES-256-GCM</div>
+            <div class="step">Reed-Solomon N+K</div>
+            <div class="step">Merkle manifest root</div>
+            <div class="step">Signed store/retrieve proofs</div>
+          </div>
+        </div>
+        <div class="card vault">
+          <h2>Shard an Image</h2>
+          <label class="field">
+            <span>Upload Image</span>
+            <input id="fileInput" type="file" accept="image/*" />
+          </label>
+          <label class="field">
+            <span>Passphrase</span>
+            <input id="passwordInput" type="password" placeholder="Vault passphrase" />
+          </label>
+          <label class="field">
+            <span>Redundancy Profile</span>
+            <select id="profileInput">
+              <option value="mobile">Mobile</option>
+              <option value="balanced" selected>Balanced</option>
+              <option value="resilient">Resilient</option>
+            </select>
+          </label>
+          <button id="runBtn">Encrypt + Shard</button>
+          <div id="status" class="status">Awaiting input...</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Manifest</h3>
+            <p>Merkle root and dataset stats, ready for verification loops.</p>
+          </div>
+          <div class="manifest" id="manifestRoot">-</div>
+        </div>
+        <div class="stats">
+          <div>
+            <span class="stat" id="totalBytes">0</span>
+            <span class="label">Total Bytes</span>
+          </div>
+          <div>
+            <span class="stat" id="chunkCount">0</span>
+            <span class="label">Chunks</span>
+          </div>
+          <div>
+            <span class="stat" id="shardCount">0</span>
+            <span class="label">Shards</span>
+          </div>
+          <div>
+            <span class="stat" id="codingRatio">-</span>
+            <span class="label">Coding Ratio</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel network-panel">
+        <div class="panel-header">
+          <h3>Node Map + Shard Flow</h3>
+          <p>Simulated DHT edge map with animated shard transmissions.</p>
+        </div>
+        <canvas id="nodeMap" height="320"></canvas>
+        <div class="trace-grid">
+          <div class="trace-box">
+            <h4>Placement Decisions</h4>
+            <div id="placementLog" class="trace-log"></div>
+          </div>
+          <div class="trace-box">
+            <h4>Retry Trace</h4>
+            <div id="retryLog" class="trace-log"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Native Bridge</h3>
+          <p>Desktop/mobile shell commands: picker, secure key storage, background sync.</p>
+        </div>
+        <div class="trace-grid">
+          <div class="trace-box">
+            <h4>File + Keys</h4>
+            <div class="native-controls">
+              <button id="nativePickBtn">Pick File (Native)</button>
+              <button id="saveKeyBtn">Save Vault Key</button>
+              <button id="loadKeyBtn">Load Vault Key</button>
+              <button id="deleteKeyBtn">Delete Vault Key</button>
+            </div>
+          </div>
+          <div class="trace-box">
+            <h4>Background Sync</h4>
+            <div class="native-controls">
+              <button id="syncStartBtn">Start Sync</button>
+              <button id="syncStopBtn">Stop Sync</button>
+              <button id="syncStatusBtn">Sync Status</button>
+            </div>
+          </div>
+        </div>
+        <div id="nativeLog" class="trace-log"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Shard Output</h3>
+          <p>SHA-256 CIDs and sizes for each shard.</p>
+        </div>
+        <div class="trace-grid">
+          <div class="trace-box">
+            <h4>Secure Node Upload</h4>
+            <label class="field">
+              <span>Node API Endpoint</span>
+              <input id="nodeApiInput" type="text" value="http://127.0.0.1:8787" />
+            </label>
+            <button id="uploadNodeBtn">Upload Encrypted Shards to Node</button>
+          </div>
+          <div class="trace-box">
+            <h4>AI Node Health</h4>
+            <div id="aiMetrics" class="trace-log"></div>
+          </div>
+        </div>
+        <div id="output" class="output"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

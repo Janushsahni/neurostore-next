@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3-gateway
+  namespace: neurostore
+  labels:
+    app: s3-gateway
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: s3-gateway
+  template:
+    metadata:
+      labels:
+        app: s3-gateway
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: s3-gateway
+          image: ghcr.io/your-org/neurostore-s3-gateway:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 9009
+          envFrom:
+            - configMapRef:
+                name: s3-gateway-config
+            - secretRef:
+                name: s3-gateway-secret
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1
+              memory: 1Gi
+          volumeMounts:
+            - name: s3-gateway-data
+              mountPath: /var/lib/neurostore/s3-gateway
+      volumes:
+        - name: s3-gateway-data
+          persistentVolumeClaim:
+            claimName: s3-gateway-data

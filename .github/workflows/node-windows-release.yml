@@ -1,0 +1,225 @@
+name: Node Windows Release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build-node-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build Windows binaries
+        run: cargo build -p neuro-node -p neuro-uploader --release
+
+      - name: Resolve MSI version
+        shell: pwsh
+        run: |
+          $raw = "${{ github.ref_name }}"
+          $version = "0.1.0"
+          if ($raw -match '^v?(\d+\.\d+\.\d+)') {
+            $version = $Matches[1]
+          }
+          "MSI_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "MSI_VERSION=$version"
+
+      - name: Package Windows node bundle
+        shell: pwsh
+        run: |
+          $bundleRoot = "dist\neuro-node-windows-x86_64"
+
+          Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $bundleRoot | Out-Null
+
+          Copy-Item "target\release\neuro-node.exe" "$bundleRoot\neuro-node.exe"
+          Copy-Item "target\release\neuro-uploader.exe" "$bundleRoot\neuro-uploader.exe"
+          Copy-Item "deploy\windows\install-service.ps1" "$bundleRoot\install-service.ps1"
+          Copy-Item "deploy\windows\uninstall-service.ps1" "$bundleRoot\uninstall-service.ps1"
+          Copy-Item "deploy\windows\install-service.bat" "$bundleRoot\install-service.bat"
+          Copy-Item "deploy\windows\show-node-address.ps1" "$bundleRoot\show-node-address.ps1"
+          Copy-Item "deploy\windows\show-node-address.bat" "$bundleRoot\show-node-address.bat"
+          Copy-Item "deploy\windows\upload-image.ps1" "$bundleRoot\upload-image.ps1"
+          Copy-Item "deploy\windows\upload-image.bat" "$bundleRoot\upload-image.bat"
+          Copy-Item "deploy\windows\retrieve-image.ps1" "$bundleRoot\retrieve-image.ps1"
+          Copy-Item "deploy\windows\retrieve-image.bat" "$bundleRoot\retrieve-image.bat"
+          Copy-Item "deploy\windows\start-demo-portal.ps1" "$bundleRoot\start-demo-portal.ps1"
+          Copy-Item "deploy\windows\start-demo-portal.bat" "$bundleRoot\start-demo-portal.bat"
+          Copy-Item "deploy\windows\update-node.ps1" "$bundleRoot\update-node.ps1"
+          Copy-Item "deploy\windows\install-updater-task.ps1" "$bundleRoot\install-updater-task.ps1"
+          Copy-Item "deploy\windows\uninstall-updater-task.ps1" "$bundleRoot\uninstall-updater-task.ps1"
+          Copy-Item "deploy\windows\install-updater-task.bat" "$bundleRoot\install-updater-task.bat"
+          Copy-Item "deploy\windows\uninstall-updater-task.bat" "$bundleRoot\uninstall-updater-task.bat"
+          New-Item -ItemType Directory -Path "$bundleRoot\demo-portal\public" -Force | Out-Null
+          Copy-Item "apps\demo-portal\server.mjs" "$bundleRoot\demo-portal\server.mjs"
+          Copy-Item "apps\demo-portal\public\index.html" "$bundleRoot\demo-portal\public\index.html"
+          Copy-Item "apps\demo-portal\public\app.js" "$bundleRoot\demo-portal\public\app.js"
+          Copy-Item "apps\demo-portal\public\style.css" "$bundleRoot\demo-portal\public\style.css"
+          Set-Content -Path "$bundleRoot\version.txt" -Value "${env:MSI_VERSION}"
+
+          @"
+          @echo off
+          setlocal
+          echo Starting Neuro Node setup...
+          echo.
+          neuro-node.exe --interactive-setup
+          echo.
+          echo Node stopped.
+          pause
+          "@ | Set-Content -Path "$bundleRoot\start-node.bat"
+
+          @"
+          Neuro Node Windows Bundle
+          ========================
+
+          1) Run start-node.bat
+          2) Enter how much disk space in GB to allocate
+          3) Keep this window open to keep the node online
+          4) Run show-node-address.bat and share your multiaddr
+
+          Install as Windows background service:
+          1) Right-click install-service.bat and Run as administrator
+          2) Enter storage path and disk allocation in GB
+          3) Service name: NeurostoreNode (auto-start enabled)
+
+          Upload image to decentralized nodes:
+          1) Run upload-image.bat
+          2) Paste peer multiaddrs from your friends' laptops
+          3) Share manifest file with the uploader account
+
+          Retrieve image from decentralized nodes:
+          1) Run retrieve-image.bat
+          2) Provide manifest path and passphrase
+
+          Run local website upload portal:
+          1) Install Node.js 20+
+          2) Run start-demo-portal.bat
+          3) Open http://127.0.0.1:7070 and use login/upload/retrieve UI
+
+          Install automatic background updates:
+          1) Right-click install-updater-task.bat and Run as administrator
+          2) Task name: NeurostoreNodeAutoUpdate (default every 12 hours)
+          3) Updater script validates MSI SHA-256 before install
+
+          Optional manual command:
+          neuro-node.exe --storage-path .\node-data --max-gb 100 --listen /ip4/0.0.0.0/tcp/9000
+          "@ | Set-Content -Path "$bundleRoot\README.txt"
+
+      - name: Prepare code-sign certificate
+        if: ${{ secrets.WINDOWS_CODESIGN_PFX_B64 != '' && secrets.WINDOWS_CODESIGN_PASSWORD != '' }}
+        shell: pwsh
+        run: |
+          $pfxPath = "dist\codesign.pfx"
+          [System.IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String("${{ secrets.WINDOWS_CODESIGN_PFX_B64 }}"))
+          "WINDOWS_CODESIGN_PFX_PATH=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Sign neuro-node.exe
+        if: ${{ secrets.WINDOWS_CODESIGN_PFX_B64 != '' && secrets.WINDOWS_CODESIGN_PASSWORD != '' }}
+        shell: pwsh
+        run: |
+          $signtool = (Get-Command signtool.exe -ErrorAction Stop).Source
+          & $signtool sign `
+            /f "${env:WINDOWS_CODESIGN_PFX_PATH}" `
+            /p "${{ secrets.WINDOWS_CODESIGN_PASSWORD }}" `
+            /fd sha256 `
+            /tr http://timestamp.digicert.com `
+            /td sha256 `
+            "dist\neuro-node-windows-x86_64\neuro-node.exe"
+
+          & $signtool sign `
+            /f "${env:WINDOWS_CODESIGN_PFX_PATH}" `
+            /p "${{ secrets.WINDOWS_CODESIGN_PASSWORD }}" `
+            /fd sha256 `
+            /tr http://timestamp.digicert.com `
+            /td sha256 `
+            "dist\neuro-node-windows-x86_64\neuro-uploader.exe"
+
+      - name: Install WiX toolset
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 4.0.4
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Build MSI installer
+        shell: pwsh
+        run: |
+          $bundleRoot = (Resolve-Path "dist\neuro-node-windows-x86_64").Path
+          wix build deploy/windows/neuro-node.wxs `
+            -d SourceDir="$bundleRoot" `
+            -d Version="${env:MSI_VERSION}" `
+            -o dist/neuro-node-windows-x86_64.msi
+
+      - name: Sign MSI
+        if: ${{ secrets.WINDOWS_CODESIGN_PFX_B64 != '' && secrets.WINDOWS_CODESIGN_PASSWORD != '' }}
+        shell: pwsh
+        run: |
+          $signtool = (Get-Command signtool.exe -ErrorAction Stop).Source
+          & $signtool sign `
+            /f "${env:WINDOWS_CODESIGN_PFX_PATH}" `
+            /p "${{ secrets.WINDOWS_CODESIGN_PASSWORD }}" `
+            /fd sha256 `
+            /tr http://timestamp.digicert.com `
+            /td sha256 `
+            "dist\neuro-node-windows-x86_64.msi"
+
+      - name: Archive zip bundle
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist\neuro-node-windows-x86_64\*" -DestinationPath "dist\neuro-node-windows-x86_64.zip" -Force
+          Write-Host "Created dist/neuro-node-windows-x86_64.zip and dist/neuro-node-windows-x86_64.msi"
+
+      - name: Generate release checksums and update manifest
+        shell: pwsh
+        run: |
+          $zipPath = "dist\neuro-node-windows-x86_64.zip"
+          $msiPath = "dist\neuro-node-windows-x86_64.msi"
+          $zipHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $msiHash = (Get-FileHash -Path $msiPath -Algorithm SHA256).Hash.ToLowerInvariant()
+
+          @"
+          $zipHash  neuro-node-windows-x86_64.zip
+          $msiHash  neuro-node-windows-x86_64.msi
+          "@ | Set-Content -Path "dist\SHA256SUMS.txt"
+
+          $manifest = [ordered]@{
+            version = "${env:MSI_VERSION}"
+            released_at = (Get-Date).ToUniversalTime().ToString("o")
+            msi_asset = "neuro-node-windows-x86_64.msi"
+            zip_asset = "neuro-node-windows-x86_64.zip"
+            msi_sha256 = $msiHash
+            zip_sha256 = $zipHash
+          } | ConvertTo-Json
+          Set-Content -Path "dist\neuro-node-update.json" -Value $manifest
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neuro-node-windows-x86_64-bundle
+          path: |
+            dist/neuro-node-windows-x86_64.zip
+            dist/neuro-node-windows-x86_64.msi
+            dist/neuro-node-update.json
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Attach bundle to GitHub release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/neuro-node-windows-x86_64.zip
+            dist/neuro-node-windows-x86_64.msi
+            dist/neuro-node-update.json
+            dist/SHA256SUMS.txt

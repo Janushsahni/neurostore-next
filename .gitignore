@@ -1,0 +1,10 @@
+/target
+/node-data
+/web/pkg
+.DS_Store
+apps/tauri-shell/node_modules
+.tmp
+services/control-plane/.tmp
+deploy/.env.option-a.prod
+deploy/certs/*.pem
+deploy/k8s/generated/
