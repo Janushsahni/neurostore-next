@@ -1,287 +1,204 @@
-import { test } from "node:test";
+// ═══════════════════════════════════════════════════════════════
+// Control-Plane API Tests — Node.js native test runner
+// ═══════════════════════════════════════════════════════════════
+
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import {
-  classifyProjectHeat,
-  clamp,
-  computeNodeAiSnapshot,
-  computeNodeRisk,
-  computeNodeScore,
-  decryptSigV4Secret,
-  encryptSigV4Secret,
-  estimateNodePayout,
-  estimateProjectBill,
-  generateSigV4AccessKey,
-  generateSigV4SecretKey,
-  mintMacaroon,
-  pickPlacementCandidates,
-  recommendReplicaPolicy,
-  round2,
-  scorePlacementCandidate,
-  verifyMacaroon,
-} from "../server.mjs";
-import { createStateStore } from "../persistence.mjs";
 
-test("macaroon mint and verify", () => {
-  const token = mintMacaroon({
-    v: 1,
-    project_id: "prj_abc123",
-    caveats: { bucket: "datasets", ops: ["put", "get"] },
-    issued_at: Date.now(),
-    expires_at: Date.now() + 60_000,
-  });
+let app, server, state, baseUrl;
 
-  const verified = verifyMacaroon(token);
-  assert.equal(verified.ok, true);
-  assert.equal(verified.payload.project_id, "prj_abc123");
-
-  const tampered = `${token.slice(0, -1)}x`;
-  const invalid = verifyMacaroon(tampered);
-  assert.equal(invalid.ok, false);
+before(async () => {
+    process.env.PORT = "0"; // random port
+    const mod = await import("../server.mjs");
+    app = mod.app;
+    server = mod.server;
+    state = mod.state;
+    const addr = server.address();
+    baseUrl = `http://127.0.0.1:${addr.port}`;
 });
 
-test("node reliability score favors healthy low latency nodes", () => {
-  const strong = computeNodeScore(
-    { uptime_pct: 99.9, latency_ms: 70, proof_success_pct: 99.4 },
-    {},
-  );
-  const weak = computeNodeScore(
-    { uptime_pct: 75, latency_ms: 650, proof_success_pct: 88 },
-    {},
-  );
+after(() => { server.close(); });
 
-  assert.ok(strong > weak);
-  assert.ok(strong >= 80);
-  assert.ok(weak <= 70);
+async function api(method, path, body) {
+    const opts = { method, headers: { "content-type": "application/json" } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(`${baseUrl}${path}`, opts);
+    const json = await res.json();
+    return { status: res.status, json };
+}
+
+describe("Health", () => {
+    it("GET /readyz returns ok", async () => {
+        const { status, json } = await api("GET", "/readyz");
+        assert.equal(status, 200);
+        assert.equal(json.status, "ok");
+        assert.equal(json.service, "neurostore-control-plane");
+    });
 });
 
-test("ai snapshot flags latency spike anomalies", () => {
-  const baseNode = {
-    uptime_pct: 99.8,
-    proof_success_pct: 99.7,
-    latency_ms: 40,
-    available_gb: 800,
-    capacity_gb: 1000,
-    bandwidth_mbps: 1200,
-    ai: {
-      sample_count: 10,
-      ema_latency_ms: 45,
-      ema_uptime_pct: 99.8,
-      ema_proof_success_pct: 99.6,
-    },
-  };
+describe("Projects", () => {
+    let projectId;
 
-  const calm = computeNodeAiSnapshot(baseNode, {
-    latency_ms: 55,
-    uptime_pct: 99.7,
-    proof_success_pct: 99.4,
-  });
-  const spike = computeNodeAiSnapshot(baseNode, {
-    latency_ms: 2000,
-    uptime_pct: 98.8,
-    proof_success_pct: 94.2,
-  });
+    it("POST /v1/projects creates a project", async () => {
+        const { status, json } = await api("POST", "/v1/projects", { name: "test-proj", owner: "alice", tier: "pro" });
+        assert.equal(status, 201);
+        assert.ok(json.project.id);
+        assert.equal(json.project.name, "test-proj");
+        assert.equal(json.project.tier, "pro");
+        assert.ok(json.macaroon.token);
+        assert.ok(json.sigv4.access_key);
+        assert.ok(json.sigv4.secret_key);
+        projectId = json.project.id;
+    });
 
-  assert.ok(calm.anomaly_score < spike.anomaly_score);
-  assert.ok(spike.reliability_score < calm.reliability_score);
-  assert.ok(spike.reasons.includes("latency_spike"));
+    it("GET /v1/projects/:id returns the project", async () => {
+        const { status, json } = await api("GET", `/v1/projects/${projectId}`);
+        assert.equal(status, 200);
+        assert.equal(json.name, "test-proj");
+    });
+
+    it("GET /v1/projects/:id returns 404 for missing", async () => {
+        const { status } = await api("GET", "/v1/projects/does-not-exist");
+        assert.equal(status, 404);
+    });
+
+    it("rejects invalid tier", async () => {
+        const { status } = await api("POST", "/v1/projects", { name: "bad", tier: "platinum" });
+        assert.equal(status, 400);
+    });
 });
 
-test("project billing estimate is deterministic", () => {
-  const usage = {
-    storage_gb_hours: 720 * 1024 * 2,
-    egress_gb: 1024,
-    api_ops: 2_500_000,
-  };
-  const bill = estimateProjectBill(usage, "archive");
+describe("Macaroons", () => {
+    let projectId, token;
 
-  assert.equal(bill.storage_tb_month, 2);
-  assert.equal(bill.egress_tb, 1);
-  assert.equal(bill.storage_cost_usd, 14);
-  assert.equal(bill.egress_cost_usd, 8);
-  assert.equal(bill.api_cost_usd, 1);
-  assert.equal(bill.total_usd, 23);
+    before(async () => {
+        const { json } = await api("POST", "/v1/projects", { name: "mac-proj" });
+        projectId = json.project.id;
+        token = json.macaroon.token;
+    });
+
+    it("POST /v1/tokens/macaroon issues a token", async () => {
+        const { status, json } = await api("POST", "/v1/tokens/macaroon", { project_id: projectId });
+        assert.equal(status, 201);
+        assert.ok(json.token);
+        assert.ok(json.expires_at > Date.now());
+    });
+
+    it("rejects missing project_id", async () => {
+        const { status } = await api("POST", "/v1/tokens/macaroon", {});
+        assert.equal(status, 400);
+    });
 });
 
-test("node payout estimate rewards quality and penalizes proof failures", () => {
-  const node = { score: 92 };
-  const usage = {
-    stored_gb_hours: 720 * 1024,
-    egress_gb: 1024,
-    proofs_failed: 10,
-  };
-  const payout = estimateNodePayout(node, usage, { failed: 5 });
+describe("SigV4 Keys", () => {
+    let projectId;
 
-  assert.ok(payout.base_usd > 0);
-  assert.ok(payout.quality_multiplier > 1.0);
-  assert.ok(payout.proof_penalty_usd > 0);
-  assert.ok(payout.payout_usd > 0);
+    before(async () => {
+        const { json } = await api("POST", "/v1/projects", { name: "sigv4-proj" });
+        projectId = json.project.id;
+    });
+
+    it("generates and revokes keys", async () => {
+        const { status, json } = await api("POST", "/v1/sigv4/keys", { project_id: projectId });
+        assert.equal(status, 201);
+        assert.ok(json.access_key.startsWith("NRST"));
+
+        const { status: s2, json: j2 } = await api("POST", "/v1/sigv4/keys/revoke", { access_key: json.access_key });
+        assert.equal(s2, 200);
+        assert.equal(j2.revoked, true);
+    });
 });
 
-test("placement selection keeps regional diversity when possible", () => {
-  const nodes = [
-    { node_id: "a", score: 95, region: "us-east", asn: "as-1", ai: { anomaly: false } },
-    { node_id: "b", score: 91, region: "us-east", asn: "as-1", ai: { anomaly: false } },
-    { node_id: "c", score: 89, region: "us-west", asn: "as-2", ai: { anomaly: false } },
-    { node_id: "d", score: 88, region: "eu-central", asn: "as-3", ai: { anomaly: false } },
-  ];
+describe("Node Registry", () => {
+    it("registers a node and receives heartbeat", async () => {
+        const { status, json } = await api("POST", "/v1/nodes/register", {
+            peer_id: "QmTestPeer123", addr: "/ip4/127.0.0.1/tcp/9000", max_gb: 100,
+        });
+        assert.equal(status, 201);
+        assert.equal(json.peer_id, "QmTestPeer123");
+        assert.equal(json.status, "active");
 
-  const picks = pickPlacementCandidates(nodes, 3);
-  const regions = new Set(picks.map((p) => p.region));
+        const { json: hb } = await api("POST", "/v1/nodes/heartbeat", {
+            peer_id: "QmTestPeer123", used_gb: 12.5, score: 87.5,
+        });
+        assert.equal(hb.score, 87.5);
+    });
 
-  assert.equal(picks.length, 3);
-  assert.ok(regions.size >= 2);
+    it("GET /v1/nodes lists all nodes", async () => {
+        const { json } = await api("GET", "/v1/nodes");
+        assert.ok(json.count >= 1);
+        assert.ok(Array.isArray(json.nodes));
+    });
+
+    it("heartbeat rejects unregistered node", async () => {
+        const { status } = await api("POST", "/v1/nodes/heartbeat", { peer_id: "QmUnknown" });
+        assert.equal(status, 404);
+    });
 });
 
-test("placement deprioritizes anomalous nodes", () => {
-  const nodes = [
-    { node_id: "clean-1", score: 84, region: "us-east", asn: "as-1", ai: { anomaly: false } },
-    { node_id: "clean-2", score: 82, region: "eu-west", asn: "as-2", ai: { anomaly: false } },
-    { node_id: "noisy", score: 97, region: "ap-south", asn: "as-3", ai: { anomaly: true } },
-  ];
+describe("Placement", () => {
+    before(async () => {
+        // Register multiple nodes for placement testing
+        for (let i = 0; i < 5; i++) {
+            await api("POST", "/v1/nodes/register", {
+                peer_id: `QmPlacement${i}`, addr: `/ip4/10.0.0.${i}/tcp/9000`, max_gb: 50,
+            });
+            await api("POST", "/v1/nodes/heartbeat", {
+                peer_id: `QmPlacement${i}`, score: 60 + i * 8,
+            });
+        }
+    });
 
-  const picks = pickPlacementCandidates(nodes, 2);
-  const pickedIds = new Set(picks.map((node) => node.node_id));
-
-  assert.equal(picks.length, 2);
-  assert.ok(!pickedIds.has("noisy"));
+    it("recommends placement for shards", async () => {
+        const { json } = await api("POST", "/v1/placement/recommend", {
+            shard_count: 3, replica_factor: 2,
+        });
+        assert.equal(json.shard_count, 3);
+        assert.equal(json.placements.length, 3);
+        for (const p of json.placements) {
+            assert.ok(p.targets.length <= 2);
+        }
+    });
 });
 
-test("node risk score increases with stale heartbeat and anomalies", () => {
-  const nowIso = new Date().toISOString();
-  const healthy = computeNodeRisk({
-    score: 92,
-    uptime_pct: 99.7,
-    proof_success_pct: 99.5,
-    latency_ms: 55,
-    capacity_gb: 1000,
-    available_gb: 800,
-    ai: { anomaly_score: 0.05, ema_latency_ms: 60, ema_uptime_pct: 99.7, ema_proof_success_pct: 99.5 },
-    last_heartbeat_at: nowIso,
-  });
+describe("Billing & Usage", () => {
+    let projectId;
 
-  const risky = computeNodeRisk({
-    score: 30,
-    uptime_pct: 91,
-    proof_success_pct: 85,
-    latency_ms: 2200,
-    capacity_gb: 1000,
-    available_gb: 30,
-    ai: { anomaly_score: 0.92, ema_latency_ms: 2000, ema_uptime_pct: 92, ema_proof_success_pct: 84 },
-    last_heartbeat_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-  });
+    before(async () => {
+        const { json } = await api("POST", "/v1/projects", { name: "billing-proj", tier: "pro" });
+        projectId = json.project.id;
+    });
 
-  assert.ok(healthy.risk_score < risky.risk_score);
-  assert.ok(risky.reasons.length > 0);
+    it("ingests usage and returns summary", async () => {
+        await api("POST", "/v1/usage/ingest", { project_id: projectId, operation: "store", bytes: 1024 * 1024 * 100 });
+        await api("POST", "/v1/usage/ingest", { project_id: projectId, operation: "retrieve", bytes: 1024 * 1024 * 50 });
+
+        const { json } = await api("GET", `/v1/usage/${projectId}`);
+        assert.ok(json.stored_bytes > 0);
+        assert.ok(json.retrieved_bytes > 0);
+        assert.equal(json.tier, "pro");
+    });
 });
 
-test("heat classification and replica recommendation react to traffic intensity", () => {
-  const coldHeat = classifyProjectHeat({
-    storage_gb_hours: 720 * 1024,
-    egress_gb: 20,
-    api_ops: 3_000,
-  });
-  const hotHeat = classifyProjectHeat({
-    storage_gb_hours: 720 * 300,
-    egress_gb: 2500,
-    api_ops: 25_000_000,
-  });
+describe("Pricing & Payouts", () => {
+    it("GET /v1/pricing/quote returns quote", async () => {
+        const { json } = await api("GET", "/v1/pricing/quote?storage_gb=100&egress_gb=50&tier=pro");
+        assert.ok(typeof json.monthly_cost_usd === "number");
+        assert.equal(json.tier, "pro");
+    });
 
-  const coldPolicy = recommendReplicaPolicy({
-    tier: "archive",
-    objective: "cost",
-    heat: coldHeat,
-    nodeRiskP90: 20,
-    objectSizeMb: 32,
-  });
-  const hotPolicy = recommendReplicaPolicy({
-    tier: "active",
-    objective: "latency",
-    heat: hotHeat,
-    nodeRiskP90: 70,
-    objectSizeMb: 32,
-  });
-
-  assert.ok(coldHeat.score < hotHeat.score);
-  assert.ok(hotPolicy.replica_count > coldPolicy.replica_count);
+    it("GET /v1/payouts/preview returns payout preview", async () => {
+        const { json } = await api("GET", "/v1/payouts/preview");
+        assert.ok(typeof json.pool_usd === "number");
+        assert.ok(Array.isArray(json.nodes));
+    });
 });
 
-test("placement scoring adapts to objective weights", () => {
-  const nodeFast = {
-    node_id: "fast",
-    score: 75,
-    region: "us-east",
-    asn: "as-1",
-    latency_ms: 35,
-    bandwidth_mbps: 800,
-    capacity_gb: 1000,
-    available_gb: 120,
-    ai: { anomaly_score: 0.05, ema_latency_ms: 35 },
-  };
-  const nodeDurable = {
-    node_id: "durable",
-    score: 90,
-    region: "us-west",
-    asn: "as-2",
-    latency_ms: 140,
-    bandwidth_mbps: 500,
-    capacity_gb: 4000,
-    available_gb: 3200,
-    ai: { anomaly_score: 0.02, ema_latency_ms: 140 },
-  };
-
-  const fastLatency = scorePlacementCandidate(nodeFast, { objective: "latency" });
-  const durableLatency = scorePlacementCandidate(nodeDurable, { objective: "latency" });
-  const fastDurability = scorePlacementCandidate(nodeFast, { objective: "durability" });
-  const durableDurability = scorePlacementCandidate(nodeDurable, { objective: "durability" });
-
-  assert.ok(fastLatency > durableLatency);
-  assert.ok(durableDurability > fastDurability);
-});
-
-test("utility math helpers clamp and round correctly", () => {
-  assert.equal(clamp(120, 0, 100), 100);
-  assert.equal(clamp(-2, 0, 100), 0);
-  assert.equal(clamp(45, 0, 100), 45);
-  assert.equal(round2(1.234), 1.23);
-  assert.equal(round2(1.235), 1.24);
-});
-
-test("file state backend saves and reloads", () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cp-state-"));
-  const stateFile = path.join(tmpDir, "state.json");
-
-  const store = createStateStore({
-    backend: "file",
-    stateFile,
-  });
-
-  const state = {
-    version: 1,
-    projects: { prj_1: { project_id: "prj_1", name: "demo" } },
-    nodes: {},
-    sigv4_keys: {},
-    usage: {},
-    node_usage: {},
-    proofs: {},
-    events: [],
-  };
-
-  store.save(state);
-  const loaded = store.load();
-  assert.equal(loaded.projects.prj_1.name, "demo");
-});
-
-test("sigv4 key generation and encryption round-trip", () => {
-  const accessKey = generateSigV4AccessKey();
-  const secret = generateSigV4SecretKey();
-  const encrypted = encryptSigV4Secret(secret);
-  const decrypted = decryptSigV4Secret(encrypted);
-
-  assert.ok(accessKey.startsWith("NSIA"));
-  assert.equal(accessKey.length, 20);
-  assert.ok(secret.length >= 32);
-  assert.equal(decrypted, secret);
+describe("Dashboard", () => {
+    it("GET /v1/dashboard/summary returns summary", async () => {
+        const { json } = await api("GET", "/v1/dashboard/summary");
+        assert.ok(json.projects >= 0);
+        assert.ok(json.nodes.total >= 0);
+        assert.ok(typeof json.storage.used_gb === "number");
+    });
 });

@@ -15,6 +15,7 @@ use std::{
 };
 use store::SecureBlockStore;
 use tokio::sync::oneshot;
+use tracing::{info, warn};
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "neuro-node", version, about = "Decentralized storage node")]
@@ -67,6 +68,16 @@ struct RuntimeConfig {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Initialize structured logging
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_target(true)
+        .with_thread_ids(true)
+        .init();
+
     let args = Args::parse();
     #[cfg(windows)]
     if args.run_as_service {
@@ -136,10 +147,11 @@ async fn run_node_with_shutdown(
     let node = build_node(store, keypair, bootstrap_addrs, allowlist).await?;
     let listen_addr = parse_listen_multiaddr(&runtime.listen)?;
 
-    println!("Node peer id: {}", node.peer_id);
-    println!(
-        "Node storage allocation: {} GB at {}",
-        runtime.max_gb, runtime.storage_path
+    info!(peer_id = %node.peer_id, "Node identity loaded");
+    info!(
+        max_gb = runtime.max_gb,
+        path = %runtime.storage_path,
+        "Node storage allocation configured"
     );
     drive_node(node, listen_addr, shutdown_rx).await?;
     Ok(())
@@ -181,10 +193,7 @@ fn resolve_setup_config(
 
     if launched_without_flags {
         if let Some(saved) = load_setup_config(config_path)? {
-            println!(
-                "Loaded saved node setup from {}",
-                config_path.to_string_lossy()
-            );
+            info!(path = %config_path.display(), "Loaded saved node setup");
             return Ok(saved);
         }
     }

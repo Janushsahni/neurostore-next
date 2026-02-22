@@ -1,11 +1,19 @@
 {
-  "name": "neurostore-control-plane",
+  "name": "@neurostore/control-plane",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Option A control-plane for Neurostore (no-token SaaS billing and node payouts)",
+  "description": "NeuroStore control-plane: tenant lifecycle, macaroon auth, node registry, placement, billing, payouts",
+  "main": "server.mjs",
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

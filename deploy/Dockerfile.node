@@ -1,0 +1,19 @@
+# ── Build Stage ──────────────────────────────────────────────
+FROM rust:1.77-slim-bookworm AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev protobuf-compiler && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+RUN cargo build -p neuro-node --release
+
+# ── Runtime Stage ────────────────────────────────────────────
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libssl3 && \
+    rm -rf /var/lib/apt/lists/*
+COPY --from=builder /src/target/release/neuro-node /usr/local/bin/neuro-node
+RUN chmod +x /usr/local/bin/neuro-node
+EXPOSE 9000
+ENTRYPOINT ["/usr/local/bin/neuro-node"]

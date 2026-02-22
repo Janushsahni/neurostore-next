@@ -22,6 +22,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::{io, sync::Arc, time::Duration};
 use tokio::sync::oneshot;
+use tracing::{info, warn, debug};
 
 #[derive(Clone, Default)]
 pub struct ChunkCodec;
@@ -237,7 +238,7 @@ pub async fn drive_node(
     loop {
         tokio::select! {
             _ = &mut shutdown => {
-                println!("Shutdown signal received. Stopping node.");
+                info!("Shutdown signal received, stopping node");
                 break;
             }
             event = node.swarm.select_next_some() => {
@@ -258,33 +259,33 @@ pub async fn drive_node(
                                     .behaviour_mut()
                                     .chunk
                                     .send_response(channel, response);
-                                println!("Served chunk command from {peer}");
+                                debug!(peer = %peer, "Served chunk command");
                             }
                         }
                         RequestResponseEvent::InboundFailure { peer, error, .. } => {
-                            println!("Chunk inbound failure from {peer}: {error}");
+                            warn!(peer = %peer, error = %error, "Chunk inbound failure");
                         }
                         RequestResponseEvent::OutboundFailure { peer, error, .. } => {
-                            println!("Chunk outbound failure to {peer}: {error}");
+                            warn!(peer = %peer, error = %error, "Chunk outbound failure");
                         }
                         RequestResponseEvent::ResponseSent { peer, .. } => {
-                            println!("Chunk response sent to {peer}");
+                            debug!(peer = %peer, "Chunk response sent");
                         }
                     },
                     SwarmEvent::NewListenAddr { address, .. } => {
-                        println!("Listening on {address}");
+                        info!(address = %address, "Listening");
                     }
                     SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
-                        println!("Connection established peer={peer_id} endpoint={endpoint:?}");
+                        info!(peer = %peer_id, endpoint = ?endpoint, "Connection established");
                     }
                     SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
-                        println!("Connection closed peer={peer_id} cause={cause:?}");
+                        info!(peer = %peer_id, cause = ?cause, "Connection closed");
                     }
                     SwarmEvent::IncomingConnectionError { error, .. } => {
-                        println!("Incoming connection error: {error:?}");
+                        warn!(error = ?error, "Incoming connection error");
                     }
                     SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
-                        println!("Outgoing connection error peer={peer_id:?}: {error:?}");
+                        warn!(peer = ?peer_id, error = ?error, "Outgoing connection error");
                     }
                     _ => {}
                 }

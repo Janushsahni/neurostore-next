@@ -1,454 +1,625 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NeuroStore — Next-Generation Decentralized Storage</title>
-    <meta name="description" content="Zero-trust decentralized storage with client-side encryption, AI-driven network intelligence, and erasure-coded redundancy. Surpassing Filecoin, Storj, and Arweave." />
-    <link rel="stylesheet" href="./style.css" />
-  </head>
-  <body>
-    <!-- Animated background orbs -->
-    <div class="bg-orbs" aria-hidden="true">
-      <div class="orb orb-1"></div>
-      <div class="orb orb-2"></div>
-      <div class="orb orb-3"></div>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NeuroStore — Next-Generation Decentralized Storage</title>
+  <meta name="description"
+    content="Zero-trust decentralized storage with client-side encryption, AI-driven network intelligence, and erasure-coded redundancy. Surpassing Filecoin, Storj, and Arweave." />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body>
+  <!-- Animated background orbs -->
+  <div class="bg-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <!-- ═══ STICKY NAVIGATION ═══ -->
+  <nav class="nav" id="mainNav">
+    <div class="nav-inner">
+      <a href="#hero" class="nav-brand">
+        <div class="nav-logo"></div>
+        <span class="nav-logo-text">NeuroStore</span>
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#problem">Problem</a></li>
+        <li><a href="#technology">Technology</a></li>
+        <li><a href="#demo">Live Demo</a></li>
+        <li><a href="#metrics">Metrics</a></li>
+        <li><a href="#network">Network</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
+        <li><a href="#download">Get Started</a></li>
+      </ul>
+      <a href="#demo" class="nav-cta">Try Demo →</a>
+    </div>
+  </nav>
+
+  <!-- ═══ HERO ═══ -->
+  <section class="section hero" id="hero">
+    <div class="reveal">
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        Open Source Protocol — Now Live
+      </div>
+    </div>
+    <h1 class="reveal reveal-delay-1">The Future of<br />Decentralized Storage</h1>
+    <p class="hero-sub reveal reveal-delay-2">
+      Client-side encryption. AI-driven network intelligence. Erasure-coded redundancy.
+      NeuroStore is the zero-trust storage protocol built for the next era of data sovereignty.
+    </p>
+    <div class="hero-actions reveal reveal-delay-3">
+      <a href="#demo" class="btn-primary">See It Work →</a>
+      <a href="https://github.com/Janushsahni/neurostore-next" target="_blank" rel="noopener" class="btn-secondary">
+        ⭐ GitHub
+      </a>
+    </div>
+    <div class="hero-metrics reveal reveal-delay-4">
+      <div class="hero-metric">
+        <div class="hero-metric-value" data-counter="256" data-suffix="-bit">256-bit</div>
+        <div class="hero-metric-label">AES-GCM Encryption</div>
+      </div>
+      <div class="hero-metric">
+        <div class="hero-metric-value">&lt;400ms</div>
+        <div class="hero-metric-label">p95 Retrieve Latency</div>
+      </div>
+      <div class="hero-metric">
+        <div class="hero-metric-value">99.95%</div>
+        <div class="hero-metric-label">Availability SLO</div>
+      </div>
+      <div class="hero-metric">
+        <div class="hero-metric-value">AI-First</div>
+        <div class="hero-metric-label">Network Intelligence</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider">
+    <hr />
+  </div>
+
+  <!-- ═══ PROBLEM / SOLUTION ═══ -->
+  <section class="section problem-section" id="problem">
+    <div class="section-label reveal">The Problem</div>
+    <h2 class="section-title reveal reveal-delay-1">Cloud Storage Is Broken</h2>
+    <p class="section-desc reveal reveal-delay-2">
+      Centralized providers hold your encryption keys. Existing decentralized protocols sacrifice speed for security.
+      NeuroStore eliminates the tradeoff.
+    </p>
+    <div class="problem-grid">
+      <div class="problem-card card-red reveal">
+        <div class="problem-icon">🔓</div>
+        <h3>Server-Side Encryption</h3>
+        <p>AWS, GCP, and Azure hold your keys. One breach exposes everything. Your data is only as safe as their
+          infrastructure.</p>
+      </div>
+      <div class="problem-card card-gold reveal reveal-delay-1">
+        <div class="problem-icon">🐢</div>
+        <h3>Slow Retrieval</h3>
+        <p>Filecoin retrieve latency often exceeds seconds. For real-time apps, that's a dealbreaker. Users deserves
+          sub-second access.</p>
+      </div>
+      <div class="problem-card card-purple reveal reveal-delay-2">
+        <div class="problem-icon">🎲</div>
+        <h3>Blind Node Trust</h3>
+        <p>Most protocols randomly assign data to nodes with no intelligence. No reputation system means unreliable
+          storage.</p>
+      </div>
+      <div class="problem-card card-cyan reveal">
+        <div class="problem-icon">🔐</div>
+        <h3>Client-Side Zero-Trust</h3>
+        <p>NeuroStore encrypts on your device with Argon2id + AES-256-GCM. No plaintext ever leaves the browser. You
+          hold the keys.</p>
+      </div>
+      <div class="problem-card card-emerald reveal reveal-delay-1">
+        <div class="problem-icon">⚡</div>
+        <h3>Sub-Second Retrieval</h3>
+        <p>p95 latency target under 400ms with AI-optimized route selection. Faster than centralized providers in target
+          regions.</p>
+      </div>
+      <div class="problem-card card-blue reveal reveal-delay-2">
+        <div class="problem-icon">🧠</div>
+        <h3>AI-Driven Placement</h3>
+        <p>DDPG reinforcement learning continuously scores node reputation. Data is placed on the most reliable peers,
+          automatically.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider">
+    <hr />
+  </div>
+
+  <!-- ═══ TECHNOLOGY PIPELINE ═══ -->
+  <section class="section tech-section" id="technology">
+    <div class="section-label reveal">How It Works</div>
+    <h2 class="section-title reveal reveal-delay-1">Encryption Pipeline</h2>
+    <p class="section-desc reveal reveal-delay-2">
+      Every file passes through a 5-step cryptographic pipeline — entirely client-side via WebAssembly.
+      No server ever sees your plaintext.
+    </p>
+    <div class="pipeline">
+      <div class="pipe-step reveal">
+        <div class="pipe-num">1</div>
+        <div>
+          <h4>Adaptive Chunking</h4>
+          <p>Files split into 128–256KB chunks optimized for the redundancy profile.</p>
+          <span class="pipe-tag">128–256 KB</span>
+        </div>
+      </div>
+      <div class="pipe-step reveal reveal-delay-1">
+        <div class="pipe-num">2</div>
+        <div>
+          <h4>Key Derivation</h4>
+          <p>Argon2id derives encryption keys from your passphrase with memory-hard security.</p>
+          <span class="pipe-tag">Argon2id KDF</span>
+        </div>
+      </div>
+      <div class="pipe-step reveal reveal-delay-2">
+        <div class="pipe-num">3</div>
+        <div>
+          <h4>AES-256-GCM</h4>
+          <p>Each chunk is encrypted with authenticated encryption. Tamper-proof by design.</p>
+          <span class="pipe-tag">256-bit AES</span>
+        </div>
+      </div>
+      <div class="pipe-step reveal reveal-delay-3">
+        <div class="pipe-num">4</div>
+        <div>
+          <h4>Erasure Coding</h4>
+          <p>Reed-Solomon generates parity shards for fault tolerance across node failures.</p>
+          <span class="pipe-tag">Reed-Solomon N+K</span>
+        </div>
+      </div>
+      <div class="pipe-step reveal reveal-delay-4">
+        <div class="pipe-num">5</div>
+        <div>
+          <h4>Distribute & Verify</h4>
+          <p>Shards placed on AI-ranked peers with Merkle-root integrity verification.</p>
+          <span class="pipe-tag">SHA-256 CID</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider">
+    <hr />
+  </div>
+
+  <!-- ═══ LIVE DEMO ═══ -->
+  <section class="section demo-section" id="demo">
+    <div class="section-label reveal">Try It Now</div>
+    <h2 class="section-title reveal reveal-delay-1">Live Encryption Demo</h2>
+    <p class="section-desc reveal reveal-delay-2">
+      Upload an image, enter a passphrase, and watch the cryptographic pipeline process your data in real-time — all in
+      your browser.
+    </p>
+    <div class="demo-wrapper">
+      <!-- Upload Card -->
+      <div class="demo-card reveal">
+        <h3>🔐 Encrypt & Shard</h3>
+        <label class="field">
+          <span>Upload Image</span>
+          <input id="fileInput" type="file" accept="image/*" />
+        </label>
+        <label class="field">
+          <span>Passphrase</span>
+          <input id="passwordInput" type="password" placeholder="Enter vault passphrase" />
+        </label>
+        <label class="field">
+          <span>Redundancy Profile</span>
+          <select id="profileInput">
+            <option value="mobile">Mobile — Low Redundancy</option>
+            <option value="balanced" selected>Balanced — Default</option>
+            <option value="resilient">Resilient — Maximum Durability</option>
+          </select>
+        </label>
+        <button id="runBtn">Encrypt + Shard →</button>
+        <div id="status" class="status">Awaiting input…</div>
+      </div>
+
+      <!-- Manifest Card -->
+      <div class="manifest-panel reveal reveal-delay-1">
+        <div class="manifest-header">
+          <h3>📋 Manifest</h3>
+          <p style="color:var(--text-muted);font-size:0.88rem;">Merkle root and dataset statistics</p>
+          <div class="manifest-hash" id="manifestRoot">—</div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-value" id="totalBytes">0</span>
+            <span class="stat-label">Total Bytes</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value" id="chunkCount">0</span>
+            <span class="stat-label">Chunks</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value" id="shardCount">0</span>
+            <span class="stat-label">Shards</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value" id="codingRatio">—</span>
+            <span class="stat-label">Coding Ratio</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider">
+    <hr />
+  </div>
+
+  <!-- ═══ METRICS & COMPARISON ═══ -->
+  <section class="section metrics-section" id="metrics">
+    <div class="section-label reveal">By The Numbers</div>
+    <h2 class="section-title reveal reveal-delay-1">Protocol Performance</h2>
+    <p class="section-desc reveal reveal-delay-2">
+      NeuroStore is built to outperform existing decentralized storage on the metrics that matter most.
+    </p>
+    <div class="metrics-grid reveal">
+      <div class="metric-card">
+        <span class="counter" data-target="400" data-prefix="<" data-suffix="ms">0</span>
+        <div class="metric-label">p95 Retrieve Latency</div>
+      </div>
+      <div class="metric-card">
+        <span class="counter" data-target="99.95" data-suffix="%" data-decimals="2">0</span>
+        <div class="metric-label">Monthly Availability</div>
+      </div>
+      <div class="metric-card">
+        <span class="counter" data-target="2" data-suffix=" min">0</span>
+        <div class="metric-label">Mean Time to Repair</div>
+      </div>
+      <div class="metric-card">
+        <span class="counter" data-target="30" data-suffix="%" data-prefix="-">0</span>
+        <div class="metric-label">Cost vs Incumbents</div>
+      </div>
     </div>
 
-    <!-- ═══ STICKY NAVIGATION ═══ -->
-    <nav class="nav" id="mainNav">
-      <div class="nav-inner">
-        <a href="#hero" class="nav-brand">
-          <div class="nav-logo"></div>
-          <span class="nav-logo-text">NeuroStore</span>
-        </a>
-        <ul class="nav-links" id="navLinks">
-          <li><a href="#problem">Problem</a></li>
-          <li><a href="#technology">Technology</a></li>
-          <li><a href="#demo">Live Demo</a></li>
-          <li><a href="#metrics">Metrics</a></li>
-          <li><a href="#network">Network</a></li>
-          <li><a href="#download">Get Started</a></li>
+    <h3 class="section-title reveal" style="font-size:1.4rem;margin-top:48px;margin-bottom:24px;">How We Compare</h3>
+    <div class="reveal">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="highlight-col">NeuroStore</th>
+            <th>Filecoin</th>
+            <th>Storj</th>
+            <th>Arweave</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Client-Side Encryption</td>
+            <td class="highlight-col"><span class="check">✓ Built-in</span></td>
+            <td><span class="cross">✗ Optional</span></td>
+            <td><span class="check">✓ Yes</span></td>
+            <td><span class="cross">✗ No</span></td>
+          </tr>
+          <tr>
+            <td>AI Node Intelligence</td>
+            <td class="highlight-col"><span class="check">✓ DDPG RL</span></td>
+            <td><span class="cross">✗ No</span></td>
+            <td><span class="cross">✗ No</span></td>
+            <td><span class="cross">✗ No</span></td>
+          </tr>
+          <tr>
+            <td>p95 Retrieve Latency</td>
+            <td class="highlight-col"><span class="check">&lt;400ms</span></td>
+            <td><span class="cross">&gt;2s</span></td>
+            <td><span class="partial">~500ms</span></td>
+            <td><span class="partial">~1s</span></td>
+          </tr>
+          <tr>
+            <td>Erasure Coding</td>
+            <td class="highlight-col"><span class="check">✓ Adaptive</span></td>
+            <td><span class="partial">~ Fixed</span></td>
+            <td><span class="check">✓ Yes</span></td>
+            <td><span class="cross">✗ No</span></td>
+          </tr>
+          <tr>
+            <td>Verifiable Proofs</td>
+            <td class="highlight-col"><span class="check">✓ Signed</span></td>
+            <td><span class="check">✓ PoRep</span></td>
+            <td><span class="partial">~ Audits</span></td>
+            <td><span class="check">✓ PoA</span></td>
+          </tr>
+          <tr>
+            <td>S3 Compatibility</td>
+            <td class="highlight-col"><span class="check">✓ Gateway</span></td>
+            <td><span class="cross">✗ No</span></td>
+            <td><span class="check">✓ Native</span></td>
+            <td><span class="cross">✗ No</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="section-divider">
+    <hr />
+  </div>
+
+  <!-- ═══ NODE MAP ═══ -->
+  <section class="section nodemap-section" id="network">
+    <div class="section-label reveal">Network Intelligence</div>
+    <h2 class="section-title reveal reveal-delay-1">Live Node Map</h2>
+    <p class="section-desc reveal reveal-delay-2">
+      Simulated DHT edge map with animated shard transmissions. Each particle represents an encrypted shard being placed
+      on an AI-ranked peer.
+    </p>
+    <div class="nodemap-wrapper reveal">
+      <canvas id="nodeMap" height="360"></canvas>
+      <div class="trace-grid">
+        <div class="trace-box">
+          <h4>Placement Decisions</h4>
+          <div id="placementLog" class="trace-log"></div>
+        </div>
+        <div class="trace-box">
+          <h4>Retry Trace</h4>
+          <div id="retryLog" class="trace-log"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider">
+    <hr />
+  </div>
+
+  <!-- ═══ BUSINESS MODEL & PRICING ═══ -->
+  <section class="section pricing-section" id="pricing">
+    <div class="section-label reveal">Business Model</div>
+    <h2 class="section-title reveal reveal-delay-1">Simple, Transparent Pricing</h2>
+    <p class="section-desc reveal reveal-delay-2">
+      No tokens. No gas fees. Pay per GB stored and retrieved. Node providers earn fiat or USDC based on AI reputation
+      scores.
+    </p>
+    <div class="pricing-grid reveal">
+      <div class="pricing-card">
+        <div class="pricing-tier">Free</div>
+        <div class="pricing-price">$0<span>/mo</span></div>
+        <ul class="pricing-features">
+          <li>5 GB storage</li>
+          <li>10 GB/mo retrieval</li>
+          <li>Community support</li>
+          <li>Standard redundancy</li>
         </ul>
-        <a href="#demo" class="nav-cta">Try Demo →</a>
+        <a href="#demo" class="pricing-cta">Get Started</a>
       </div>
-    </nav>
+      <div class="pricing-card featured">
+        <div class="pricing-badge">Most Popular</div>
+        <div class="pricing-tier">Pro</div>
+        <div class="pricing-price">$4.99<span>/mo</span></div>
+        <ul class="pricing-features">
+          <li>100 GB storage</li>
+          <li>500 GB/mo retrieval</li>
+          <li>Priority placement</li>
+          <li>API keys + S3 gateway</li>
+          <li>Dashboard analytics</li>
+        </ul>
+        <a href="#demo" class="pricing-cta featured-cta">Start Pro Trial</a>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-tier">Enterprise</div>
+        <div class="pricing-price">Custom</div>
+        <ul class="pricing-features">
+          <li>Unlimited storage</li>
+          <li>Dedicated nodes</li>
+          <li>SLA guarantee</li>
+          <li>Audit logs &amp; compliance</li>
+          <li>24/7 support</li>
+        </ul>
+        <a href="mailto:hello@neurostore.io" class="pricing-cta">Contact Sales</a>
+      </div>
+    </div>
+  </section>
 
-    <!-- ═══ HERO ═══ -->
-    <section class="section hero" id="hero">
-      <div class="reveal">
-        <div class="hero-badge">
-          <span class="hero-badge-dot"></span>
-          Open Source Protocol — Now Live
+  <div class="section-divider">
+    <hr />
+  </div>
+
+  <!-- ═══ ROADMAP ═══ -->
+  <section class="section roadmap-section" id="roadmap">
+    <div class="section-label reveal">Roadmap</div>
+    <h2 class="section-title reveal reveal-delay-1">Execution Timeline</h2>
+    <p class="section-desc reveal reveal-delay-2">
+      From prototype to production — a clear path to market with milestones investors can track.
+    </p>
+    <div class="roadmap-timeline reveal">
+      <div class="roadmap-item completed">
+        <div class="roadmap-marker"></div>
+        <div class="roadmap-content">
+          <div class="roadmap-phase">v0.1 — Foundation</div>
+          <div class="roadmap-status">✅ Shipped</div>
+          <p>Core protocol: encrypted storage, P2P networking, erasure coding, Windows MSI, AI sentinel, signed proofs
+          </p>
         </div>
       </div>
-      <h1 class="reveal reveal-delay-1">The Future of<br/>Decentralized Storage</h1>
-      <p class="hero-sub reveal reveal-delay-2">
-        Client-side encryption. AI-driven network intelligence. Erasure-coded redundancy.
-        NeuroStore is the zero-trust storage protocol built for the next era of data sovereignty.
-      </p>
-      <div class="hero-actions reveal reveal-delay-3">
-        <a href="#demo" class="btn-primary">See It Work →</a>
-        <a href="https://github.com/Janushsahni/neurostore-next" target="_blank" rel="noopener" class="btn-secondary">
-          ⭐ GitHub
+      <div class="roadmap-item active">
+        <div class="roadmap-marker"></div>
+        <div class="roadmap-content">
+          <div class="roadmap-phase">v0.2 — S3 Gateway</div>
+          <div class="roadmap-status">🔄 In Progress</div>
+          <p>S3-compatible API, control plane, tenant isolation, macaroon auth, billing engine</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-marker"></div>
+        <div class="roadmap-content">
+          <div class="roadmap-phase">v0.3 — Public Benchmarks</div>
+          <div class="roadmap-status">📋 Planned — Q3 2026</div>
+          <p>Live benchmark dashboard, multi-region optimization, paid beta launch</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-marker"></div>
+        <div class="roadmap-content">
+          <div class="roadmap-phase">v0.4 — Mobile SDKs</div>
+          <div class="roadmap-status">📋 Planned — Q4 2026</div>
+          <p>iOS/Android SDKs, browser extension, enterprise compliance (SOC 2, GDPR)</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-marker"></div>
+        <div class="roadmap-content">
+          <div class="roadmap-phase">v1.0 — Production GA</div>
+          <div class="roadmap-status">🎯 Target — Jan 2027</div>
+          <p>Full production launch with 2-3 enterprise verticals, global node network</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider">
+    <hr />
+  </div>
+
+  <!-- ═══ COMPETITIVE EDGE ═══ -->
+  <section class="section edge-section" id="edge">
+    <div class="section-label reveal">Why Invest</div>
+    <h2 class="section-title reveal reveal-delay-1">The Competitive Edge</h2>
+    <div class="edge-grid reveal">
+      <div class="edge-card">
+        <div class="edge-icon">🏗️</div>
+        <h3>$110B Market</h3>
+        <p>Cloud storage market growing 25% YoY. Decentralized storage captures 3-5% within 5 years.</p>
+      </div>
+      <div class="edge-card">
+        <div class="edge-icon">🧠</div>
+        <h3>AI Moat</h3>
+        <p>Only protocol with ML-driven node intelligence. Placement improves with every upload.</p>
+      </div>
+      <div class="edge-card">
+        <div class="edge-icon">💰</div>
+        <h3>Unit Economics</h3>
+        <p>COGS ~$5.4/TB. Sale $7-11/TB. 35-45% gross margin from day one. No token dependency.</p>
+      </div>
+      <div class="edge-card">
+        <div class="edge-icon">🔌</div>
+        <h3>S3 Drop-in</h3>
+        <p>Any AWS SDK works. Zero migration friction. Developers switch in minutes.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider">
+    <hr />
+  </div>
+
+  <!-- ═══ DOWNLOAD / GET STARTED ═══ -->
+  <section class="section download-section" id="download">
+    <div class="section-label reveal">Get Started</div>
+    <h2 class="section-title reveal reveal-delay-1">Run a Node</h2>
+    <p class="section-desc reveal reveal-delay-2">
+      Download the Windows installer, allocate disk space, and join the network in minutes.
+    </p>
+    <div class="download-wrapper reveal">
+      <div class="download-actions">
+        <a class="download-btn"
+          href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi"
+          target="_blank" rel="noopener">
+          ⬇ Windows Installer (.msi)
+        </a>
+        <a class="download-btn secondary"
+          href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip"
+          target="_blank" rel="noopener">
+          📦 Portable Bundle (.zip)
         </a>
       </div>
-      <div class="hero-metrics reveal reveal-delay-4">
-        <div class="hero-metric">
-          <div class="hero-metric-value" data-counter="256" data-suffix="-bit">256-bit</div>
-          <div class="hero-metric-label">AES-GCM Encryption</div>
-        </div>
-        <div class="hero-metric">
-          <div class="hero-metric-value">&lt;400ms</div>
-          <div class="hero-metric-label">p95 Retrieve Latency</div>
-        </div>
-        <div class="hero-metric">
-          <div class="hero-metric-value">99.95%</div>
-          <div class="hero-metric-label">Availability SLO</div>
-        </div>
-        <div class="hero-metric">
-          <div class="hero-metric-value">AI-First</div>
-          <div class="hero-metric-label">Network Intelligence</div>
-        </div>
-      </div>
-    </section>
+      <ol class="download-steps">
+        <li>Install via <code>.msi</code> for one-click setup.</li>
+        <li>Enter storage path and allocated disk size in GB.</li>
+        <li>Use <code>install-service.bat</code> to auto-start as a Windows service.</li>
+        <li>Use <code>show-node-address.bat</code> to share your node address.</li>
+        <li>Use <code>upload-image.bat</code> and <code>retrieve-image.bat</code> for guided failover demo.</li>
+        <li>Use <code>install-updater-task.bat</code> for automatic secure updates.</li>
+        <li>Optional browser portal: run <code>node apps/demo-portal/server.mjs</code> then open
+          <code>http://127.0.0.1:7070</code>.
+        </li>
+      </ol>
+    </div>
+  </section>
 
-    <div class="section-divider"><hr/></div>
-
-    <!-- ═══ PROBLEM / SOLUTION ═══ -->
-    <section class="section problem-section" id="problem">
-      <div class="section-label reveal">The Problem</div>
-      <h2 class="section-title reveal reveal-delay-1">Cloud Storage Is Broken</h2>
-      <p class="section-desc reveal reveal-delay-2">
-        Centralized providers hold your encryption keys. Existing decentralized protocols sacrifice speed for security. 
-        NeuroStore eliminates the tradeoff.
-      </p>
-      <div class="problem-grid">
-        <div class="problem-card card-red reveal">
-          <div class="problem-icon">🔓</div>
-          <h3>Server-Side Encryption</h3>
-          <p>AWS, GCP, and Azure hold your keys. One breach exposes everything. Your data is only as safe as their infrastructure.</p>
-        </div>
-        <div class="problem-card card-gold reveal reveal-delay-1">
-          <div class="problem-icon">🐢</div>
-          <h3>Slow Retrieval</h3>
-          <p>Filecoin retrieve latency often exceeds seconds. For real-time apps, that's a dealbreaker. Users deserves sub-second access.</p>
-        </div>
-        <div class="problem-card card-purple reveal reveal-delay-2">
-          <div class="problem-icon">🎲</div>
-          <h3>Blind Node Trust</h3>
-          <p>Most protocols randomly assign data to nodes with no intelligence. No reputation system means unreliable storage.</p>
-        </div>
-        <div class="problem-card card-cyan reveal">
-          <div class="problem-icon">🔐</div>
-          <h3>Client-Side Zero-Trust</h3>
-          <p>NeuroStore encrypts on your device with Argon2id + AES-256-GCM. No plaintext ever leaves the browser. You hold the keys.</p>
-        </div>
-        <div class="problem-card card-emerald reveal reveal-delay-1">
-          <div class="problem-icon">⚡</div>
-          <h3>Sub-Second Retrieval</h3>
-          <p>p95 latency target under 400ms with AI-optimized route selection. Faster than centralized providers in target regions.</p>
-        </div>
-        <div class="problem-card card-blue reveal reveal-delay-2">
-          <div class="problem-icon">🧠</div>
-          <h3>AI-Driven Placement</h3>
-          <p>DDPG reinforcement learning continuously scores node reputation. Data is placed on the most reliable peers, automatically.</p>
-        </div>
-      </div>
-    </section>
-
-    <div class="section-divider"><hr/></div>
-
-    <!-- ═══ TECHNOLOGY PIPELINE ═══ -->
-    <section class="section tech-section" id="technology">
-      <div class="section-label reveal">How It Works</div>
-      <h2 class="section-title reveal reveal-delay-1">Encryption Pipeline</h2>
-      <p class="section-desc reveal reveal-delay-2">
-        Every file passes through a 5-step cryptographic pipeline — entirely client-side via WebAssembly. 
-        No server ever sees your plaintext.
-      </p>
-      <div class="pipeline">
-        <div class="pipe-step reveal">
-          <div class="pipe-num">1</div>
-          <div>
-            <h4>Adaptive Chunking</h4>
-            <p>Files split into 128–256KB chunks optimized for the redundancy profile.</p>
-            <span class="pipe-tag">128–256 KB</span>
-          </div>
-        </div>
-        <div class="pipe-step reveal reveal-delay-1">
-          <div class="pipe-num">2</div>
-          <div>
-            <h4>Key Derivation</h4>
-            <p>Argon2id derives encryption keys from your passphrase with memory-hard security.</p>
-            <span class="pipe-tag">Argon2id KDF</span>
-          </div>
-        </div>
-        <div class="pipe-step reveal reveal-delay-2">
-          <div class="pipe-num">3</div>
-          <div>
-            <h4>AES-256-GCM</h4>
-            <p>Each chunk is encrypted with authenticated encryption. Tamper-proof by design.</p>
-            <span class="pipe-tag">256-bit AES</span>
-          </div>
-        </div>
-        <div class="pipe-step reveal reveal-delay-3">
-          <div class="pipe-num">4</div>
-          <div>
-            <h4>Erasure Coding</h4>
-            <p>Reed-Solomon generates parity shards for fault tolerance across node failures.</p>
-            <span class="pipe-tag">Reed-Solomon N+K</span>
-          </div>
-        </div>
-        <div class="pipe-step reveal reveal-delay-4">
-          <div class="pipe-num">5</div>
-          <div>
-            <h4>Distribute & Verify</h4>
-            <p>Shards placed on AI-ranked peers with Merkle-root integrity verification.</p>
-            <span class="pipe-tag">SHA-256 CID</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div class="section-divider"><hr/></div>
-
-    <!-- ═══ LIVE DEMO ═══ -->
-    <section class="section demo-section" id="demo">
-      <div class="section-label reveal">Try It Now</div>
-      <h2 class="section-title reveal reveal-delay-1">Live Encryption Demo</h2>
-      <p class="section-desc reveal reveal-delay-2">
-        Upload an image, enter a passphrase, and watch the cryptographic pipeline process your data in real-time — all in your browser.
-      </p>
-      <div class="demo-wrapper">
-        <!-- Upload Card -->
-        <div class="demo-card reveal">
-          <h3>🔐 Encrypt & Shard</h3>
-          <label class="field">
-            <span>Upload Image</span>
-            <input id="fileInput" type="file" accept="image/*" />
-          </label>
-          <label class="field">
-            <span>Passphrase</span>
-            <input id="passwordInput" type="password" placeholder="Enter vault passphrase" />
-          </label>
-          <label class="field">
-            <span>Redundancy Profile</span>
-            <select id="profileInput">
-              <option value="mobile">Mobile — Low Redundancy</option>
-              <option value="balanced" selected>Balanced — Default</option>
-              <option value="resilient">Resilient — Maximum Durability</option>
-            </select>
-          </label>
-          <button id="runBtn">Encrypt + Shard →</button>
-          <div id="status" class="status">Awaiting input…</div>
-        </div>
-
-        <!-- Manifest Card -->
-        <div class="manifest-panel reveal reveal-delay-1">
-          <div class="manifest-header">
-            <h3>📋 Manifest</h3>
-            <p style="color:var(--text-muted);font-size:0.88rem;">Merkle root and dataset statistics</p>
-            <div class="manifest-hash" id="manifestRoot">—</div>
-          </div>
-          <div class="stats-grid">
-            <div class="stat-box">
-              <span class="stat-value" id="totalBytes">0</span>
-              <span class="stat-label">Total Bytes</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-value" id="chunkCount">0</span>
-              <span class="stat-label">Chunks</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-value" id="shardCount">0</span>
-              <span class="stat-label">Shards</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-value" id="codingRatio">—</span>
-              <span class="stat-label">Coding Ratio</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div class="section-divider"><hr/></div>
-
-    <!-- ═══ METRICS & COMPARISON ═══ -->
-    <section class="section metrics-section" id="metrics">
-      <div class="section-label reveal">By The Numbers</div>
-      <h2 class="section-title reveal reveal-delay-1">Protocol Performance</h2>
-      <p class="section-desc reveal reveal-delay-2">
-        NeuroStore is built to outperform existing decentralized storage on the metrics that matter most.
-      </p>
-      <div class="metrics-grid reveal">
-        <div class="metric-card">
-          <span class="counter" data-target="400" data-prefix="<" data-suffix="ms">0</span>
-          <div class="metric-label">p95 Retrieve Latency</div>
-        </div>
-        <div class="metric-card">
-          <span class="counter" data-target="99.95" data-suffix="%" data-decimals="2">0</span>
-          <div class="metric-label">Monthly Availability</div>
-        </div>
-        <div class="metric-card">
-          <span class="counter" data-target="2" data-suffix=" min">0</span>
-          <div class="metric-label">Mean Time to Repair</div>
-        </div>
-        <div class="metric-card">
-          <span class="counter" data-target="30" data-suffix="%" data-prefix="-">0</span>
-          <div class="metric-label">Cost vs Incumbents</div>
+  <!-- ═══ ADVANCED: NATIVE BRIDGE + NODE UPLOAD + AI METRICS ═══ -->
+  <section class="section advanced-section" id="advanced">
+    <div class="advanced-grid">
+      <!-- Node Upload -->
+      <div class="advanced-card reveal">
+        <h3>🚀 Secure Node Upload</h3>
+        <label class="field">
+          <span>Node API Endpoint</span>
+          <input id="nodeApiInput" type="text" value="http://127.0.0.1:8787" />
+        </label>
+        <button id="uploadNodeBtn">Upload Encrypted Shards to Node</button>
+        <div style="margin-top:16px;">
+          <h4 style="font-family:var(--font-head);font-size:0.88rem;font-weight:600;margin-bottom:8px;">AI Node Health
+          </h4>
+          <div id="aiMetrics" class="trace-log"></div>
         </div>
       </div>
 
-      <h3 class="section-title reveal" style="font-size:1.4rem;margin-top:48px;margin-bottom:24px;">How We Compare</h3>
-      <div class="reveal">
-        <table class="comparison-table">
-          <thead>
-            <tr>
-              <th>Feature</th>
-              <th class="highlight-col">NeuroStore</th>
-              <th>Filecoin</th>
-              <th>Storj</th>
-              <th>Arweave</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Client-Side Encryption</td>
-              <td class="highlight-col"><span class="check">✓ Built-in</span></td>
-              <td><span class="cross">✗ Optional</span></td>
-              <td><span class="check">✓ Yes</span></td>
-              <td><span class="cross">✗ No</span></td>
-            </tr>
-            <tr>
-              <td>AI Node Intelligence</td>
-              <td class="highlight-col"><span class="check">✓ DDPG RL</span></td>
-              <td><span class="cross">✗ No</span></td>
-              <td><span class="cross">✗ No</span></td>
-              <td><span class="cross">✗ No</span></td>
-            </tr>
-            <tr>
-              <td>p95 Retrieve Latency</td>
-              <td class="highlight-col"><span class="check">&lt;400ms</span></td>
-              <td><span class="cross">&gt;2s</span></td>
-              <td><span class="partial">~500ms</span></td>
-              <td><span class="partial">~1s</span></td>
-            </tr>
-            <tr>
-              <td>Erasure Coding</td>
-              <td class="highlight-col"><span class="check">✓ Adaptive</span></td>
-              <td><span class="partial">~ Fixed</span></td>
-              <td><span class="check">✓ Yes</span></td>
-              <td><span class="cross">✗ No</span></td>
-            </tr>
-            <tr>
-              <td>Verifiable Proofs</td>
-              <td class="highlight-col"><span class="check">✓ Signed</span></td>
-              <td><span class="check">✓ PoRep</span></td>
-              <td><span class="partial">~ Audits</span></td>
-              <td><span class="check">✓ PoA</span></td>
-            </tr>
-            <tr>
-              <td>S3 Compatibility</td>
-              <td class="highlight-col"><span class="check">✓ Gateway</span></td>
-              <td><span class="cross">✗ No</span></td>
-              <td><span class="check">✓ Native</span></td>
-              <td><span class="cross">✗ No</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <div class="section-divider"><hr/></div>
-
-    <!-- ═══ NODE MAP ═══ -->
-    <section class="section nodemap-section" id="network">
-      <div class="section-label reveal">Network Intelligence</div>
-      <h2 class="section-title reveal reveal-delay-1">Live Node Map</h2>
-      <p class="section-desc reveal reveal-delay-2">
-        Simulated DHT edge map with animated shard transmissions. Each particle represents an encrypted shard being placed on an AI-ranked peer.
-      </p>
-      <div class="nodemap-wrapper reveal">
-        <canvas id="nodeMap" height="360"></canvas>
-        <div class="trace-grid">
+      <!-- Native Bridge -->
+      <div class="advanced-card reveal reveal-delay-1">
+        <h3>🖥️ Native Bridge</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px;">Desktop/mobile shell commands: picker,
+          secure key storage, background sync.</p>
+        <div class="trace-grid" style="margin-top:0;">
           <div class="trace-box">
-            <h4>Placement Decisions</h4>
-            <div id="placementLog" class="trace-log"></div>
+            <h4>File + Keys</h4>
+            <div class="native-controls">
+              <button id="nativePickBtn">Pick File (Native)</button>
+              <button id="saveKeyBtn">Save Vault Key</button>
+              <button id="loadKeyBtn">Load Vault Key</button>
+              <button id="deleteKeyBtn">Delete Vault Key</button>
+            </div>
           </div>
           <div class="trace-box">
-            <h4>Retry Trace</h4>
-            <div id="retryLog" class="trace-log"></div>
+            <h4>Background Sync</h4>
+            <div class="native-controls">
+              <button id="syncStartBtn">Start Sync</button>
+              <button id="syncStopBtn">Stop Sync</button>
+              <button id="syncStatusBtn">Sync Status</button>
+            </div>
           </div>
         </div>
+        <div id="nativeLog" class="trace-log" style="margin-top:12px;"></div>
       </div>
-    </section>
+    </div>
 
-    <div class="section-divider"><hr/></div>
-
-    <!-- ═══ DOWNLOAD / GET STARTED ═══ -->
-    <section class="section download-section" id="download">
-      <div class="section-label reveal">Get Started</div>
-      <h2 class="section-title reveal reveal-delay-1">Run a Node</h2>
-      <p class="section-desc reveal reveal-delay-2">
-        Download the Windows installer, allocate disk space, and join the network in minutes.
+    <!-- Shard Output -->
+    <div class="advanced-card reveal" style="margin-top:20px;">
+      <h3>📦 Shard Output</h3>
+      <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px;">SHA-256 CIDs and sizes for each shard.
       </p>
-      <div class="download-wrapper reveal">
-        <div class="download-actions">
-          <a class="download-btn"
-            href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi"
-            target="_blank" rel="noopener">
-            ⬇ Windows Installer (.msi)
-          </a>
-          <a class="download-btn secondary"
-            href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip"
-            target="_blank" rel="noopener">
-            📦 Portable Bundle (.zip)
-          </a>
-        </div>
-        <ol class="download-steps">
-          <li>Install via <code>.msi</code> for one-click setup.</li>
-          <li>Enter storage path and allocated disk size in GB.</li>
-          <li>Use <code>install-service.bat</code> to auto-start as a Windows service.</li>
-          <li>Use <code>show-node-address.bat</code> to share your node address.</li>
-          <li>Use <code>upload-image.bat</code> and <code>retrieve-image.bat</code> for guided failover demo.</li>
-          <li>Use <code>install-updater-task.bat</code> for automatic secure updates.</li>
-          <li>Optional browser portal: run <code>node apps/demo-portal/server.mjs</code> then open <code>http://127.0.0.1:7070</code>.</li>
-        </ol>
+      <div id="output" class="output"></div>
+    </div>
+  </section>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="footer-logo"></div>
+        <span class="footer-name">NeuroStore</span>
       </div>
-    </section>
+      <ul class="footer-links">
+        <li><a href="https://github.com/Janushsahni/neurostore-next" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="#technology">Technology</a></li>
+        <li><a href="#metrics">Metrics</a></li>
+        <li><a href="#demo">Demo</a></li>
+        <li><a href="#download">Download</a></li>
+      </ul>
+      <p class="footer-copy">&copy; 2026 NeuroStore Protocol. All rights reserved.</p>
+    </div>
+  </footer>
 
-    <!-- ═══ ADVANCED: NATIVE BRIDGE + NODE UPLOAD + AI METRICS ═══ -->
-    <section class="section advanced-section" id="advanced">
-      <div class="advanced-grid">
-        <!-- Node Upload -->
-        <div class="advanced-card reveal">
-          <h3>🚀 Secure Node Upload</h3>
-          <label class="field">
-            <span>Node API Endpoint</span>
-            <input id="nodeApiInput" type="text" value="http://127.0.0.1:8787" />
-          </label>
-          <button id="uploadNodeBtn">Upload Encrypted Shards to Node</button>
-          <div style="margin-top:16px;">
-            <h4 style="font-family:var(--font-head);font-size:0.88rem;font-weight:600;margin-bottom:8px;">AI Node Health</h4>
-            <div id="aiMetrics" class="trace-log"></div>
-          </div>
-        </div>
+  <script type="module" src="./app.js"></script>
+</body>
 
-        <!-- Native Bridge -->
-        <div class="advanced-card reveal reveal-delay-1">
-          <h3>🖥️ Native Bridge</h3>
-          <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px;">Desktop/mobile shell commands: picker, secure key storage, background sync.</p>
-          <div class="trace-grid" style="margin-top:0;">
-            <div class="trace-box">
-              <h4>File + Keys</h4>
-              <div class="native-controls">
-                <button id="nativePickBtn">Pick File (Native)</button>
-                <button id="saveKeyBtn">Save Vault Key</button>
-                <button id="loadKeyBtn">Load Vault Key</button>
-                <button id="deleteKeyBtn">Delete Vault Key</button>
-              </div>
-            </div>
-            <div class="trace-box">
-              <h4>Background Sync</h4>
-              <div class="native-controls">
-                <button id="syncStartBtn">Start Sync</button>
-                <button id="syncStopBtn">Stop Sync</button>
-                <button id="syncStatusBtn">Sync Status</button>
-              </div>
-            </div>
-          </div>
-          <div id="nativeLog" class="trace-log" style="margin-top:12px;"></div>
-        </div>
-      </div>
-
-      <!-- Shard Output -->
-      <div class="advanced-card reveal" style="margin-top:20px;">
-        <h3>📦 Shard Output</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px;">SHA-256 CIDs and sizes for each shard.</p>
-        <div id="output" class="output"></div>
-      </div>
-    </section>
-
-    <!-- ═══ FOOTER ═══ -->
-    <footer class="footer">
-      <div class="footer-inner">
-        <div class="footer-brand">
-          <div class="footer-logo"></div>
-          <span class="footer-name">NeuroStore</span>
-        </div>
-        <ul class="footer-links">
-          <li><a href="https://github.com/Janushsahni/neurostore-next" target="_blank" rel="noopener">GitHub</a></li>
-          <li><a href="#technology">Technology</a></li>
-          <li><a href="#metrics">Metrics</a></li>
-          <li><a href="#demo">Demo</a></li>
-          <li><a href="#download">Download</a></li>
-        </ul>
-        <p class="footer-copy">&copy; 2026 NeuroStore Protocol. All rights reserved.</p>
-      </div>
-    </footer>
-
-    <script type="module" src="./app.js"></script>
-  </body>
 </html>

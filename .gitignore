@@ -2,9 +2,14 @@
 /node-data
 /web/pkg
 .DS_Store
+node_modules
 apps/tauri-shell/node_modules
+services/control-plane/node_modules
+services/s3-gateway/node_modules
 .tmp
 services/control-plane/.tmp
 deploy/.env.option-a.prod
 deploy/certs/*.pem
 deploy/k8s/generated/
+*.swp
+*.swo
