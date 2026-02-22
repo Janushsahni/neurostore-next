@@ -93,17 +93,17 @@ Saved setup config path:
 
 Windows `.exe` bundle:
 - Build artifact workflow: `.github/workflows/node-windows-release.yml`
-- Latest download URL: `https://github.com/janyshhh/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip`
+- Latest download URL: `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip`
 - End-user run command: `start-node.bat`
-- Windows installer URL: `https://github.com/janyshhh/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`
+- Windows installer URL: `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`
 - Service installer command: `install-service.bat` (run as Administrator)
 - Show node share address: `show-node-address.bat`
 - Guided upload helper: `upload-image.bat`
 - Guided retrieve helper: `retrieve-image.bat`
 - Local website launcher: `start-demo-portal.bat` (requires Node.js 20+)
 - Auto-update task installer: `install-updater-task.bat` (run as Administrator)
-- Update manifest URL: `https://github.com/janyshhh/neurostore-next/releases/latest/download/neuro-node-update.json`
-- Checksums URL: `https://github.com/janyshhh/neurostore-next/releases/latest/download/SHA256SUMS.txt`
+- Update manifest URL: `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-update.json`
+- Checksums URL: `https://github.com/Janushsahni/neurostore-next/releases/latest/download/SHA256SUMS.txt`
 
 Windows service internals:
 - Node service mode flag: `--run-as-service`
