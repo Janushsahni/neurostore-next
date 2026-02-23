@@ -1,0 +1,26 @@
+# Stage 1: Build Environment
+FROM rust:1.77-alpine as builder
+
+# Install build dependencies for Alpine
+RUN apk add --no-cache musl-dev gcc make pkgconfig openssl-dev
+
+WORKDIR /app
+COPY . .
+
+# Build the Sentinel binary specifically for Alpine Linux
+RUN cargo build --release --bin neuro-sentinel
+
+# Stage 2: Production Runtime
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates libgcc
+
+WORKDIR /app
+
+# Copy the compiled AI Sentinel binary from the builder stage
+COPY --from=builder /app/target/release/neuro-sentinel /usr/local/bin/neuro-sentinel
+
+# Configure default Production variables
+ENV RUST_LOG=info
+
+ENTRYPOINT ["neuro-sentinel"]

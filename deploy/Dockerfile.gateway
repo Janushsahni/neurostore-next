@@ -1,0 +1,31 @@
+# Stage 1: Build Environment
+FROM rust:1.77-alpine as builder
+
+# Install build dependencies for Alpine (musl libc, openssl, protobuf, libp2p needs)
+RUN apk add --no-cache musl-dev gcc make pkgconfig openssl-dev
+
+WORKDIR /app
+COPY . .
+
+# Build the Gateway binary specifically for Alpine Linux
+RUN cargo build --release --bin neurostore-gateway
+
+# Stage 2: Production Runtime
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates libgcc
+
+WORKDIR /app
+
+# Copy the compiled Axum binary from the builder stage
+COPY --from=builder /app/target/release/neurostore-gateway /usr/local/bin/neurostore-gateway
+
+# Expose the HTTP API Port (9009) and the LibP2P Kademlia Port (9010)
+EXPOSE 9009
+EXPOSE 9010
+
+# Configure default Production variables (these should be overridden in ECS/docker-compose)
+ENV RUST_LOG=info
+ENV DATABASE_URL=postgres://neuro_admin:neuro_dev_password_2026@postgres:5432/neurostore_production
+
+ENTRYPOINT ["neurostore-gateway"]

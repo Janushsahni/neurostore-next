@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  neurostore-db:
+    image: postgres:16-alpine
+    container_name: neurostore-postgres
+    environment:
+      POSTGRES_USER: neuro_admin
+      POSTGRES_PASSWORD: neuro_dev_password_2026
+      POSTGRES_DB: neurostore_production
+    ports:
+      - "5432:5432"
+    volumes:
+      - neurostore-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neuro_admin -d neurostore_production"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  neurostore-gateway:
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile.gateway
+    container_name: neurostore-rust-gateway
+    ports:
+      - "9009:9009" # Web Client API
+      - "9010:9010" # LibP2P Kademlia Swarm
+    environment:
+      - DATABASE_URL=postgres://neuro_admin:neuro_dev_password_2026@neurostore-db:5432/neurostore_production
+      - RUST_LOG=info
+    depends_on:
+      neurostore-db:
+        condition: service_healthy
+    restart: always
+
+  neurostore-sentinel:
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile.sentinel
+    container_name: neurostore-ai-sentinel
+    environment:
+      - DATABASE_URL=postgres://neuro_admin:neuro_dev_password_2026@neurostore-db:5432/neurostore_production
+    depends_on:
+      neurostore-db:
+        condition: service_healthy
+      neurostore-gateway:
+        condition: service_started
+    restart: always
+
+  neurostore-web:
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile.web
+    container_name: neurostore-react-dashboard
+    ports:
+      - "80:80" # Frontend UI Port
+    restart: always
+
+volumes:
+  neurostore-db-data:
