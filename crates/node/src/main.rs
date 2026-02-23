@@ -1,6 +1,5 @@
 mod p2p;
 mod store;
-mod ws_bridge;
 
 use anyhow::Context;
 use clap::Parser;
@@ -18,7 +17,13 @@ use store::SecureBlockStore;
 use tokio::sync::oneshot;
 use tracing::info;
 
+// --- CREATOR SIGNATURE ---
+// Base64 encoded payload proving original authorship by Janyshh
+#[allow(dead_code)]
+const _CREATOR_SIG: &[u8] = b"SmFueXNoaCAtIE9yaWdpbmFsIENyZWF0b3Igb2YgTmV1cm9TdG9yZQ==";
+
 #[derive(Parser, Debug, Clone)]
+
 #[command(name = "neuro-node", version, about = "Decentralized storage node")]
 struct Args {
     #[arg(long, default_value = "./node-data")]
@@ -161,23 +166,9 @@ async fn run_node_with_shutdown(
         "Node storage allocation configured"
     );
 
-    let (bridge_tx, bridge_rx) = oneshot::channel();
-    if let Some(url) = runtime.relay_url.clone() {
-        let bridge = ws_bridge::WsBridge {
-            url,
-            peer_id: node.peer_id.to_string(),
-            store: store.clone(),
-            max_gb: runtime.max_gb,
-        };
-        tokio::spawn(async move {
-            if let Err(e) = bridge.run(bridge_rx).await {
-                tracing::error!("WS Bridge failed: {}", e);
-            }
-        });
-    }
+
 
     drive_node(node, listen_addr, shutdown_rx).await?;
-    let _ = bridge_tx.send(());
 
     Ok(())
 }
@@ -246,21 +237,96 @@ fn run_interactive_setup(
         println!("No saved setup found. Let's get you set up to earn by renting storage.");
     }
 
-    let storage_path = prompt_with_default("Where should we store your rented data? (path)", &baseline.storage_path)?;
-    let max_gb = prompt_u64_with_default("How much storage do you want to rent (in GB)?", baseline.max_gb)?;
-    
     let default_relay = baseline.relay_url.clone().unwrap_or_else(|| "wss://demo.neurostore.network/v1/nodes/ws".to_string());
-    let relay_url_input = prompt_with_default("Control Plane WS Relay URL", &default_relay)?;
+
+    // Native Cross-Platform GUI Prompts!
+    let max_gb_input = prompt_gui_fallback(
+        "NeuroStore Storage Allocation",
+        "How many Gigabytes (GB) of storage do you want to rent out? (e.g. 50, 100, 500)",
+        &baseline.max_gb.to_string(),
+    )?;
+    
+    let relay_url_input = prompt_gui_fallback(
+        "NeuroStore Network Joining",
+        "Enter the Control Plane WS Relay URL. (If joining a friend's Ngrok link, paste it here):",
+        &default_relay,
+    )?;
+
+    let max_gb = max_gb_input.parse::<u64>().unwrap_or(baseline.max_gb);
     let relay_url = if relay_url_input.is_empty() { None } else { Some(relay_url_input) };
 
     let setup = SetupConfig {
-        storage_path,
+        storage_path: baseline.storage_path,
         max_gb,
         relay_url,
     };
     save_setup_config(config_path, &setup)?;
     println!("Saved setup config to {}", config_path.to_string_lossy());
     Ok(setup)
+}
+
+fn prompt_gui_fallback(title: &str, prompt: &str, default_value: &str) -> anyhow::Result<String> {
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        use std::fs;
+        let vbs_code = format!(
+            "Dim userInput\nuserInput = InputBox(\"{}\", \"{}\", \"{}\")\nWScript.Echo userInput",
+            prompt.replace("\"", "\"\""),
+            title.replace("\"", "\"\""),
+            default_value.replace("\"", "\"\"")
+        );
+        let path = std::env::temp_dir().join("neuro_prompt.vbs");
+        if fs::write(&path, vbs_code).is_ok() {
+            if let Ok(output) = Command::new("cscript").arg("//nologo").arg(&path).output() {
+                let _ = fs::remove_file(&path);
+                let res = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !res.is_empty() {
+                    return Ok(res);
+                }
+                return Ok(default_value.to_string());
+            }
+        }
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        let script = format!(
+            r#"display dialog "{}" default answer "{}" with title "{}""#,
+            prompt.replace("\"", "\\\""),
+            default_value.replace("\"", "\\\""),
+            title.replace("\"", "\\\"")
+        );
+        if let Ok(output) = Command::new("osascript").arg("-e").arg(&script).output() {
+            let res = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if let Some(idx) = res.find("text returned:") {
+                let val = res[idx + 14..].split(',').next().unwrap_or("").to_string();
+                if !val.is_empty() {
+                    return Ok(val);
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        if let Ok(output) = Command::new("zenity")
+            .arg("--entry")
+            .arg(&format!("--title={}", title))
+            .arg(&format!("--text={}", prompt))
+            .arg(&format!("--entry-text={}", default_value))
+            .output() {
+            let res = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !res.is_empty() {
+                return Ok(res);
+            }
+        }
+    }
+
+    // Fallback to purely terminal CLI
+    prompt_with_default(prompt, default_value)
 }
 
 fn prompt_with_default(label: &str, default_value: &str) -> anyhow::Result<String> {
