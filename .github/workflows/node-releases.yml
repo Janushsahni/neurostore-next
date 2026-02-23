@@ -1,0 +1,86 @@
+name: NeuroStore Multi-Platform Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger workflow on version tags (e.g. v0.4.0)
+
+jobs:
+  build-release:
+    name: Build & Release Node
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: neuro-node-linux-x86_64
+            executable: neuro-node
+            script_ext: sh
+            cmd: chmod +x start-node.sh
+          - os: macos-latest
+            target: aarch64-apple-darwin # Apple Silicon M1/M2/M3
+            artifact_name: neuro-node-macos-arm64
+            executable: neuro-node
+            script_ext: sh
+            cmd: chmod +x start-node.sh
+          - os: macos-latest
+            target: x86_64-apple-darwin # Intel Mac
+            artifact_name: neuro-node-macos-x86_64
+            executable: neuro-node
+            script_ext: sh
+            cmd: chmod +x start-node.sh
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: neuro-node-windows-x86_64
+            executable: neuro-node.exe
+            script_ext: bat
+            cmd: echo
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build Physical Node Daemon
+        run: cargo build -p neuro-node --release --target ${{ matrix.target }}
+
+      - name: Package Bundle (Mac/Linux)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir -p release_bundle
+          cp target/${{ matrix.target }}/release/${{ matrix.executable }} release_bundle/
+          
+          # Create Mac/Linux shell script
+          echo '#!/bin/bash' > release_bundle/start-node.sh
+          echo 'echo "========================================================"' >> release_bundle/start-node.sh
+          echo 'echo "      NEUROSTORE DECENTRALIZED STORAGE NODE (V4)      "' >> release_bundle/start-node.sh
+          echo 'echo "========================================================"' >> release_bundle/start-node.sh
+          echo 'read -p "How many Gigabytes (GB) of storage do you want to rent out? (e.g. 50): " MAX_GB' >> release_bundle/start-node.sh
+          echo 'chmod +x ./${{ matrix.executable }}' >> release_bundle/start-node.sh
+          echo './${{ matrix.executable }} --storage-path ./neuro-data --max-gb $MAX_GB' >> release_bundle/start-node.sh
+          
+          chmod +x release_bundle/start-node.sh
+          tar -czvf ${{ matrix.artifact_name }}.tar.gz -C release_bundle .
+
+      - name: Package Bundle (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir release_bundle
+          cp target/${{ matrix.target }}/release/${{ matrix.executable }} release_bundle/
+          cp start-node.bat release_bundle/
+          Compress-Archive -Path release_bundle/* -DestinationPath ${{ matrix.artifact_name }}.zip
+
+      - name: Upload Binaries to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            *.tar.gz
+            *.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
