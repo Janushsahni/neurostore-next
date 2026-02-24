@@ -102,6 +102,8 @@ struct PolicyOutput {
     trend: String,              // stable | improving | degrading
     trend_velocity: f64,        // rate of change
     action: String,             // promote | hold | probation | quarantine | evict
+    churn_probability: f64,     // 0.0 - 1.0 risk of node dropping offline
+    price_per_gb: f64,          // Dynamic $NEURO payout rate
     confidence: f64,            // 0.0 - 1.0
     observations: u64,
     slo_violations: SloStatus,
@@ -277,6 +279,29 @@ fn score_bandwidth(bandwidth_mbps: f64, slo_mbps: f64) -> f64 {
     }
 }
 
+fn compute_churn_probability(reputation: f64, anomaly_level: &str, trend_velocity: f64) -> f64 {
+    // High anomaly, dropping reputation, negative velocity = high churn risk
+    let base: f64 = if reputation < 40.0 { 0.5 } else { 0.05 };
+    let trend_hit: f64 = if trend_velocity < -2.0 { 0.25 } else { 0.0 };
+    let anomaly_hit: f64 = if anomaly_level == "critical" { 0.2 } else if anomaly_level == "warn" { 0.1 } else { 0.0 };
+    (base + trend_hit + anomaly_hit).clamp(0.01, 0.99)
+}
+
+fn compute_dynamic_price(reputation: f64, action: &str) -> f64 {
+    // Top nodes command a premium. Degraded nodes earn pennies.
+    // Base price is 0.005 $NEURO per GB.
+    let base = 0.005;
+    let multiplier = match action {
+        "promote" => 1.5,
+        "hold" => 1.0,
+        "probation" => 0.5,
+        "quarantine" => 0.1,
+        "evict" => 0.0,
+        _ => 1.0,
+    };
+    (base * multiplier * (reputation / 100.0)).clamp(0.0, 0.05)
+}
+
 fn compute_composite_score(factors: &ScoreFactors) -> f64 {
     // Weighted combination with verification as a gate
     let raw = factors.latency_score * 0.30
@@ -434,6 +459,8 @@ fn process_static(metrics: &NodeMetrics, args: &Args) -> PolicyOutput {
         trend: "stable".to_string(),
         trend_velocity: 0.0,
         action: if score >= 80.0 { "promote" } else { "hold" }.to_string(),
+        churn_probability: 0.1,
+        price_per_gb: compute_dynamic_price(score, if score >= 80.0 { "promote" } else { "hold" }),
         confidence: 0.5,
         observations: 1,
         slo_violations: slo,
@@ -536,6 +563,8 @@ fn process_adaptive(model: &mut PeerModel, metrics: &NodeMetrics, args: &Args) -
         trend: trend_label.to_string(),
         trend_velocity: (model.trend.velocity * 1000.0).round() / 1000.0,
         action: action.to_string(),
+        churn_probability: compute_churn_probability(model.reputation, anomaly_lvl, model.trend.velocity),
+        price_per_gb: compute_dynamic_price(model.reputation, action),
         confidence: (confidence * 1000.0).round() / 1000.0,
         observations: model.observations,
         slo_violations: slo,

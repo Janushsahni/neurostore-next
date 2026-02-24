@@ -1,0 +1,46 @@
+[package]
+name = "neurostore-gateway"
+version = "0.3.0"
+edition = "2021"
+description = "NeuroStore V3 Enterprise S3 API Gateway & P2P Router"
+
+[dependencies]
+# Web Server & Async
+axum = { version = "0.7", features = ["multipart"] }
+tokio = { version = "1.36", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
+moka = { version = "0.12", features = ["future"] }
+
+# Serialization & Ecosystem
+serde = { workspace = true }
+serde_json = "1.0"
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono = { version = "0.4", features = ["serde"] }
+bytes = { workspace = true }
+base64 = "0.22"
+hex = { workspace = true }
+dotenvy = "0.15"
+
+# Database (PostgreSQL)
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
+
+# Cryptography & Security
+jsonwebtoken = "9.3"
+argon2 = "0.5" # Industry standard password hashing (upgrade from bcrypt)
+rand = { workspace = true }
+sha2 = { workspace = true }
+
+# P2P & Erasure Coding (Phases 9 & 10)
+reed-solomon-erasure = "6.0"
+libp2p = { version = "0.53", features = ["tokio", "tcp", "noise", "yamux", "kad", "request-response", "identify", "websocket", "dns", "macros", "relay", "autonat"] }
+md-5 = "0.10.6"
+bs58 = "0.5.1"
+futures = "0.3"
+bincode = "1.0"
+async-trait = "0.1"
+neuro-protocol = { path = "../protocol" }
+

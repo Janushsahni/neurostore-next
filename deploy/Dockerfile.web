@@ -1,7 +1,9 @@
 FROM nginx:alpine
 
+# Inject the unified Gateway Reverse Proxy configuration
+COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
+
 # Copy the static web frontend and compiled WebAssembly to the default Nginx HTML path
-# Uses 'web' instead of '../web' because docker-compose context is the repo root
 COPY web /usr/share/nginx/html
 
 # Expose port 80 for UI traffic

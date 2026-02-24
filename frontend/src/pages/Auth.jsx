@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HardDrive, Mail, Lock, User, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
 
-const API_BASE = "http://localhost:9009";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:9009";
 
 export const Login = ({ onAuth }) => {
     const [email, setEmail] = useState('');
@@ -34,7 +34,14 @@ export const Login = ({ onAuth }) => {
 
             onAuth(data.user);
         } catch (err) {
-            setError(err.message);
+            // OWASP Database Error Masking
+            const msg = err.message.toLowerCase();
+            if (msg.includes('sql') || msg.includes('database') || msg.includes('postgres')) {
+                setError("An internal system error occurred. Please try again later.");
+                console.error("[OWASP Security] Masked raw database leak from UI.");
+            } else {
+                setError(err.message);
+            }
         } finally {
             setIsLoading(false);
         }
@@ -136,7 +143,14 @@ export const Register = ({ onAuth }) => {
 
             onAuth(data.user);
         } catch (err) {
-            setError(err.message);
+            // OWASP Database Error Masking
+            const msg = err.message.toLowerCase();
+            if (msg.includes('sql') || msg.includes('database') || msg.includes('postgres')) {
+                setError("An internal system error occurred. Please try again later.");
+                console.error("[OWASP Security] Masked raw database leak from UI.");
+            } else {
+                setError(err.message);
+            }
         } finally {
             setIsLoading(false);
         }

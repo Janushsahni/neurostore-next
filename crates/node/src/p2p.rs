@@ -5,7 +5,7 @@ use libp2p::{
     gossipsub::{self, IdentTopic as Topic, MessageAuthenticity, ValidationMode},
     identify, identity,
     kad::{self, store::MemoryStore},
-    noise, ping,
+    noise, ping, relay, autonat, dcutr,
     request_response::{
         self, Behaviour as RequestResponse, Codec as RequestResponseCodec,
         Event as RequestResponseEvent, Message as RequestResponseMessage,
@@ -96,6 +96,9 @@ pub struct NeuroBehaviour {
     pub identify: identify::Behaviour,
     pub ping: ping::Behaviour,
     pub chunk: RequestResponse<ChunkCodec>,
+    pub relay: relay::client::Behaviour,
+    pub autonat: autonat::Behaviour,
+    pub dcutr: dcutr::Behaviour,
 }
 
 #[derive(Debug)]
@@ -105,6 +108,9 @@ pub enum NeuroEvent {
     Identify(identify::Event),
     Ping(ping::Event),
     Chunk(RequestResponseEvent<ChunkCommand, ChunkReply>),
+    Relay(relay::client::Event),
+    Autonat(autonat::Event),
+    Dcutr(dcutr::Event),
 }
 
 impl From<kad::Event> for NeuroEvent {
@@ -132,6 +138,21 @@ impl From<RequestResponseEvent<ChunkCommand, ChunkReply>> for NeuroEvent {
         Self::Chunk(v)
     }
 }
+impl From<relay::client::Event> for NeuroEvent {
+    fn from(v: relay::client::Event) -> Self {
+        Self::Relay(v)
+    }
+}
+impl From<autonat::Event> for NeuroEvent {
+    fn from(v: autonat::Event) -> Self {
+        Self::Autonat(v)
+    }
+}
+impl From<dcutr::Event> for NeuroEvent {
+    fn from(v: dcutr::Event) -> Self {
+        Self::Dcutr(v)
+    }
+}
 
 pub struct NeuroNode {
     pub peer_id: PeerId,
@@ -142,6 +163,7 @@ pub struct NeuroNode {
     pub audit_replay_guard: Mutex<HashMap<String, u64>>,
     pub bootstrap_addrs: Vec<Multiaddr>,
     pub allowlist: HashSet<PeerId>,
+    pub relay_url: Option<String>,
 }
 
 pub async fn build_node(
@@ -149,13 +171,18 @@ pub async fn build_node(
     keypair: identity::Keypair,
     bootstrap_addrs: Vec<Multiaddr>,
     allowlist: HashSet<PeerId>,
+    relay_url: Option<String>,
 ) -> Result<NeuroNode> {
     let peer_id = PeerId::from(keypair.public());
 
     let noise_config = noise::Config::new(&keypair)
         .map_err(|e| anyhow::anyhow!("Noise key generation failed: {e}"))?;
 
-    let transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
+    let (relay_transport, relay_client) = relay::client::new(peer_id);
+    let tcp_transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true));
+
+    let transport = relay_transport
+        .or_transport(tcp_transport)
         .upgrade(libp2p::core::upgrade::Version::V1Lazy)
         .authenticate(noise_config)
         .multiplex(yamux::Config::default())
@@ -187,12 +214,18 @@ pub async fn build_node(
         request_response::Config::default(),
     );
 
+    let autonat = autonat::Behaviour::new(peer_id, autonat::Config::default());
+    let dcutr = dcutr::Behaviour::new(peer_id);
+
     let behaviour = NeuroBehaviour {
         kademlia,
         gossipsub,
         identify,
         ping,
         chunk,
+        relay: relay_client,
+        autonat,
+        dcutr,
     };
 
     let swarm = Swarm::new(
@@ -212,6 +245,7 @@ pub async fn build_node(
         audit_replay_guard: Mutex::new(HashMap::new()),
         bootstrap_addrs,
         allowlist,
+        relay_url,
     })
 }
 
@@ -225,6 +259,26 @@ pub async fn drive_node(
         .behaviour_mut()
         .gossipsub
         .subscribe(&node.topic_announce)?;
+
+    // V7 AutoNAT & DCUtR NAT Hole-Punching
+    // We negotiate a circuit via the Relay server. This enables 99% of residential 
+    // nodes behind NAT firewalls to accept direct libp2p uploads bypassing routers.
+    if let Some(relay_str) = &node.relay_url {
+        if let Ok(relay_addr) = relay_str.parse::<Multiaddr>() {
+            info!("Dialing Web3 NAT Relay for Traversal: {}", relay_addr);
+            let _ = node.swarm.dial(relay_addr.clone());
+            
+            // Arm the DCUtR protocol by explicitly listening on the proxy circuit
+            let circuit_listen = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
+            match node.swarm.listen_on(circuit_listen.clone()) {
+                Ok(_) => info!("Hole-Punch Circuit Armored: Listening on {}", circuit_listen),
+                Err(e) => warn!("Failed to arm DCUtR relay circuit: {}", e),
+            }
+        } else {
+            warn!("Failed to parse Multiaddr from Relay URL: {}. NAT traversal inactive.", relay_str);
+        }
+    }
+
     for addr in &node.bootstrap_addrs {
         let _ = node.swarm.dial(addr.clone());
         if let Some(peer) = peer_id_from_multiaddr(addr) {

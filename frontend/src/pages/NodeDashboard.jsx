@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, HardDrive, DollarSign, Download, Server, Cpu, AlertTriangle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 export const NodeDashboard = () => {
     const [nodes, setNodes] = useState([]);
     const [health, setHealth] = useState({ total_nodes: 0, online_nodes: 0, network_health: '0%', active_shards: 0 });
     const [isLoading, setIsLoading] = useState(true);
 
-    const S3_GATEWAY_URL = "http://localhost:9009";
+    const S3_GATEWAY_URL = import.meta.env.VITE_API_URL || "http://localhost:9009";
 
     const fetchNodeData = async () => {
         try {
@@ -25,6 +27,7 @@ export const NodeDashboard = () => {
             }
         } catch (err) {
             console.error("Failed to fetch node telemetry", err);
+            // Throttle toast errors so it doesn't spam on the 3s interval if backend is dead
         } finally {
             setIsLoading(false);
         }
@@ -34,6 +37,7 @@ export const NodeDashboard = () => {
         fetchNodeData();
         const interval = setInterval(fetchNodeData, 3000);
         return () => clearInterval(interval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
@@ -56,32 +60,32 @@ export const NodeDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-card p-6 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="glass-card p-6 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
                         <Activity size={64} />
                     </div>
                     <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Network Health</h3>
-                    <div className="text-4xl font-display font-bold text-white mb-1">{health.network_health}</div>
+                    <div className="text-4xl font-display font-bold text-white mb-1 group-hover:text-green-400 transition-colors">{health.network_health}</div>
                     <p className="text-xs text-green-400 flex items-center gap-1">{health.online_nodes} / {health.total_nodes} Nodes Online</p>
-                </div>
+                </motion.div>
 
-                <div className="glass-card p-6 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="glass-card p-6 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
                         <HardDrive size={64} />
                     </div>
                     <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Global Shards</h3>
-                    <div className="text-4xl font-display font-bold text-white mb-1">{health.active_shards} <span className="text-xl text-muted">pieces</span></div>
+                    <div className="text-4xl font-display font-bold text-white mb-1">{health.active_shards} <span className="text-xl text-muted group-hover:text-white/70 transition-colors">pieces</span></div>
                     <p className="text-xs text-muted flex items-center gap-1">Distributed globally</p>
-                </div>
+                </motion.div>
 
-                <div className="glass-card p-6 relative overflow-hidden border-primary/30 bg-primary/5">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 text-primary">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="glass-card p-6 relative overflow-hidden border-primary/30 bg-primary/5 group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 text-primary group-hover:scale-110 transition-transform duration-500">
                         <DollarSign size={64} />
                     </div>
                     <h3 className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">Your Earnings</h3>
-                    <div className="text-4xl font-display font-bold text-white mb-1">$0.00</div>
+                    <div className="text-4xl font-display font-bold text-white mb-1 group-hover:text-primary transition-colors">$0.00</div>
                     <p className="text-xs text-primary flex items-center gap-1">Start a node to earn</p>
-                </div>
+                </motion.div>
             </div>
 
             {/* Neural Heatmap Visualizer */}
@@ -95,8 +99,8 @@ export const NodeDashboard = () => {
                             key={i}
                             title={`Node ${node.id} - ${node.status}`}
                             className={`h-8 rounded-sm transition-colors duration-500 ${node.status === 'Online'
-                                    ? (node.latency > 100 ? 'bg-yellow-500/50' : 'bg-green-500/50 border border-green-400/30')
-                                    : 'bg-red-500/50'
+                                ? (node.latency > 100 ? 'bg-yellow-500/50' : 'bg-green-500/50 border border-green-400/30')
+                                : 'bg-red-500/50'
                                 }`}
                         ></div>
                     ))}
@@ -128,18 +132,35 @@ export const NodeDashboard = () => {
                         </thead>
                         <tbody>
                             {isLoading ? (
-                                <tr><td colSpan="6" className="p-8 text-center text-muted">Booting AI Sentinel...</td></tr>
-                            ) : nodes.map(node => (
-                                <tr key={node.id} className={`border-t border-border hover:bg-background/40 transition-colors ${node.status === 'Offline' ? 'opacity-50' : ''}`}>
+                                <>
+                                    {[1, 2, 3].map((i) => (
+                                        <tr key={i} className="border-t border-border/50">
+                                            <td className="p-4"><div className="h-4 bg-muted/20 animate-pulse rounded w-24"></div></td>
+                                            <td className="p-4"><div className="h-5 bg-muted/20 animate-pulse rounded-full w-20"></div></td>
+                                            <td className="p-4"><div className="h-2 bg-muted/20 animate-pulse rounded-full w-24 mt-2"></div></td>
+                                            <td className="p-4"><div className="h-4 bg-muted/20 animate-pulse rounded w-12"></div></td>
+                                            <td className="p-4"><div className="h-4 bg-muted/20 animate-pulse rounded w-16"></div></td>
+                                            <td className="p-4"><div className="h-4 bg-muted/20 animate-pulse rounded w-12"></div></td>
+                                        </tr>
+                                    ))}
+                                </>
+                            ) : nodes.map((node, index) => (
+                                <motion.tr
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.2, delay: index * 0.05 }}
+                                    key={node.id}
+                                    className={`border-t border-border/50 hover:bg-background/40 transition-colors ${node.status === 'Offline' ? 'opacity-50' : ''}`}
+                                >
                                     <td className="p-4 font-mono text-gray-300">
                                         {node.id.substring(0, 12)}...
                                     </td>
                                     <td className="p-4">
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${node.status === 'Online'
-                                                ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                                                : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                            ? 'bg-green-500/10 text-green-400 border-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.1)]'
+                                            : 'bg-red-500/10 text-red-400 border-red-500/20'
                                             }`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${node.status === 'Online' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${node.status === 'Online' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
                                             {node.status}
                                         </span>
                                     </td>
@@ -159,7 +180,7 @@ export const NodeDashboard = () => {
                                         </span>
                                     </td>
                                     <td className="p-4 text-gray-300">{node.bandwidth} TB</td>
-                                </tr>
+                                </motion.tr>
                             ))}
                         </tbody>
                     </table>

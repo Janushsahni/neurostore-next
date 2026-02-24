@@ -25,7 +25,10 @@ libp2p = { version = "0.53", features = [
   "ping",
   "request-response",
   "tokio",
-  "macros"
+  "macros",
+  "relay",
+  "autonat",
+  "dcutr"
 ] }
 serde_json = "1"
 bincode = "1"
@@ -35,7 +38,6 @@ futures = "0.3"
 async-trait = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
-tokio-tungstenite = { version = "0.20.1", features = ["rustls-tls-native-roots"] }
 libp2p-identity = "0.2"
 base64 = "0.22"
 
@@ -44,3 +46,11 @@ windows-service = "0.7"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
+
+[profile.release]
+opt-level = "z"  # Optimize for size
+lto = true       # Link Time Optimization (Removes dead code)
+strip = true     # Strip symbols from binary
+codegen-units = 1 # Maximize size reduction
+panic = "abort"  # Remove panic unwinding overhead
+

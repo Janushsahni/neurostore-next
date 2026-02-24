@@ -1,5 +1,5 @@
 # Stage 1: Build Environment
-FROM rust:1.77-alpine as builder
+FROM rust:alpine as builder
 
 # Install build dependencies for Alpine
 RUN apk add --no-cache musl-dev gcc make pkgconfig openssl-dev

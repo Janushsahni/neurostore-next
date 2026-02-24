@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 mod p2p;
 mod store;
 
@@ -156,7 +157,7 @@ async fn run_node_with_shutdown(
         .iter()
         .map(|s| libp2p::PeerId::from_str(s))
         .collect::<Result<HashSet<_>, _>>()?;
-    let node = build_node(store.clone(), keypair, bootstrap_addrs, allowlist).await?;
+    let node = build_node(store.clone(), keypair, bootstrap_addrs, allowlist, runtime.relay_url.clone()).await?;
     let listen_addr = parse_listen_multiaddr(&runtime.listen)?;
 
     info!(peer_id = %node.peer_id, "Node identity loaded");

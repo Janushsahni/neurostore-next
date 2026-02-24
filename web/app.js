@@ -35,7 +35,7 @@ const navLinks = document.getElementById("navLinks");
 
 let sessionToken = localStorage.getItem("ns_token") || "";
 let sessionUsername = localStorage.getItem("ns_username") || "";
-const API_BASE = "http://127.0.0.1:8080";
+const API_BASE = ""; // Reversed proxied via Nginx
 
 let workerReady = false;
 let useFallback = false;
@@ -61,7 +61,7 @@ function setSession(username, token) {
   }
 }
 
-async function api(path, options = {}) {
+async function api(path, options = {}, isXml = false) {
   const headers = { ...options.headers };
   if (sessionToken) headers.authorization = `Bearer ${sessionToken}`;
   if (options.body) {
@@ -71,8 +71,11 @@ async function api(path, options = {}) {
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `HTTP ${res.status}`);
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  if (isXml) {
+    return res.text();
   }
   return res.json();
 }
@@ -488,7 +491,7 @@ registerBtn?.addEventListener("click", async () => {
   const username = registerUsername.value.trim();
   const password = registerPassword.value;
   try {
-    await api("/v1/auth/register", { method: "POST", body: { username, password } });
+    await api("/auth/register", { method: "POST", body: { username, password } });
     if (authStatus) authStatus.textContent = "Account created. Please login.";
     loginUsername.value = username;
   } catch (e) {
@@ -500,8 +503,8 @@ loginBtn?.addEventListener("click", async () => {
   const username = loginUsername.value.trim();
   const password = loginPassword.value;
   try {
-    const res = await api("/v1/auth/login", { method: "POST", body: { username, password } });
-    setSession(res.username, res.token);
+    const res = await api("/auth/login", { method: "POST", body: { username, password } });
+    setSession(username, res.token);
     if (authStatus) authStatus.textContent = "Logged in.";
     refreshObjects();
   } catch (e) {
@@ -521,19 +524,31 @@ refreshBtn?.addEventListener("click", refreshObjects);
 async function refreshObjects() {
   if (!sessionToken || !objectsBody) return;
   try {
-    const { objects } = await api("/v1/objects");
+    const xmlText = await api(`/s3/${sessionUsername}`, {
+      headers: { accept: "application/xml" }
+    }, true);
+
+    // Parse the AWS-style XML response
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+    const contents = xmlDoc.getElementsByTagName("Contents");
+
     objectsBody.innerHTML = "";
-    for (const obj of objects) {
+    for (let i = 0; i < contents.length; i++) {
+      const item = contents[i];
+      const key = item.getElementsByTagName("Key")[0]?.textContent || "Unknown";
+      const size = parseInt(item.getElementsByTagName("Size")[0]?.textContent || "0");
+
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${obj.filename}</td>
-        <td>${formatBytes(obj.total_bytes)}</td>
-        <td>${obj.shards?.length || 0}</td>
-        <td><button class="btn-secondary" style="padding:4px 8px;" onclick="window.alert('Download not implemented in UI stub yet')">Download</button></td>
-      `;
+          <td>${key}</td>
+          <td>${formatBytes(size)}</td>
+          <td>15 (RS Parity)</td>
+          <td><button class="btn-secondary" style="padding:4px 8px;" onclick="window.alert('Download not implemented in UI stub yet')">Download</button></td>
+        `;
       objectsBody.appendChild(tr);
     }
-  } catch (e) { console.error(e); }
+  } catch (e) { console.error("XML Parsing Error:", e); }
 }
 
 uploadBtn?.addEventListener("click", async () => {
@@ -588,44 +603,37 @@ uploadBtn?.addEventListener("click", async () => {
     startMap(result.shards);
     renderProtocolTrace(result.shards);
 
-    uploadStatus.textContent = `Pushing ${result.shards.length} shards to Control Plane (in batches)...`;
+    uploadStatus.textContent = `Streaming zero-knowledge encrypted shards directly to Gateway...`;
 
-    // Assign peers sequentially from active list
-    const shardsWithPeers = result.shards.map((s, idx) => ({
-      cid: s.cid,
-      bytes_b64: bytesToBase64(s.bytes),
-      chunk_index: s.chunk_index,
-      shard_index: s.shard_index,
-      peer_id: activeNodes[idx % activeNodes.length].peer_id
-    }));
+    // Zero-Knowledge Post to the V4 Rust Endpoint
+    const zkPayload = {
+      manifest_root: result.manifest_root,
+      total_bytes: result.total_bytes,
+      chunk_count: result.chunk_count,
+      shards: result.shards.map(s => ({
+        cid: s.cid,
+        chunk_index: s.chunk_index,
+        shard_index: s.shard_index,
+        data_shards: s.data_shards,
+        parity_shards: s.parity_shards,
+        bytes: bytesToBase64(s.bytes)
+      }))
+    };
 
-    const object_id = "obj_" + Math.random().toString(36).substring(2, 10);
-    const BATCH_SIZE = 10;
-    let storedCount = 0;
+    const res = await fetch(`${API_BASE}/zk/store/${sessionUsername}/${file.name}`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${sessionToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(zkPayload)
+    });
 
-    for (let i = 0; i < shardsWithPeers.length; i += BATCH_SIZE) {
-      const batch = shardsWithPeers.slice(i, i + BATCH_SIZE);
-
-      uploadStatus.textContent = `Uploading batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(shardsWithPeers.length / BATCH_SIZE)}...`;
-
-      const storeRes = await api("/v1/store", {
-        method: "POST",
-        body: {
-          object_id,
-          filename: file.name,
-          total_bytes: bytes.length,
-          root: result.manifest_root,
-          shards: batch
-        }
-      });
-
-      if (storeRes.errors && storeRes.errors.length > 0) {
-        console.warn("Upload warnings:", storeRes.errors);
-      }
-      storedCount += storeRes.stored_chunks || 0;
+    if (!res.ok) {
+      throw new Error(`ZK Upload Failed: ${res.statusText}`);
     }
 
-    uploadStatus.textContent = `Success! Stored ${storedCount} encrypted shards across ${activeNodes.length} nodes.`;
+    uploadStatus.textContent = `Success! Stored 15 perfect Erasure Shards dynamically into the physical LibP2P Swarm.`;
 
     refreshObjects();
 

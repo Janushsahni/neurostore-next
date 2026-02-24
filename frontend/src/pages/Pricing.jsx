@@ -1,8 +1,30 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Check, Zap, Server, Shield } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Check, CreditCard, Lock, X, Loader2 } from 'lucide-react';
 
 export const Pricing = () => {
+    const navigate = useNavigate();
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const handleSubscribe = () => {
+        const token = localStorage.getItem('neuro_token');
+        if (!token) {
+            navigate('/login');
+            return;
+        }
+        setIsCheckoutOpen(true);
+    };
+
+    const processPayment = () => {
+        setIsProcessing(true);
+        setTimeout(() => {
+            localStorage.setItem('neuro_plan', 'pro');
+            setIsProcessing(false);
+            setIsCheckoutOpen(false);
+            navigate('/dashboard/drive');
+        }, 1500); // Simulate API latency
+    };
     return (
         <div className="min-h-[calc(100vh-80px)] p-8 max-w-6xl mx-auto py-20">
             <div className="text-center mb-16">
@@ -54,9 +76,9 @@ export const Pricing = () => {
                         <li className="flex items-center gap-3 text-sm"><Check className="text-primary" size={18} /> 10 Gbps Edge Routing</li>
                         <li className="flex items-center gap-3 text-sm"><Check className="text-primary" size={18} /> Blockchain CID Verification</li>
                     </ul>
-                    <Link to="/register" className="w-full text-center py-3 rounded-lg bg-gradient-to-r from-blue-500 to-primary text-background font-bold hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all">
+                    <button onClick={handleSubscribe} className="w-full text-center py-3 rounded-lg bg-gradient-to-r from-blue-500 to-primary text-background font-bold hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all">
                         Subscribe Now
-                    </Link>
+                    </button>
                 </div>
 
                 {/* Enterprise Plan */}
@@ -81,6 +103,58 @@ export const Pricing = () => {
                 </div>
 
             </div>
+
+            {/* Simulated Secure Checkout Modal */}
+            {isCheckoutOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-card w-full max-w-md rounded-2xl flex flex-col overflow-hidden border border-border shadow-2xl relative">
+                        <div className="flex items-center justify-between p-4 border-b border-border bg-background">
+                            <h3 className="font-bold flex items-center gap-2">
+                                <Lock size={18} className="text-green-400" />
+                                Secure Checkout
+                            </h3>
+                            <button onClick={() => setIsCheckoutOpen(false)} className="p-2 hover:bg-white/10 rounded-lg transition-colors" disabled={isProcessing}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <h4 className="text-xl font-bold mb-1">Pro Node Subscription</h4>
+                            <p className="text-muted text-sm mb-6">1 Terabyte of encrypted storage. $10.00 / month.</p>
+
+                            <div className="space-y-4 mb-8">
+                                <div>
+                                    <label className="block text-xs text-muted mb-1">Card Number</label>
+                                    <div className="relative">
+                                        <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
+                                        <input type="text" placeholder="•••• •••• •••• ••••" className="w-full bg-background border border-border rounded py-2.5 pl-9 pr-3 text-sm focus:border-primary/50 text-white font-mono" readOnly value="4242 4242 4242 4242" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs text-muted mb-1">Expiry</label>
+                                        <input type="text" placeholder="MM/YY" className="w-full bg-background border border-border rounded py-2.5 px-3 text-sm focus:border-primary/50 text-white" readOnly value="12/28" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-muted mb-1">CVC</label>
+                                        <input type="text" placeholder="123" className="w-full bg-background border border-border rounded py-2.5 px-3 text-sm focus:border-primary/50 text-white" readOnly value="123" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onClick={processPayment} disabled={isProcessing} className="w-full bg-primary text-background font-bold rounded-lg py-3 flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50">
+                                {isProcessing ? (
+                                    <><Loader2 className="animate-spin" size={18} /> Processing...</>
+                                ) : (
+                                    <>Pay $10.00</>
+                                )}
+                            </button>
+                            <p className="text-center text-xs text-muted mt-4 flex items-center justify-center gap-1">
+                                <Lock size={12} /> Payments securely processed by Stripe.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -815,76 +815,73 @@ async fn run_retrieve(args: RetrieveArgs) -> Result<()> {
             break;
         }
 
-        match swarm.select_next_some().await {
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(event)) => match event {
-                RequestResponseEvent::Message { message, .. } => {
-                    if let RequestResponseMessage::Response {
-                        request_id,
-                        response,
-                    } = message
-                    {
-                        if let Some(mut state) = inflight.remove(&request_id) {
-                            match response {
-                                ChunkReply::Retrieve(reply) => {
-                                    let key = (state.chunk_index, state.shard_index);
-                                    if completed.contains_key(&key) {
+        if let SwarmEvent::Behaviour(UploaderEvent::Chunk(event)) = swarm.select_next_some().await { match event {
+            RequestResponseEvent::Message { message, .. } => {
+                if let RequestResponseMessage::Response {
+                    request_id,
+                    response,
+                } = message
+                {
+                    if let Some(mut state) = inflight.remove(&request_id) {
+                        match response {
+                            ChunkReply::Retrieve(reply) => {
+                                let key = (state.chunk_index, state.shard_index);
+                                if completed.contains_key(&key) {
+                                    continue;
+                                }
+
+                                if reply.found
+                                    && reply.verify_proof(&state.cid)
+                                    && reply.is_fresh(
+                                        chrono::Utc::now().timestamp_millis() as u64,
+                                        max_age_ms,
+                                    )
+                                    && sha256_hex(&reply.data) == state.cid
+                                {
+                                    if let Some(template) = manifest
+                                        .shards
+                                        .iter()
+                                        .find(|x| x.cid == state.cid)
+                                        .map(manifest_shard_to_template)
+                                    {
+                                        let mut shard = template;
+                                        shard.bytes = reply.data;
+                                        completed.insert(key, shard);
+                                        println!(
+                                            "retrieve cid={} chunk={} shard={} via_attempt={}",
+                                            state.cid,
+                                            state.chunk_index,
+                                            state.shard_index,
+                                            state.attempt + 1
+                                        );
                                         continue;
                                     }
-
-                                    if reply.found
-                                        && reply.verify_proof(&state.cid)
-                                        && reply.is_fresh(
-                                            chrono::Utc::now().timestamp_millis() as u64,
-                                            max_age_ms,
-                                        )
-                                        && sha256_hex(&reply.data) == state.cid
-                                    {
-                                        if let Some(template) = manifest
-                                            .shards
-                                            .iter()
-                                            .find(|x| x.cid == state.cid)
-                                            .map(manifest_shard_to_template)
-                                        {
-                                            let mut shard = template;
-                                            shard.bytes = reply.data;
-                                            completed.insert(key, shard);
-                                            println!(
-                                                "retrieve cid={} chunk={} shard={} via_attempt={}",
-                                                state.cid,
-                                                state.chunk_index,
-                                                state.shard_index,
-                                                state.attempt + 1
-                                            );
-                                            continue;
-                                        }
-                                    }
-
-                                    state.attempt += 1;
-                                    if state.attempt < state.peers.len() {
-                                        pending.push_back(state);
-                                    }
                                 }
-                                _ => {
-                                    return Err(anyhow!(
-                                        "unexpected response type for retrieve request"
-                                    ))
+
+                                state.attempt += 1;
+                                if state.attempt < state.peers.len() {
+                                    pending.push_back(state);
                                 }
+                            }
+                            _ => {
+                                return Err(anyhow!(
+                                    "unexpected response type for retrieve request"
+                                ))
                             }
                         }
                     }
                 }
-                RequestResponseEvent::OutboundFailure { request_id, .. } => {
-                    if let Some(mut state) = inflight.remove(&request_id) {
-                        state.attempt += 1;
-                        if state.attempt < state.peers.len() {
-                            pending.push_back(state);
-                        }
+            }
+            RequestResponseEvent::OutboundFailure { request_id, .. } => {
+                if let Some(mut state) = inflight.remove(&request_id) {
+                    state.attempt += 1;
+                    if state.attempt < state.peers.len() {
+                        pending.push_back(state);
                     }
                 }
-                _ => {}
-            },
+            }
             _ => {}
-        }
+        } }
 
         if pending.is_empty() && inflight.is_empty() {
             break;
@@ -1275,76 +1272,73 @@ async fn run_retrieve_raw(args: RetrieveRawArgs) -> Result<()> {
             break;
         }
 
-        match swarm.select_next_some().await {
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(event)) => match event {
-                RequestResponseEvent::Message { message, .. } => {
-                    if let RequestResponseMessage::Response {
-                        request_id,
-                        response,
-                    } = message
-                    {
-                        if let Some(mut state) = inflight.remove(&request_id) {
-                            match response {
-                                ChunkReply::Retrieve(reply) => {
-                                    let key = (state.chunk_index, state.shard_index);
-                                    if completed.contains_key(&key) {
+        if let SwarmEvent::Behaviour(UploaderEvent::Chunk(event)) = swarm.select_next_some().await { match event {
+            RequestResponseEvent::Message { message, .. } => {
+                if let RequestResponseMessage::Response {
+                    request_id,
+                    response,
+                } = message
+                {
+                    if let Some(mut state) = inflight.remove(&request_id) {
+                        match response {
+                            ChunkReply::Retrieve(reply) => {
+                                let key = (state.chunk_index, state.shard_index);
+                                if completed.contains_key(&key) {
+                                    continue;
+                                }
+
+                                if reply.found
+                                    && reply.verify_proof(&state.cid)
+                                    && reply.is_fresh(
+                                        chrono::Utc::now().timestamp_millis() as u64,
+                                        max_age_ms,
+                                    )
+                                    && sha256_hex(&reply.data) == state.cid
+                                {
+                                    if let Some(template) = manifest
+                                        .shards
+                                        .iter()
+                                        .find(|x| x.cid == state.cid)
+                                        .map(manifest_shard_to_template)
+                                    {
+                                        let mut shard = template;
+                                        shard.bytes = reply.data;
+                                        completed.insert(key, shard);
+                                        println!(
+                                            "retrieve-raw cid={} chunk={} shard={} via_attempt={}",
+                                            state.cid,
+                                            state.chunk_index,
+                                            state.shard_index,
+                                            state.attempt + 1
+                                        );
                                         continue;
                                     }
-
-                                    if reply.found
-                                        && reply.verify_proof(&state.cid)
-                                        && reply.is_fresh(
-                                            chrono::Utc::now().timestamp_millis() as u64,
-                                            max_age_ms,
-                                        )
-                                        && sha256_hex(&reply.data) == state.cid
-                                    {
-                                        if let Some(template) = manifest
-                                            .shards
-                                            .iter()
-                                            .find(|x| x.cid == state.cid)
-                                            .map(manifest_shard_to_template)
-                                        {
-                                            let mut shard = template;
-                                            shard.bytes = reply.data;
-                                            completed.insert(key, shard);
-                                            println!(
-                                                "retrieve-raw cid={} chunk={} shard={} via_attempt={}",
-                                                state.cid,
-                                                state.chunk_index,
-                                                state.shard_index,
-                                                state.attempt + 1
-                                            );
-                                            continue;
-                                        }
-                                    }
-
-                                    state.attempt += 1;
-                                    if state.attempt < state.peers.len() {
-                                        pending.push_back(state);
-                                    }
                                 }
-                                _ => {
-                                    return Err(anyhow!(
-                                        "unexpected response type for retrieve request"
-                                    ))
+
+                                state.attempt += 1;
+                                if state.attempt < state.peers.len() {
+                                    pending.push_back(state);
                                 }
+                            }
+                            _ => {
+                                return Err(anyhow!(
+                                    "unexpected response type for retrieve request"
+                                ))
                             }
                         }
                     }
                 }
-                RequestResponseEvent::OutboundFailure { request_id, .. } => {
-                    if let Some(mut state) = inflight.remove(&request_id) {
-                        state.attempt += 1;
-                        if state.attempt < state.peers.len() {
-                            pending.push_back(state);
-                        }
+            }
+            RequestResponseEvent::OutboundFailure { request_id, .. } => {
+                if let Some(mut state) = inflight.remove(&request_id) {
+                    state.attempt += 1;
+                    if state.attempt < state.peers.len() {
+                        pending.push_back(state);
                     }
                 }
-                _ => {}
-            },
+            }
             _ => {}
-        }
+        } }
 
         if pending.is_empty() && inflight.is_empty() {
             break;
@@ -1503,72 +1497,69 @@ async fn run_audit(args: AuditArgs) -> Result<()> {
             break;
         }
 
-        match swarm.select_next_some().await {
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(event)) => match event {
-                RequestResponseEvent::Message { message, .. } => {
-                    if let RequestResponseMessage::Response {
-                        request_id,
-                        response,
-                    } = message
-                    {
-                        if let Some(mut state) = inflight.remove(&request_id) {
-                            match response {
-                                ChunkReply::Audit(resp) => {
-                                    let ok = resp.found
-                                        && resp.verify_audit(
-                                            &state.cid,
-                                            &state.challenge_hex,
-                                            &state.nonce_hex,
-                                        )
-                                        && resp.is_fresh(
-                                            chrono::Utc::now().timestamp_millis() as u64,
-                                            max_age_ms,
-                                        )
-                                        && resp.response_hash == state.expected_token;
-                                    if ok {
-                                        passed += 1;
-                                        println!(
-                                            "audit cid={} passed attempt={}",
-                                            state.cid,
-                                            state.attempt + 1
-                                        );
+        if let SwarmEvent::Behaviour(UploaderEvent::Chunk(event)) = swarm.select_next_some().await { match event {
+            RequestResponseEvent::Message { message, .. } => {
+                if let RequestResponseMessage::Response {
+                    request_id,
+                    response,
+                } = message
+                {
+                    if let Some(mut state) = inflight.remove(&request_id) {
+                        match response {
+                            ChunkReply::Audit(resp) => {
+                                let ok = resp.found
+                                    && resp.verify_audit(
+                                        &state.cid,
+                                        &state.challenge_hex,
+                                        &state.nonce_hex,
+                                    )
+                                    && resp.is_fresh(
+                                        chrono::Utc::now().timestamp_millis() as u64,
+                                        max_age_ms,
+                                    )
+                                    && resp.response_hash == state.expected_token;
+                                if ok {
+                                    passed += 1;
+                                    println!(
+                                        "audit cid={} passed attempt={}",
+                                        state.cid,
+                                        state.attempt + 1
+                                    );
+                                } else {
+                                    state.attempt += 1;
+                                    if state.attempt < state.peers.len() {
+                                        state.nonce_hex = random_nonce_hex();
+                                        pending.push_back(state);
                                     } else {
-                                        state.attempt += 1;
-                                        if state.attempt < state.peers.len() {
-                                            state.nonce_hex = random_nonce_hex();
-                                            pending.push_back(state);
-                                        } else {
-                                            return Err(anyhow!(
-                                                "audit failed for cid={}",
-                                                state.cid
-                                            ));
-                                        }
+                                        return Err(anyhow!(
+                                            "audit failed for cid={}",
+                                            state.cid
+                                        ));
                                     }
                                 }
-                                _ => {
-                                    return Err(anyhow!(
-                                        "unexpected response type for audit request"
-                                    ))
-                                }
+                            }
+                            _ => {
+                                return Err(anyhow!(
+                                    "unexpected response type for audit request"
+                                ))
                             }
                         }
                     }
                 }
-                RequestResponseEvent::OutboundFailure { request_id, .. } => {
-                    if let Some(mut state) = inflight.remove(&request_id) {
-                        state.attempt += 1;
-                        if state.attempt < state.peers.len() {
-                            state.nonce_hex = random_nonce_hex();
-                            pending.push_back(state);
-                        } else {
-                            return Err(anyhow!("audit failed for cid={}", state.cid));
-                        }
+            }
+            RequestResponseEvent::OutboundFailure { request_id, .. } => {
+                if let Some(mut state) = inflight.remove(&request_id) {
+                    state.attempt += 1;
+                    if state.attempt < state.peers.len() {
+                        state.nonce_hex = random_nonce_hex();
+                        pending.push_back(state);
+                    } else {
+                        return Err(anyhow!("audit failed for cid={}", state.cid));
                     }
                 }
-                _ => {}
-            },
+            }
             _ => {}
-        }
+        } }
     }
 
     if passed != sample_count {
@@ -2153,34 +2144,31 @@ async fn send_chunk_request(
 ) -> Result<ChunkReply> {
     let request_id = swarm.behaviour_mut().chunk.send_request(peer_id, request);
     loop {
-        match swarm.select_next_some().await {
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(event)) => match event {
-                RequestResponseEvent::Message { message, .. } => {
-                    if let RequestResponseMessage::Response {
-                        request_id: rid,
-                        response,
-                    } = message
-                    {
-                        if rid == request_id {
-                            return Ok(response);
-                        }
+        if let SwarmEvent::Behaviour(UploaderEvent::Chunk(event)) = swarm.select_next_some().await { match event {
+            RequestResponseEvent::Message { message, .. } => {
+                if let RequestResponseMessage::Response {
+                    request_id: rid,
+                    response,
+                } = message
+                {
+                    if rid == request_id {
+                        return Ok(response);
                     }
                 }
-                RequestResponseEvent::OutboundFailure {
-                    request_id: rid,
-                    error,
-                    ..
-                } if rid == request_id => {
-                    return Err(anyhow!(
-                        "request to peer {} failed for request {:?}: {error}",
-                        peer_id,
-                        request_id
-                    ));
-                }
-                _ => {}
-            },
+            }
+            RequestResponseEvent::OutboundFailure {
+                request_id: rid,
+                error,
+                ..
+            } if rid == request_id => {
+                return Err(anyhow!(
+                    "request to peer {} failed for request {:?}: {error}",
+                    peer_id,
+                    request_id
+                ));
+            }
             _ => {}
-        }
+        } }
     }
 }
 

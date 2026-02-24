@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, Lock, RefreshCw, CheckCircle2, Download, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, Lock, RefreshCw, CheckCircle2, Download, AlertCircle, Eye, X } from 'lucide-react';
 import { encryptFile, decryptFile } from '../lib/crypto';
+import DOMPurify from 'dompurify';
+import { toast } from 'react-hot-toast';
 
 export const DriveDashboard = () => {
     const [files, setFiles] = useState([]);
@@ -8,9 +10,10 @@ export const DriveDashboard = () => {
     const [uploadState, setUploadState] = useState({ progress: 0, text: '' });
     const [storageUsed, setStorageUsed] = useState(0);
     const [vaultPassword, setVaultPassword] = useState('neuro-hackathon-key'); // Default for demo
+    const [previewFile, setPreviewFile] = useState(null); // { url, type, name }
 
     const BUCKET_NAME = "user-drive";
-    const S3_GATEWAY_URL = "http://localhost:9009";
+    const S3_GATEWAY_URL = import.meta.env.VITE_API_URL || "http://localhost:9009";
 
     const getAuthHeaders = () => {
         const token = localStorage.getItem('neuro_token');
@@ -35,7 +38,7 @@ export const DriveDashboard = () => {
                 totalSize += size;
                 return {
                     id: node.getElementsByTagName("ETag")[0]?.textContent || `file-${index}`,
-                    name: node.getElementsByTagName("Key")[0].textContent,
+                    name: DOMPurify.sanitize(node.getElementsByTagName("Key")[0].textContent),
                     sizeRaw: size,
                     size: (size / (1024 * 1024)).toFixed(2) + " MB",
                     date: new Date(node.getElementsByTagName("LastModified")[0].textContent).toLocaleDateString(),
@@ -56,44 +59,70 @@ export const DriveDashboard = () => {
         // eslint-disable-next-line
     }, []);
 
-    const uploadSingleFile = (file) => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                // 1. Client-Side Encryption
-                setUploadState({ progress: 0, text: `Encrypting ${file.name} (AES-256)...` });
-                const encryptedBlob = await encryptFile(file, vaultPassword);
+    const generateCID = async (file) => {
+        const buffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return "Qm" + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    };
 
-                // 2. Real XHR Upload
-                const xhr = new XMLHttpRequest();
-                xhr.open('PUT', `${S3_GATEWAY_URL}/s3/${BUCKET_NAME}/${file.name}`, true);
+    const uploadSingleFile = async (file) => {
+        // 0. Global Content Deduplication Check (Phase 33)
+        setUploadState({ progress: 10, text: `Generating SHA-256 CID...` });
+        const cid = await generateCID(file);
 
-                const token = localStorage.getItem('neuro_token');
-                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        try {
+            const token = localStorage.getItem('neuro_token');
+            const dedupRes = await fetch(`${S3_GATEWAY_URL}/s3/deduplicate/${BUCKET_NAME}/${file.name}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ cid })
+            });
 
-                // Track real network progress
-                xhr.upload.onprogress = (e) => {
-                    if (e.lengthComputable) {
-                        const percentComplete = Math.round((e.loaded / e.total) * 100);
-                        // Start network progress at 10% visually (since encryption took 10%)
-                        setUploadState({ progress: percentComplete, text: `Uploading: ${percentComplete}%` });
-                    }
-                };
-
-                xhr.onload = () => {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        resolve();
-                    } else {
-                        reject(new Error(`Upload failed with status ${xhr.status}`));
-                    }
-                };
-
-                xhr.onerror = () => reject(new Error('Network error during upload'));
-
-                xhr.send(encryptedBlob);
-            } catch (err) {
-                reject(err);
+            if (dedupRes.ok) {
+                // Instantly mapped to existing Rust Gateway shards!
+                setUploadState({ progress: 100, text: `Global Match: Skipped Upload!` });
+                return Promise.resolve();
             }
+        } catch (e) {
+            console.error("Deduplication check failed, falling back to upload", e);
+        }
+
+        // 1. Client-Side Encryption
+        setUploadState({ progress: 20, text: `Encrypting ${file.name} (AES-256)...` });
+        const encryptedBlob = await encryptFile(file, vaultPassword);
+
+        return new Promise((resolve, reject) => {
+            // 2. Real XHR Upload
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', `${S3_GATEWAY_URL}/s3/${BUCKET_NAME}/${file.name}`, true);
+
+            const token = localStorage.getItem('neuro_token');
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+
+            // Track real network progress
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = Math.round((e.loaded / e.total) * 100);
+                    setUploadState({ progress: percentComplete, text: `Uploading: ${percentComplete}%` });
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve();
+                } else {
+                    reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error during upload'));
+
+            xhr.send(encryptedBlob);
         });
     };
 
@@ -102,7 +131,7 @@ export const DriveDashboard = () => {
         if (selectedFiles.length === 0) return;
 
         if (!vaultPassword) {
-            alert("Please enter a Vault Key to encrypt your files.");
+            toast.error("Please enter a Vault Key to encrypt your files.", { icon: '🔐' });
             return;
         }
 
@@ -124,15 +153,15 @@ export const DriveDashboard = () => {
 
         } catch (err) {
             console.error("Upload Queue Failed", err);
-            alert("Upload failed: " + err.message);
+            toast.error("Upload failed: " + err.message);
             setIsUploading(false);
         }
     };
 
-    const handleDownload = async (fileName) => {
+    const handleDownload = async (fileName, mode = 'download') => {
         try {
             if (!vaultPassword) {
-                alert("Please enter your Vault Key to decrypt this file.");
+                toast.error("Please enter your Vault Key to decrypt this file.", { icon: '🔐' });
                 return;
             }
 
@@ -143,26 +172,42 @@ export const DriveDashboard = () => {
 
             if (!response.ok) throw new Error("Failed to download file from Nodes");
 
-            const encryptedBuffer = await response.arrayBuffer();
+            const encryptedBlob = await response.blob();
 
-            // 2. Client-Side Decryption
-            const decryptedBlob = await decryptFile(encryptedBuffer, vaultPassword);
+            // Guess mime type for preview based on extension
+            let mimeType = 'application/octet-stream';
+            const lowerName = fileName.toLowerCase();
+            if (lowerName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) mimeType = 'image/png';
+            else if (lowerName.endsWith('.pdf')) mimeType = 'application/pdf';
+            else if (lowerName.match(/\.(txt|md|csv|json)$/i)) mimeType = 'text/plain';
 
-            // 3. Trigger Download
+            // 2. Client-Side Decryption (V7 Chunked Streaming)
+            const decryptedBlob = await decryptFile(encryptedBlob, vaultPassword, mimeType);
+
+            // 3. Create Local Object URL
             const url = window.URL.createObjectURL(decryptedBlob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
 
+            if (mode === 'preview') {
+                setPreviewFile({ url, name: fileName, type: mimeType });
+            } else {
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+                document.body.removeChild(a);
+            }
         } catch (err) {
             console.error("Decryption failed", err);
-            alert("Decryption Failed! Invalid Vault Key or corrupted shards.");
+            toast.error("Decryption Failed! Invalid Vault Key or corrupted shards.", { icon: '🚨' });
         }
+    };
+
+    const closePreview = () => {
+        if (previewFile?.url) window.URL.revokeObjectURL(previewFile.url);
+        setPreviewFile(null);
     };
 
     return (
@@ -177,19 +222,19 @@ export const DriveDashboard = () => {
                         </div>
                         <div>
                             <h2 className="font-bold">My Storage</h2>
-                            <p className="text-xs text-muted">Personal Plan</p>
+                            <p className="text-xs text-muted">{localStorage.getItem('neuro_plan') === 'pro' ? 'Pro Node Plan' : 'Personal Plan'}</p>
                         </div>
                     </div>
 
                     <div className="space-y-2 mb-6">
                         <div className="flex justify-between text-sm">
                             <span>{storageUsed} GB</span>
-                            <span className="text-muted">100 GB</span>
+                            <span className="text-muted">{localStorage.getItem('neuro_plan') === 'pro' ? '1000 GB' : '100 GB'}</span>
                         </div>
                         <div className="w-full h-2 bg-background rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-gradient-to-r from-blue-500 to-primary rounded-full transition-all duration-1000"
-                                style={{ width: `${Math.max((storageUsed / 100) * 100, 2)}%` }}
+                                style={{ width: `${Math.max((storageUsed / (localStorage.getItem('neuro_plan') === 'pro' ? 1000 : 100)) * 100, 2)}%` }}
                             ></div>
                         </div>
                     </div>
@@ -317,7 +362,14 @@ export const DriveDashboard = () => {
                                             </td>
                                             <td className="p-4 text-right">
                                                 <button
-                                                    onClick={() => handleDownload(file.name)}
+                                                    onClick={() => handleDownload(file.name, 'preview')}
+                                                    className="inline-flex items-center justify-center p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors mr-2"
+                                                    title="Secure Preview"
+                                                >
+                                                    <Eye size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDownload(file.name, 'download')}
                                                     className="inline-flex items-center justify-center p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
                                                     title="Decrypt and Download"
                                                 >
@@ -333,6 +385,44 @@ export const DriveDashboard = () => {
                 </div>
 
             </div>
+
+            {/* Secure Zero-Knowledge Preview Modal */}
+            {previewFile && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-card w-full max-w-5xl h-[85vh] rounded-2xl flex flex-col overflow-hidden border border-border shadow-2xl relative">
+                        <div className="flex items-center justify-between p-4 border-b border-border bg-background">
+                            <h3 className="font-bold flex items-center gap-2">
+                                <ShieldCheck size={18} className="text-green-400" />
+                                <span className="truncate">{previewFile.name} (Decrypted Securely)</span>
+                            </h3>
+                            <button onClick={closePreview} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 bg-black/50 p-6 flex items-center justify-center overflow-auto relative">
+                            {previewFile.type.startsWith('image/') ? (
+                                <img src={previewFile.url} alt="Preview" className="max-w-full max-h-full object-contain rounded drop-shadow-2xl" />
+                            ) : previewFile.type === 'application/pdf' ? (
+                                <iframe src={previewFile.url} className="w-full h-full rounded border-none bg-white" title="PDF Preview"></iframe>
+                            ) : previewFile.type === 'text/plain' ? (
+                                <iframe src={previewFile.url} className="w-full h-full rounded border-none bg-white font-mono text-black" title="Text Preview"></iframe>
+                            ) : (
+                                <div className="text-center space-y-4">
+                                    <FileIcon size={64} className="mx-auto text-muted" />
+                                    <p className="text-muted">Preview not officially supported for this file type.</p>
+                                    <br />
+                                    <button onClick={() => {
+                                        const a = document.createElement('a');
+                                        a.href = previewFile.url;
+                                        a.download = previewFile.name;
+                                        a.click();
+                                    }} className="btn-primary">Download File Automatically Instead</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

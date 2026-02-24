@@ -1,8 +1,35 @@
 import React, { useState } from 'react';
 import { Download as DownloadIcon, AlertTriangle, Terminal, Monitor, Apple } from 'lucide-react';
 
+import { toast } from 'react-hot-toast';
+
 export const Download = () => {
     const [activeOS, setActiveOS] = useState('windows');
+    const [storageRent, setStorageRent] = useState(500);
+
+    const handleWindowsDownload = (e) => {
+        e.preventDefault();
+
+        // 1. Generate local Silent Config
+        const config = {
+            storage_path: "./neuro-data",
+            max_gb: parseInt(storageRent),
+            relay_url: null
+        };
+        const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'node-config.json';
+        a.click();
+
+        // 2. Trigger the ZIP executable download
+        setTimeout(() => {
+            window.location.href = "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip";
+        }, 800);
+
+        toast.success(`Allocated ${storageRent}GB! Extract the ZIP and place the node-config.json file next to the .exe for a completely silent installation.`, { duration: 8000, icon: '🚀' });
+    };
 
     return (
         <div className="min-h-[calc(100vh-80px)] p-8 max-w-4xl mx-auto py-12">
@@ -44,17 +71,31 @@ export const Download = () => {
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="flex flex-col md:flex-row items-center gap-8 mb-8">
                                 <div className="flex-1 space-y-4">
-                                    <h2 className="text-2xl font-bold">Download for Windows</h2>
-                                    <p className="text-muted">A standalone executable. No administrator privileges required. Installs cleanly.</p>
+                                    <h2 className="text-2xl font-bold">1-Click Silent Windows Node</h2>
+                                    <p className="text-muted">A standalone executable that runs invisibly in your system background. No terminal required.</p>
 
-                                    <a
-                                        href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe"
-                                        className="inline-flex items-center gap-3 bg-gradient-to-r from-blue-500 to-primary text-background px-8 py-4 rounded-xl font-bold hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all transform hover:-translate-y-1"
+                                    <div className="bg-background/50 border border-primary/20 rounded-xl p-6 my-6">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-bold text-lg">Storage to Rent</h3>
+                                            <span className="text-primary font-mono bg-primary/10 px-3 py-1 rounded-full">{storageRent} GB</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="50" max="2000" step="50"
+                                            value={storageRent}
+                                            onChange={(e) => setStorageRent(e.target.value)}
+                                            className="w-full accent-primary h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                        <p className="text-xs text-muted mt-3">Slide to allocate disk space. You will earn $0.005/GB per month.</p>
+                                    </div>
+
+                                    <button
+                                        onClick={handleWindowsDownload}
+                                        className="inline-flex w-full md:w-auto items-center justify-center gap-3 bg-gradient-to-r from-blue-500 to-primary text-background px-8 py-4 rounded-xl font-bold hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all transform hover:-translate-y-1"
                                     >
                                         <DownloadIcon size={20} />
-                                        Download neuro-node.exe
-                                        <span className="bg-background/20 px-2 py-0.5 rounded text-xs ml-2">5.4 MB</span>
-                                    </a>
+                                        Download Installer + Config
+                                    </button>
                                 </div>
                             </div>
 
@@ -76,11 +117,11 @@ export const Download = () => {
                                 <h3 className="font-bold text-lg border-b border-border pb-2">Setup Instructions</h3>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">1</div>
-                                    <p className="pt-1 text-gray-300">Run the downloaded <code className="bg-background px-1.5 py-0.5 rounded text-primary">neuro-node.exe</code>.</p>
+                                    <p className="pt-1 text-gray-300">Extract the downloaded ZIP file, and run the <code className="bg-background px-1.5 py-0.5 rounded text-primary">neuro-node.exe</code> inside.</p>
                                 </div>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">2</div>
-                                    <p className="pt-1 text-gray-300">The terminal will ask you how much storage to allocate (e.g., type <code>500</code> for 500GB).</p>
+                                    <p className="pt-1 text-gray-300">A graphical window will appear asking you how much storage to allocate (e.g., type <code>500</code> for 500GB).</p>
                                 </div>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">3</div>
@@ -99,12 +140,18 @@ export const Download = () => {
                                     <p className="text-muted">Universal binary for Apple Silicon (M1/M2/M3) and Intel Macs.</p>
 
                                     <a
-                                        href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos"
+                                        href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-arm64.tar.gz"
                                         className="inline-flex items-center gap-3 bg-gradient-to-r from-blue-500 to-primary text-background px-8 py-4 rounded-xl font-bold hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all transform hover:-translate-y-1"
                                     >
                                         <DownloadIcon size={20} />
-                                        Download macOS Binary
-                                        <span className="bg-background/20 px-2 py-0.5 rounded text-xs ml-2">4.8 MB</span>
+                                        Download macOS Binary (ARM)
+                                        <span className="bg-background/20 px-2 py-0.5 rounded text-xs ml-2">Release</span>
+                                    </a>
+                                    <a
+                                        href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-x86_64.tar.gz"
+                                        className="inline-flex items-center gap-3 border border-border text-muted px-6 py-2 rounded-xl text-sm font-bold hover:bg-white/5 transition-all w-fit"
+                                    >
+                                        Intel Mac? Download Here
                                     </a>
                                 </div>
                             </div>
@@ -128,11 +175,11 @@ export const Download = () => {
                                 <h3 className="font-bold text-lg border-b border-border pb-2">Setup Instructions</h3>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">1</div>
-                                    <p className="pt-1 text-gray-300">Open Terminal and make the file executable: <code className="bg-background px-1.5 py-0.5 rounded text-primary text-sm">chmod +x ~/Downloads/neuro-node-macos</code></p>
+                                    <p className="pt-1 text-gray-300">Extract the tar archive and make the file executable: <code className="bg-background px-1.5 py-0.5 rounded text-primary text-sm">tar -xzvf neuro-node-macos-arm64.tar.gz && chmod +x neuro-node</code></p>
                                 </div>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">2</div>
-                                    <p className="pt-1 text-gray-300">Run the node: <code className="bg-background px-1.5 py-0.5 rounded text-primary text-sm">~/Downloads/neuro-node-macos</code></p>
+                                    <p className="pt-1 text-gray-300">Run the node daemon: <code className="bg-background px-1.5 py-0.5 rounded text-primary text-sm">./neuro-node</code></p>
                                 </div>
                             </div>
                         </div>
