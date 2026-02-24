@@ -1,214 +1,41 @@
-<div align="center">
+# 🌌 NeuroStore: The Decentralized Cloud
+### Enterprise-Grade Decentralized Storage Architecture
+![NeuroStore Banner](https://img.shields.io/badge/Status-V8_Mainnet_Ready-success?style=for-the-badge) ![Rust](https://img.shields.io/badge/Core-Rust-black?style=for-the-badge&logo=rust) ![WebAssembly](https://img.shields.io/badge/Crypto-WebAssembly-654FF0?style=for-the-badge&logo=webassembly) ![LibP2P](https://img.shields.io/badge/Network-LibP2P-blue?style=for-the-badge)
 
-# NeuroStore
+Modern cloud storage is constrained by the **"Storage Trilemma,"** forcing engineering teams to sacrifice either affordability, reliability, or user friction. Centralized providers like Amazon S3 offer seamless experiences but suffer from exorbitant bandwidth pricing and single points of failure. Conversely, decentralized networks like Filecoin eliminate centralized costs but introduce immense cryptographic friction, requiring users to manage blockchain wallets and Node Operators to purchase highly specialized hardware for Proof-of-Replication.
 
-**AI-Driven Decentralized Cloud Storage Protocol**
-
-[![Build](https://img.shields.io/github/actions/workflow/status/Janushsahni/neurostore-next/node-windows-release.yml?style=flat-square&label=build)](https://github.com/Janushsahni/neurostore-next/actions)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square&logo=windows)](https://github.com/Janushsahni/neurostore-next/releases)
-[![Rust](https://img.shields.io/badge/rust-stable-orange?style=flat-square&logo=rust)](https://www.rust-lang.org/)
-
-*Zero-trust storage where no server ever sees your plaintext. AI continuously optimizes placement, predicts failures, and auto-heals the network.*
-
-[**Download Node**](https://github.com/Janushsahni/neurostore-next/releases/latest) · [**Live Demo**](https://janushsahni.github.io/neurostore-next/) · [**Docs**](docs/)
-
-</div>
+**NeuroStore** resolves this trilemma. We deliver a hyper-premium, enterprise-grade cloud storage protocol built entirely on consumer-grade hardware.
 
 ---
 
-## Why NeuroStore?
+## 🏗️ Architecture overview
 
-Cloud storage today forces a choice: **fast but centralized** (AWS, GCP) or **decentralized but slow** (Filecoin, Arweave). NeuroStore eliminates the tradeoff.
+NeuroStore replaces rigid cryptographic mining with mathematically flawless **Reed-Solomon Erasure Coding**. 
 
-| Feature | **NeuroStore V4** | Filecoin | Storj | Arweave |
-|---|:---:|:---:|:---:|:---:|
-| **Zero-Knowledge Privacy** | ✅ WASM Client-Side | ❌ Optional | ✅ Yes | ❌ No |
-| **Node Intelligence** | ✅ PyTorch DDPG RL | ❌ Math-fixed | ❌ Static | ❌ Static |
-| **Retrieval Latency** | **<1ms (Moka CDN Layer)** | >2s (Unsealing) | ~500ms | ~1s |
-| **Self-Healing Data** | ✅ Active Repair Daemon | ~ Passive | ✅ | ❌ |
-| **Storage Proofs** | ✅ Lightweight PoSt | ❌ Heavy zk-SNARKs | ~ Audits | ✅ PoA |
-| **P2P Architecture** | ✅ LibP2P Kademlia + Hole Punching | ✅ | ✅ | ❌ |
-| **Blockchain Sync** | **Instant (0GB)** | Massive (L1 Sync) | None | Massive |
-| **Settlement Layer** | ✅ EVM L2 Micropayments | ❌ Custom L1 | ✅ ERC20 | ❌ Custom L1 |
+1. **Client-Side Cryptography (WebAssembly):** The React frontend encrypts user data entirely locally via AES-256-GCM using WebCrypto. For files over 2GB, the UI utilizes HTML5 `file.slice()` streaming cryptography to bypass WebAssembly memory crashing.
+2. **Global Gateway (Rust/Axum):** Files are fragmented into 15 distributed shards. The backend infrastructure, engineered in Rust using the asynchronous Tokio runtime, scales to thousands of concurrent S3 API requests via PostgreSQL pooling.
+3. **The Physical Swarm (LibP2P):** Lightweight, silent background daemons (`neuro-node.exe`) distributed across global laptops receive encrypted shards via a LibP2P Kademlia DHT. Because full file reconstruction demands only a 66% threshold (10 out of 15 shards), NeuroStore achieves AWS-tier reliability while accommodating the hardware dropout rates inherent to consumer Wi-Fi.
 
----
+## 🚀 Key Technological Breakthroughs (V6 -> V8)
+To compete at Fortune 500 scale, NeuroStore implements edge engineering patterns:
 
-## Architecture
-
-```
-┌───────────────────────────────────────────────────────────────┐
-│                        CLIENT (Browser / CLI)                 │
-│  ┌──────────┐  ┌─────────┐  ┌──────────┐  ┌───────────────┐ │
-│  │ Chunking │→ │ Argon2id│→ │ AES-256  │→ │ Reed-Solomon  │ │
-│  │ 128-256KB│  │   KDF   │  │   GCM    │  │   N+K shards  │ │
-│  └──────────┘  └─────────┘  └──────────┘  └───────────────┘ │
-│         ↓ Encrypted shards + Merkle manifest                  │
-├───────────────────────────────────────────────────────────────┤
-│                      P2P NETWORK (libp2p)                     │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐        │
-│  │ Node A  │  │ Node B  │  │ Node C  │  │ Node N  │  ...    │
-│  │ (sled)  │  │ (sled)  │  │ (sled)  │  │ (sled)  │        │
-│  └────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘        │
-│       └────────────┼────────────┼────────────┘               │
-│              Kademlia + Gossipsub + Noise                     │
-├───────────────────────────────────────────────────────────────┤
-│                    AI SENTINEL (neuro-sentinel)                │
-│  ┌────────────────────────────────────────────────────────┐   │
-│  │ Multi-factor anomaly detection · Trend analysis        │   │
-│  │ Confidence-weighted reputation · Auto-remediation      │   │
-│  │ SLO enforcement · Peer clustering                      │   │
-│  └────────────────────────────────────────────────────────┘   │
-└───────────────────────────────────────────────────────────────┘
-```
+* **LibP2P DCUtR Hole-Punching:** By negotiating a Relay circuit (`/p2p-circuit`), the network actively traverses strict residential NAT firewalls without manual port forwarding, allowing anyone in an apartment to rent out their hard drive.
+* **Global CID Deduplication:** Client-side SHA-256 generation ensures that duplicate files uploaded by distinct users are mathematically mapped to the same underlying shards, exponentially saving Swarm bandwidth.
+* **Trustless Blockchain Settlement ($NEURO):** An autonomous Smart Contract deployed on Base L2 streams ERC-20 utility tokens to physical Node Operators every 12 seconds, based strictly on mathematical ZK-SNARK Proof of Spacetime verification by the Gateway Oracle.
+* **Geospatial Sharding (V8 GDPR Alignment):** Reed-Solomon allocator pipelines mathematically enforce IP-geofencing, preventing EU-based payloads from ever touching nodes located in the United States, solving international data sovereignty.
 
 ---
 
-## Getting Started
+## 💻 Tech Stack
+* **Frontend:** React, Vite, Framer Motion, Tailwind CSS, Lucide React, WebCrypto API (AES-256).
+* **Gateway Node:** Rust, Axum, SQLx, Tokio, Reed-Solomon-Erasure, Moka Edge Caching.
+* **Physical Daemon:** Rust, LibP2P (Kademlia, AutoNAT, Gossipsub, DCUtR), bincode.
+* **Tokenomics:** Solidity, OpenZeppelin ERC20 Contracts.
 
-### Node Providers (Join the Network)
+## ⚙️ Running Locally
+1. Start the PostgreSQL Gateway Database: `docker compose up -d`
+2. Start the Rust Gateway Hub: `cd crates/gateway && cargo run`
+3. Start internal React Dashboard: `cd frontend && npm run dev`
+4. Connect a virtual node: `cd crates/node && cargo run -- --listen /ip4/0.0.0.0/tcp/9010 --relay <GATEWAY_RELAY_ADDR>`
 
-Download the Windows installer and allocate disk space:
-
-```bash
-# Option 1: MSI Installer (recommended)
-# Download from Releases → neuro-node-windows-x86_64.msi
-
-# Option 2: Portable Bundle
-# Download from Releases → neuro-node-windows-x86_64.zip
-# Run start-node.bat and follow the guided setup
-
-# Option 3: From Source
-cargo build -p neuro-node --release
-./target/release/neuro-node --storage-path ./data --max-gb 100
-```
-
-The node auto-discovers peers via Kademlia, persists a unique Ed25519 identity, and can run as a **Windows service** for always-on operation.
-
-### Web Upload (For End Users)
-
-Upload directly from the browser — no install needed:
-
-1. Open the [web portal](https://janushsahni.github.io/neurostore-next/) or run locally:
-   ```bash
-   npx -y serve web/
-   ```
-2. Select a file, enter your passphrase
-3. Watch the encryption pipeline process in real-time
-4. Shards are distributed to network nodes with AI-optimized placement
-
-**All encryption happens client-side via WebAssembly. No plaintext ever leaves your browser.**
-
----
-
-## Protocol Stack
-
-| Crate | Purpose |
-|-------|---------|
-| `neuro-node` | P2P storage daemon: libp2p transport, sled persistence, signed proofs, Windows service |
-| `client-sdk` | Crypto pipeline: Argon2id KDF → AES-256-GCM → Reed-Solomon erasure coding |
-| `client-wasm` | Browser WASM bindings for client-side encryption |
-| `protocol` | Wire format: STORE / RETRIEVE / AUDIT commands with signature verification |
-| `uploader` | CLI for batch replication, failover retrieval, audit probes, manifest migration |
-| `sentinel` | AI reputation engine: multi-factor anomaly detection, trend analysis, auto-remediation |
-
----
-
-## AI Sentinel — The Competitive Edge
-
-The `neuro-sentinel` is what makes NeuroStore smarter than any existing protocol:
-
-- **Multi-Factor Scoring**: Non-linear penalty curves across latency, uptime, verification, and bandwidth
-- **Anomaly Detection**: Composite z-score across all dimensions (`√(z_lat² + z_up² + z_ver² + z_bw²)`)
-- **Trend Analysis**: Exponential moving average detects gradual peer degradation before failures
-- **Confidence Decay**: New peers start low-confidence; trust builds over consistent observations
-- **5-Tier Actions**: `promote` → `hold` → `probation` → `quarantine` → `evict`
-- **SLO Enforcement**: p95 latency ≤400ms, uptime ≥99.95% as configurable thresholds
-
-```bash
-# Pipe node metrics into sentinel for real-time scoring
-echo '{"peer":"QmA...","latency_ms":42,"uptime_pct":99.8,"verify_success_pct":100,"bandwidth_mbps":85}' | \
-  cargo run -p neuro-sentinel -- --mode adaptive
-```
-
----
-
-## Security Model
-
-- **Zero-trust**: Nodes store only ciphertext. Keys derived client-side via Argon2id.
-- **Signed proofs**: Every STORE/RETRIEVE returns a signed receipt for verification.
-- **Audit protocol**: Client-generated challenge vectors with freshness enforcement.
-- **Manifest integrity**: Auth tag binds manifest to user password.
-- **Transport encryption**: All P2P traffic over Noise protocol.
-
----
-
-## Business Model
-
-**Option A — No Token, Pay-per-GB**
-
-| | Tier |
-|---|---|
-| **Free** | 5 GB storage, 10 GB/mo retrieval |
-| **Pro** | $4.99/mo — 100 GB, 500 GB retrieval, priority placement |
-| **Enterprise** | Custom — SLA, dedicated nodes, audit logs, API keys |
-
-Node providers earn payouts in **fiat or USDC** based on reliability scores from the AI sentinel.
-
----
-
-## Future Scope of Improvement (V5 Roadmap)
-
-While NeuroStore V4 solves the enterprise bottleneck, the ultimate goal is **100% Trustless Decentralization**. Here is the scope of improvement for the subsequent protocol upgrades:
-
-1. **Decentralizing the Gateway (Consensus Subnets):** Currently, the Rust Axum Gateway coordinates the DHT and holds the `moka` cache. V5 will implement a decentralized consensus mechanism (like Tendermint) to allow multiple permissionless Gateways to operate the network collectively without a central Postgres coordinator.
-2. **Oracle Integration for AI Sentinel:** The PyTorch Sentinel currently acts as a centralized "admin" triggering the Solidity Smart Contract payouts. V5 will integrate a Web3 Oracle Network (e.g., Chainlink Functions or an MPC network) to trustlessly post the AI's peer reputation scores on-chain.
-3. **Advanced zk-SNARKs for PoSt:** Upgrading our current cryptographic challenge-response mechanism to true Zero-Knowledge Succinct Non-Interactive Arguments of Knowledge (HALO2 or Plonky2), compressing proof sizes to O(1) and allowing on-chain verification without Gateway intervention.
-4. **Desktop GUI for Node Operators:** Providing a sleek Electron/Tauri desktop application utilizing our WASM modules, allowing non-technical users to rent out their hard drives with a single click instead of using the CLI `neuro-node`.
-5. **Content-Addressed Deduplication:** Implementing global file deduplication to drastically reduce the storage footprint of viral identical files (like standard OS images or NFTs) across the Kademlia swarm.
-
----
-
-## Roadmap
-
-| Phase | Status | Milestone |
-|-------|--------|-----------|
-| **V1 MVP** | ✅ | Core protocol: encrypted storage, P2P, erasure coding, Windows MSI |
-| **V2 Alpha** | ✅ | S3-compatible Node.js gateway, React dashboard |
-| **V3 Ent.** | ✅ | High-Performance Rust Gateway, PostgreSQL horizontally scaled |
-| **V4 Edge** | ✅ | WASM ZK Crypto, Edge Caching CDN, AI Smart Contracts, Hole Punching |
-| **V5 Oracle**| 📋 | Decentralized Gateways, Chainlink AI Oracles, zk-SNARKs PoSt |
-
----
-
-## Development
-
-```bash
-# Build all crates
-cargo build --workspace
-
-# Run tests
-cargo test --workspace
-
-# Build WASM client
-cd crates/client-wasm && wasm-pack build --target web
-
-# Run web portal
-npx -y serve web/
-
-# Run sentinel
-echo '{"peer":"test","latency_ms":50,"uptime_pct":99.9,"verify_success_pct":100,"bandwidth_mbps":90}' | \
-  cargo run -p neuro-sentinel
-```
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-<sub>Built with Rust 🦀 + WebAssembly + libp2p + AI</sub>
-</div>
+*The future of cloud infrastructure doesn't belong to a single tech giant—it belongs to the networked potential of the world's idle hardware.*

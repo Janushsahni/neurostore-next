@@ -3,6 +3,7 @@ use tokio::time::sleep;
 use rand::RngCore;
 use tracing::{info, warn};
 use std::sync::Arc;
+use axum::response::IntoResponse;
 use crate::AppState;
 
 pub struct ProofOfSpacetimeDaemon {
