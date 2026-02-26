@@ -126,8 +126,12 @@ async fn main() -> anyhow::Result<()> {
         .layer(cors)
         .with_state(shared_state);
 
-    // Bind server
-    let port = 9009; // Replacing the Node.js port
+    // Bind server (supporting Railway/Heroku dynamic PORT)
+    let port = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(9009);
+        
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!("NeuroStore V3 Enterprise Gateway listening on {}", addr);
     
