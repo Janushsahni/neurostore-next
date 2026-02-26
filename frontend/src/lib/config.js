@@ -2,9 +2,12 @@ export const getApiBase = () => {
     let url = import.meta.env.VITE_API_URL || "http://localhost:9009";
     // Trim trailing slash
     url = url.replace(/\/$/, "");
-    // If it looks like a domain without a protocol, default to https
+
+    // If no protocol is provided
     if (!url.startsWith('http')) {
-        url = `https://${url}`;
+        // If it's an IP address or localhost, use http
+        const isIp = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}/.test(url) || url.startsWith('localhost');
+        url = isIp ? `http://${url}` : `https://${url}`;
     }
     return url;
 };
