@@ -23,6 +23,7 @@ pub async fn register(
     Json(payload): Json<RegisterRequest>,
 ) -> impl IntoResponse {
     let email = payload.email.clone();
+    tracing::info!("Register request received for email: {}", email);
     
     // Check if user exists
     let existing = sqlx::query_as::<_, crate::models::User>("SELECT * FROM users WHERE email = $1")

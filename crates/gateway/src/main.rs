@@ -101,7 +101,11 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin([
+            "https://neurostore-next.vercel.app".parse().unwrap(),
+            "https://neurostore-next-production.up.railway.app".parse().unwrap(),
+            "http://localhost:5173".parse().unwrap(), // Local Dev
+        ])
         .allow_methods([
             axum::http::Method::GET,
             axum::http::Method::POST,
@@ -109,14 +113,26 @@ async fn main() -> anyhow::Result<()> {
             axum::http::Method::DELETE,
             axum::http::Method::OPTIONS,
         ])
-        .allow_headers(Any)
-        .expose_headers(Any);
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::AUTHORIZATION,
+        ])
+        .expose_headers([
+            axum::http::header::CONTENT_TYPE,
+        ])
+        .allow_credentials(true);
 
     // Build the Axum Router
     let app = Router::new()
         .route("/readyz", get(health_check))
+        .route("/api/health", get(health_check)) // Senior DevOps Alias
+        
+        // Auth Routes (Supporting both legacy and /api standardized paths)
         .route("/auth/register", post(handlers::auth::register))
+        .route("/api/register", post(handlers::auth::register))
         .route("/auth/login", post(handlers::auth::login))
+        .route("/api/login", post(handlers::auth::login))
+        
         .route("/s3/:bucket", get(handlers::s3::list_objects))
         .route("/s3/:bucket/:key", put(handlers::s3::put_object))
         .route("/s3/:bucket/:key", get(handlers::s3::get_object))

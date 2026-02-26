@@ -137,21 +137,20 @@ export const Register = ({ onAuth }) => {
         setIsLoading(true);
 
         try {
-            const res = await fetch(`${API_BASE}/auth/register`, {
+            console.log(`[NeuroStore] Attempting registration at ${API_BASE}/api/register`);
+            const res = await fetch(`${API_BASE}/api/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, email, password })
             });
 
-            let data;
             const contentType = res.headers.get("content-type");
-            if (contentType && contentType.includes("application/json")) {
-                data = await res.json();
-            } else {
+            if (!contentType || !contentType.includes("application/json")) {
                 const text = await res.text();
-                throw new Error(res.ok ? "Unexpected response from server" : `Server error (${res.status}): ${text.substring(0, 50)}`);
+                throw new Error(`Server returned non-JSON response (${res.status}): ${text.substring(0, 100)}`);
             }
 
+            const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Registration failed');
 
             localStorage.setItem('neuro_token', data.token);
@@ -159,11 +158,10 @@ export const Register = ({ onAuth }) => {
 
             onAuth(data.user);
         } catch (err) {
-            console.error("Auth Exception:", err);
-            // OWASP Database Error Masking
-            const msg = err.message.toLowerCase();
-            if (msg.includes('sql') || msg.includes('database') || msg.includes('postgres') || msg.includes('json')) {
-                setError("An internal system error occurred. Please check if the gateway is running.");
+            console.error("[NeuroStore] Registration Error:", err);
+
+            if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+                setError("Network error: Cannot reach the API. Please ensure your VITE_API_URL is correct and uses HTTPS.");
             } else {
                 setError(err.message);
             }
