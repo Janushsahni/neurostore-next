@@ -55,8 +55,8 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Connected to database.");
 
-    // Run Migrations (We will build these next)
-    // sqlx::migrate!("./migrations").run(&pool).await?;
+    // Run Migrations (Ensuring production schema is provisioned)
+    sqlx::migrate!("./migrations").run(&pool).await?;
 
     // Phase 10: Ignite the LibP2P Swarm Network
     let (p2p_tx, p2p_rx) = mpsc::channel(100);

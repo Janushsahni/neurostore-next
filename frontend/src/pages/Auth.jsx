@@ -21,7 +21,15 @@ export const Login = ({ onAuth }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
-            const data = await res.json();
+
+            let data;
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                data = await res.json();
+            } else {
+                const text = await res.text();
+                throw new Error(res.ok ? "Unexpected response from server" : `Server error (${res.status}): ${text.substring(0, 50)}`);
+            }
 
             if (!res.ok) throw new Error(data.error || 'Login failed');
 
@@ -34,11 +42,11 @@ export const Login = ({ onAuth }) => {
 
             onAuth(data.user);
         } catch (err) {
+            console.error("Auth Exception:", err);
             // OWASP Database Error Masking
             const msg = err.message.toLowerCase();
-            if (msg.includes('sql') || msg.includes('database') || msg.includes('postgres')) {
-                setError("An internal system error occurred. Please try again later.");
-                console.error("[OWASP Security] Masked raw database leak from UI.");
+            if (msg.includes('sql') || msg.includes('database') || msg.includes('postgres') || msg.includes('json')) {
+                setError("An internal system error occurred. Please check if the gateway is running.");
             } else {
                 setError(err.message);
             }
@@ -134,7 +142,15 @@ export const Register = ({ onAuth }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, email, password })
             });
-            const data = await res.json();
+
+            let data;
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                data = await res.json();
+            } else {
+                const text = await res.text();
+                throw new Error(res.ok ? "Unexpected response from server" : `Server error (${res.status}): ${text.substring(0, 50)}`);
+            }
 
             if (!res.ok) throw new Error(data.error || 'Registration failed');
 
@@ -143,11 +159,11 @@ export const Register = ({ onAuth }) => {
 
             onAuth(data.user);
         } catch (err) {
+            console.error("Auth Exception:", err);
             // OWASP Database Error Masking
             const msg = err.message.toLowerCase();
-            if (msg.includes('sql') || msg.includes('database') || msg.includes('postgres')) {
-                setError("An internal system error occurred. Please try again later.");
-                console.error("[OWASP Security] Masked raw database leak from UI.");
+            if (msg.includes('sql') || msg.includes('database') || msg.includes('postgres') || msg.includes('json')) {
+                setError("An internal system error occurred. Please check if the gateway is running.");
             } else {
                 setError(err.message);
             }
