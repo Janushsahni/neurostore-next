@@ -51,6 +51,20 @@ impl SecureBlockStore {
         self.db.get(cid)
     }
 
+    pub fn delete_chunk(&self, cid: &str) -> Result<bool, sled::Error> {
+        let key = chunk_key(cid);
+        if let Some(v) = self.db.remove(&key)? {
+            let used_bytes = read_used_bytes(&self.db).unwrap_or(0);
+            let updated = used_bytes.saturating_sub(v.len() as u64);
+            write_used_bytes(&self.db, updated)?;
+            self.db.flush()?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    #[allow(dead_code)]
     pub fn get_used_bytes(&self) -> u64 {
         read_used_bytes(&self.db).unwrap_or(0)
     }

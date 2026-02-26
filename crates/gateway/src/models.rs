@@ -61,3 +61,14 @@ pub struct Claims {
     pub role: String,
     pub exp: usize,
 }
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Node {
+    pub peer_id: String,
+    pub ip_address: Option<String>,
+    pub country_code: String,
+    pub bandwidth_capacity_mbps: i64,
+    pub uptime_percentage: f32,
+    pub is_super_node: bool,
+    pub last_seen: Option<DateTime<Utc>>,
+    pub created_at: Option<DateTime<Utc>>,
+}

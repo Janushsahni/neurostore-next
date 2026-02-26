@@ -10,6 +10,7 @@ use neuro_protocol::{ChunkCommand, StoreChunkRequest};
 use base64::Engine;
 
 use crate::AppState;
+use crate::p2p::SwarmRequest;
 
 #[derive(Deserialize)]
 pub struct ZkPayload {
@@ -62,7 +63,7 @@ pub async fn zk_store(
             data: decoded_bytes,
         });
 
-        if let Err(e) = state.p2p_tx.send(cmd).await {
+        if let Err(e) = state.p2p_tx.send(SwarmRequest::Store { command: cmd, geofence: "".to_string() }).await {
             tracing::error!("Failed to route ZK shard to LibP2P Swarm: {}", e);
         }
     }

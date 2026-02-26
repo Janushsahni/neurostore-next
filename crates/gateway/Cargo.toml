@@ -33,6 +33,9 @@ jsonwebtoken = "9.3"
 argon2 = "0.5" # Industry standard password hashing (upgrade from bcrypt)
 rand = { workspace = true }
 sha2 = { workspace = true }
+aes-gcm = "0.10"
+aead = "0.5"
+
 
 # P2P & Erasure Coding (Phases 9 & 10)
 reed-solomon-erasure = "6.0"
@@ -43,4 +46,6 @@ futures = "0.3"
 bincode = "1.0"
 async-trait = "0.1"
 neuro-protocol = { path = "../protocol" }
+maxminddb = "0.24"
+
 

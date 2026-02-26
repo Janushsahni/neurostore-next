@@ -347,6 +347,7 @@ fn prompt_with_default(label: &str, default_value: &str) -> anyhow::Result<Strin
     }
 }
 
+#[allow(dead_code)]
 fn prompt_u64_with_default(label: &str, default_value: u64) -> anyhow::Result<u64> {
     loop {
         let input = prompt_with_default(label, &default_value.to_string())?;

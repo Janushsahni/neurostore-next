@@ -12,6 +12,8 @@ use neuro_protocol::{ChunkCommand, StoreChunkRequest};
 
 use crate::AppState;
 use crate::erasure::ErasureEncoder;
+use crate::p2p::SwarmRequest;
+use tokio::sync::oneshot;
 
 #[derive(Deserialize)]
 pub struct ListQuery {
@@ -52,8 +54,12 @@ pub async fn list_objects(
             xml.push_str("  <IsTruncated>false</IsTruncated>\n");
 
             for o in objects {
+                // Decrypt the key for the user (The Gateway performs this in memory)
+                let decrypted_key = state.metadata_protector.decrypt(&o.key).unwrap_or_else(|_| o.key.clone());
+                
                 xml.push_str("  <Contents>\n");
-                xml.push_str(&format!("    <Key>{}</Key>\n", o.key));
+                xml.push_str(&format!("    <Key>{}</Key>\n", decrypted_key));
+
                 let date_str = o.created_at.map(|d| d.to_rfc3339()).unwrap_or_default();
                 xml.push_str(&format!("    <LastModified>{}</LastModified>\n", date_str));
                 // S3 requires ETag to be wrapped in literal quotes
@@ -77,9 +83,14 @@ pub async fn list_objects(
 pub async fn put_object(
     State(state): State<Arc<AppState>>,
     Path((bucket, key)): Path<(String, String)>,
-    // headers: HeaderMap,
+    headers: HeaderMap,
     body: Bytes,
 ) -> impl IntoResponse {
+    let geofence = headers.get("x-neuro-geofence")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("GLOBAL")
+        .to_string();
+
     let size = body.len() as i64;
 
     // Construct an artificial ETag (md5)
@@ -113,10 +124,24 @@ pub async fn put_object(
             data: shard_bytes,
         });
         
-        if let Err(e) = state.p2p_tx.send(cmd).await {
+        let swarm_req = SwarmRequest::Store {
+            command: cmd,
+            geofence: geofence.clone(),
+        };
+
+        if let Err(e) = state.p2p_tx.send(swarm_req).await {
             tracing::error!("Failed to route shard {} to LibP2P Swarm: {}", i, e);
         }
     }
+
+    let metadata_json = serde_json::json!({});
+    let metadata_str = serde_json::to_string(&metadata_json).unwrap_or_else(|_| "{}".to_string());
+    
+    // ZK-METADATA ENCRYPTION (Deterministic for exact-match search)
+    let encrypted_key = state.metadata_protector.encrypt(&key)
+        .expect("Failed to encrypt object key");
+    let encrypted_metadata = state.metadata_protector.encrypt(&metadata_str)
+        .expect("Failed to encrypt object metadata");
 
     let res = sqlx::query(
         r#"
@@ -130,15 +155,16 @@ pub async fn put_object(
         "#
     )
     .bind(&bucket)
-    .bind(&key)
+    .bind(&encrypted_key)
     .bind(&etag)
     .bind(&cid)
     .bind(shards)
     .bind(recovery_threshold)
     .bind(size)
-    .bind(serde_json::json!({}))
+    .bind(serde_json::json!({ "encrypted": encrypted_metadata }))
     .execute(&state.db)
     .await;
+
 
     match res {
         Ok(_) => {
@@ -157,28 +183,71 @@ pub async fn get_object(
     State(state): State<Arc<AppState>>,
     Path((bucket, key)): Path<(String, String)>,
 ) -> impl IntoResponse {
+    let encrypted_key = state.metadata_protector.encrypt(&key)
+        .expect("Search Encryption Failure");
+
     let row = sqlx::query_as::<_, crate::models::Object>(
         "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
     )
     .bind(&bucket)
-    .bind(&key)
+    .bind(&encrypted_key)
     .fetch_optional(&state.db)
     .await;
+
 
     match row {
         Ok(Some(obj)) => {
             // Phase 19 INJECTION POINT - CDN Edge Caching Layer
-            // If the file is a viral/hot object, all 15 shards might still be pinned
-            // in the Gateway's internal 1GB RAM Cache, granting <1ms retrieval.
             if let Some(_cached_bytes) = state.edge_cache.get(&obj.cid).await {
                tracing::info!("CDN CACHE HIT: Served {}/{} instantly from Moka RAM Cache", bucket, key);
-               // TODO: Return cached bytes instead of simulating a pending P2P operation
-               return (StatusCode::NOT_IMPLEMENTED, "CDN Cache Hit, Reconstruct Pending").into_response();
+               // TODO: Return cached bytes instead of simulating
             }
 
-            // Phase 10 LibP2P INJECTION POINT
-            // Cache Miss: Here, we broadcast a DHT request for `obj.cid` and await 10 shards from the Swarm.
-            (StatusCode::NOT_IMPLEMENTED, "LibP2P Swarm Retrieval Pending (Phase 10)").into_response()
+            // V8 SUPER NODE PRIORITIZATION & RETRIEVAL
+            let mut retrieved_shards = Vec::new();
+            
+            // For MVP, we attempt to retrieve enough shards to satisfy the threshold
+            for i in 0..obj.shards {
+                let shard_cid = format!("{}-shard-{}", obj.cid, i);
+                let (tx, rx) = oneshot::channel();
+                
+                let req = SwarmRequest::Retrieve {
+                    cid: shard_cid,
+                    tx,
+                };
+
+                if state.p2p_tx.send(req).await.is_ok() {
+                    if let Ok(Some(data)) = rx.await {
+                        retrieved_shards.push(Some(data));
+                        // Break early if we have enough for reconstruction
+                        if retrieved_shards.iter().flatten().count() >= obj.recovery_threshold as usize {
+                            break;
+                        }
+                    } else {
+                        retrieved_shards.push(None);
+                    }
+                }
+            }
+
+            // Fill remaining with None for the RS decoder
+            while retrieved_shards.len() < obj.shards as usize {
+                retrieved_shards.push(None);
+            }
+
+            // Pass to Reed-Solomon for reconstruction
+            let encoder = ErasureEncoder::new(obj.recovery_threshold as usize, (obj.shards - obj.recovery_threshold) as usize)
+                .expect("RS Reconstruct: Decoder Initialization Failed");
+            
+            match encoder.decode(retrieved_shards) {
+                Ok(reconstructed_data) => {
+                    tracing::info!("SUCCESS: Reconstructed {}/{} after P2P retrieval", bucket, key);
+                    (StatusCode::OK, reconstructed_data).into_response()
+                }
+                Err(e) => {
+                    tracing::error!("FAILURE: Failed to reconstruct shards: {}", e);
+                    (StatusCode::INTERNAL_SERVER_ERROR, "Erasure Reconstruction Failure").into_response()
+                }
+            }
         }
         Ok(None) => (StatusCode::NOT_FOUND, "NoSuchKey").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response(),
@@ -238,5 +307,63 @@ pub async fn deduplicate_object(
         },
         Ok(None) => (StatusCode::NOT_FOUND, "CID Not Found").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response(),
+    }
+}
+
+pub async fn delete_object(
+    State(state): State<Arc<AppState>>,
+    Path((bucket, key)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let encrypted_key = state.metadata_protector.encrypt(&key)
+        .expect("Delete Encryption Failure");
+
+    // 1. Find the object to get the CID and shard count
+    let row = sqlx::query_as::<_, crate::models::Object>(
+        "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
+    )
+    .bind(&bucket)
+    .bind(&encrypted_key)
+    .fetch_optional(&state.db)
+    .await;
+
+    match row {
+        Ok(Some(obj)) => {
+            // 2. Broadcast Deletion Commands for all shards
+            for i in 0..obj.shards {
+                let shard_cid = format!("{}-shard-{}", obj.cid, i);
+                let (tx, rx) = oneshot::channel();
+                
+                let req = SwarmRequest::Delete {
+                    cid: shard_cid,
+                    tx,
+                };
+
+                if state.p2p_tx.send(req).await.is_ok() {
+                    // We don't strictly wait for every shard to be confirmed deleted 
+                    // for the HTTP response, but we log the attempt.
+                    let _ = rx.await;
+                }
+            }
+
+            // 3. Remove from PostgreSQL
+            let del_res = sqlx::query("DELETE FROM objects WHERE bucket = $1 AND key = $2")
+                .bind(&bucket)
+                .bind(&encrypted_key)
+                .execute(&state.db)
+                .await;
+
+            match del_res {
+                Ok(_) => {
+                    tracing::info!("SUCCESS: Deleted {}/{} from DB and dispatched P2P erasure", bucket, key);
+                    StatusCode::NO_CONTENT.into_response()
+                }
+                Err(e) => {
+                    tracing::error!("Database error during deletion: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+            }
+        }
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }

@@ -10,21 +10,27 @@ use std::sync::Arc;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 use tokio::sync::mpsc;
-use neuro_protocol::ChunkCommand;
+use crate::p2p::SwarmRequest;
+
 use moka::future::Cache;
 
 pub mod models;
 pub mod handlers;
 pub mod erasure;
 pub mod p2p;
+
 pub mod proofs;
 pub mod repair;
+pub mod geofence;
+pub mod crypto;
 
 pub struct AppState {
     pub db: sqlx::PgPool,
-    pub p2p_tx: mpsc::Sender<ChunkCommand>,
+    pub p2p_tx: mpsc::Sender<SwarmRequest>,
     // CDN Layer: Maps CID -> Raw Bytes
     pub edge_cache: Cache<String, axum::body::Bytes>,
+    pub geo: geofence::GeoFenceManager,
+    pub metadata_protector: crypto::MetadataProtector,
 }
 
 #[tokio::main]
@@ -55,21 +61,32 @@ async fn main() -> anyhow::Result<()> {
     // Phase 10: Ignite the LibP2P Swarm Network
     let (p2p_tx, p2p_rx) = mpsc::channel(100);
     let mut swarm_node = p2p::P2pNode::new().await?;
+    let geo_manager = geofence::GeoFenceManager::new();
+    let geo_manager_clone = geofence::GeoFenceManager::new(); // For the p2p loop
+    
+    let db_for_p2p = pool.clone();
     tokio::spawn(async move {
         info!("Igniting LibP2P Kademlia DHT Swarm...");
-        if let Err(e) = swarm_node.start(9010, p2p_rx).await {
+        if let Err(e) = swarm_node.start(9010, p2p_rx, geo_manager_clone, db_for_p2p).await {
             tracing::error!("Fatal P2P Swarm crash: {}", e);
         }
     });
 
-    let edge_cache = Cache::builder()
-        // 1GB max capacity approximation (depends on shard sizing)
-        .max_capacity(10_000)
-        // Time To Live (TTL): 2 Hours
-        .time_to_live(std::time::Duration::from_secs(2 * 60 * 60))
-        .build();
+    let metadata_secret = std::env::var("METADATA_SECRET")
+        .unwrap_or_else(|_| "neurostore_fallback_v9_secret_key_2026".to_string());
+    
+    let metadata_protector = crypto::MetadataProtector::new(&metadata_secret);
 
-    let shared_state = Arc::new(AppState { db: pool, p2p_tx, edge_cache });
+    let edge_cache: Cache<String, axum::body::Bytes> = Cache::new(10_000);
+
+    let shared_state = Arc::new(AppState { 
+        db: pool, 
+        p2p_tx, 
+        edge_cache,
+        geo: geo_manager,
+        metadata_protector,
+    });
+
 
     // Phase 11: Ignite the Cryptographic Proof of Spacetime (PoSt) Daemon
     let post_daemon = proofs::ProofOfSpacetimeDaemon::new(Arc::clone(&shared_state));

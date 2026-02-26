@@ -14,9 +14,10 @@ use libp2p::{
     tcp, yamux, Multiaddr, PeerId, StreamProtocol, Transport,
 };
 use neuro_protocol::{
-    AuditChunkRequest, AuditChunkResponse, ChunkCommand, ChunkReply, RetrieveChunkRequest,
-    RetrieveChunkResponse, StoreChunkResponse,
+    AuditChunkRequest, AuditChunkResponse, ChunkCommand, ChunkReply, DeleteChunkRequest,
+    DeleteChunkResponse, RetrieveChunkRequest, RetrieveChunkResponse, StoreChunkResponse,
 };
+
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
@@ -101,6 +102,7 @@ pub struct NeuroBehaviour {
     pub dcutr: dcutr::Behaviour,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum NeuroEvent {
     Kademlia(kad::Event),
@@ -437,6 +439,25 @@ fn handle_chunk_command(node: &NeuroNode, cmd: ChunkCommand) -> ChunkReply {
                 public_key,
             })
         }
+        ChunkCommand::Delete(DeleteChunkRequest { cid }) => {
+
+            let deleted = node.store.delete_chunk(&cid).ok().unwrap_or(false);
+            let timestamp_ms = chrono::Utc::now().timestamp_millis() as u64;
+            // PoE Payload: prove that [cid] was requested to be deleted at [timestamp]
+            let payload = format!("POW:DELETE:{cid}:{timestamp_ms}");
+            let signature = node
+                .keypair
+                .sign(payload.as_bytes())
+                .map(|sig| sig.to_vec())
+                .unwrap_or_default();
+            let public_key = node.keypair.public().encode_protobuf();
+            ChunkReply::Delete(DeleteChunkResponse {
+                deleted,
+                timestamp_ms,
+                signature,
+                public_key,
+            })
+        }
     }
 }
 
@@ -488,8 +509,15 @@ fn deny_chunk_command(cmd: ChunkCommand) -> ChunkReply {
             signature: Vec::new(),
             public_key: Vec::new(),
         }),
+        ChunkCommand::Delete(_) => ChunkReply::Delete(DeleteChunkResponse {
+            deleted: false,
+            timestamp_ms,
+            signature: Vec::new(),
+            public_key: Vec::new(),
+        }),
     }
 }
+
 
 fn peer_id_from_multiaddr(addr: &Multiaddr) -> Option<PeerId> {
     addr.iter().find_map(|p| match p {

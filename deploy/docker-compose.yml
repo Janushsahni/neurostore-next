@@ -20,20 +20,41 @@ services:
       timeout: 5s
       retries: 5
 
+  neurostore-redis:
+    image: redis:7-alpine
+    container_name: neurostore-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   neurostore-gateway:
     build:
       context: ../
       dockerfile: deploy/Dockerfile.gateway
-    container_name: neurostore-rust-gateway
-    ports:
-      - "9009:9009" # Web Client API
-      - "9010:9010" # LibP2P Kademlia Swarm
+    deploy:
+      replicas: 3
     environment:
       - DATABASE_URL=postgres://neuro_admin:neuro_dev_password_2026@neurostore-db:5432/neurostore_production
+      - REDIS_URL=redis://neurostore-redis:6379
       - RUST_LOG=info
+      - METADATA_SECRET=neurostore_v9_production_secret_high_entropy
     depends_on:
       neurostore-db:
         condition: service_healthy
+      neurostore-redis:
+        condition: service_started
+    restart: always
+
+  neurostore-lb:
+    image: nginx:alpine
+    container_name: neurostore-lb
+    ports:
+      - "9009:80" # Load balanced API
+      - "9010:9010" # Load balanced P2P
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - neurostore-gateway
     restart: always
 
   neurostore-sentinel:
