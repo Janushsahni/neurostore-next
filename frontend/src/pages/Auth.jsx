@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HardDrive, Mail, Lock, User, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:9009";
+import { API_BASE } from '../lib/config';
 
 export const Login = ({ onAuth }) => {
     const [email, setEmail] = useState('');

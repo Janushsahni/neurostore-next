@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Activity, HardDrive, DollarSign, Download, Server, Cpu, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
+import { API_BASE } from '../lib/config';
 
 export const NodeDashboard = () => {
     const [nodes, setNodes] = useState([]);
     const [health, setHealth] = useState({ total_nodes: 0, online_nodes: 0, network_health: '0%', active_shards: 0 });
     const [isLoading, setIsLoading] = useState(true);
 
-    const S3_GATEWAY_URL = import.meta.env.VITE_API_URL || "http://localhost:9009";
+    const S3_GATEWAY_URL = API_BASE;
 
     const fetchNodeData = async () => {
         try {

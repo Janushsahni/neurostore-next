@@ -3,6 +3,7 @@ import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, Loc
 import { encryptFile, decryptFile } from '../lib/crypto';
 import DOMPurify from 'dompurify';
 import { toast } from 'react-hot-toast';
+import { API_BASE } from '../lib/config';
 
 export const DriveDashboard = () => {
     const [files, setFiles] = useState([]);
@@ -13,7 +14,7 @@ export const DriveDashboard = () => {
     const [previewFile, setPreviewFile] = useState(null); // { url, type, name }
 
     const BUCKET_NAME = "user-drive";
-    const S3_GATEWAY_URL = import.meta.env.VITE_API_URL || "http://localhost:9009";
+    const S3_GATEWAY_URL = API_BASE;
 
     const getAuthHeaders = () => {
         const token = localStorage.getItem('neuro_token');
