@@ -404,12 +404,19 @@ fn handle_chunk_command(node: &NeuroNode, cmd: ChunkCommand) -> ChunkReply {
             challenge_hex,
             nonce_hex,
         }) => {
-            let accepted = register_audit_nonce(&node.audit_replay_guard, &cid, &nonce_hex);
+            let mut accepted = register_audit_nonce(&node.audit_replay_guard, &cid, &nonce_hex);
             let maybe = node.store.retrieve_chunk(&cid).ok().flatten();
             let found = maybe.is_some();
+            
             let response_hash = if accepted {
                 if let Some(data) = maybe {
-                    compute_audit_response_hash(&challenge_hex, data.as_ref())
+                    match compute_audit_response_hash(&challenge_hex, data.as_ref()) {
+                        Ok(hash) => hash,
+                        Err(_) => {
+                            accepted = false; // Invalid challenge hex
+                            String::new()
+                        }
+                    }
                 } else {
                     String::new()
                 }
@@ -444,10 +451,10 @@ fn handle_chunk_command(node: &NeuroNode, cmd: ChunkCommand) -> ChunkReply {
             let deleted = node.store.delete_chunk(&cid).ok().unwrap_or(false);
             let timestamp_ms = chrono::Utc::now().timestamp_millis() as u64;
             // PoE Payload: prove that [cid] was requested to be deleted at [timestamp]
-            let payload = format!("POW:DELETE:{cid}:{timestamp_ms}");
+            let payload = DeleteChunkResponse::deletion_payload(&cid, timestamp_ms);
             let signature = node
                 .keypair
-                .sign(payload.as_bytes())
+                .sign(&payload)
                 .map(|sig| sig.to_vec())
                 .unwrap_or_default();
             let public_key = node.keypair.public().encode_protobuf();
@@ -477,12 +484,12 @@ fn register_audit_nonce(guard: &Mutex<HashMap<String, u64>>, cid: &str, nonce_he
     true
 }
 
-fn compute_audit_response_hash(challenge_hex: &str, data: &[u8]) -> String {
+fn compute_audit_response_hash(challenge_hex: &str, data: &[u8]) -> Result<String, hex::FromHexError> {
     let mut hasher = Sha256::new();
-    let challenge = hex::decode(challenge_hex).unwrap_or_default();
+    let challenge = hex::decode(challenge_hex)?;
     hasher.update(&challenge);
     hasher.update(data);
-    hex::encode(hasher.finalize())
+    Ok(hex::encode(hasher.finalize()))
 }
 
 fn deny_chunk_command(cmd: ChunkCommand) -> ChunkReply {

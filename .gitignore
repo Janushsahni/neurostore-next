@@ -13,3 +13,21 @@ deploy/certs/*.pem
 deploy/k8s/generated/
 *.swp
 *.swo
+
+# IDEs
+.vs/
+.vscode/
+*.sln
+*.user
+*.suo
+
+# Environment
+.env
+frontend/.env
+deploy/.env
+services/control-plane/.env
+
+# Artifacts
+*.log
+*.zip
+peer_id.txt

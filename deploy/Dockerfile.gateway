@@ -26,6 +26,5 @@ EXPOSE 9010
 
 # Configure default Production variables (these should be overridden in ECS/docker-compose)
 ENV RUST_LOG=info
-ENV DATABASE_URL=postgres://neuro_admin:neuro_dev_password_2026@postgres:5432/neurostore_production
 
 ENTRYPOINT ["neurostore-gateway"]

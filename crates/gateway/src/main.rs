@@ -1,9 +1,9 @@
 use axum::{
-    routing::{get, post, put},
+    routing::{get, post},
     Router,
     Json,
 };
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -31,10 +31,13 @@ pub struct AppState {
     pub edge_cache: Cache<String, axum::body::Bytes>,
     pub geo: geofence::GeoFenceManager,
     pub metadata_protector: crypto::MetadataProtector,
+    pub jwt_secret: String,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok(); // Load .env if present
+
     // Initialize tracing
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)
@@ -42,9 +45,9 @@ async fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("setting default subscriber failed");
 
-    // Connect to PostgreSQL (Spinning up via Docker)
+    // Connect to PostgreSQL
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://neuro_admin:neuro_dev_password_2026@localhost:5432/neurostore_production".to_string());
+        .expect("DATABASE_URL environment variable is required");
 
     info!("Connecting to PostgreSQL at {}...", database_url);
     
@@ -73,8 +76,11 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let metadata_secret = std::env::var("METADATA_SECRET")
-        .unwrap_or_else(|_| "neurostore_fallback_v9_secret_key_2026".to_string());
+        .expect("METADATA_SECRET environment variable is required");
     
+    let jwt_secret = std::env::var("JWT_SECRET")
+        .expect("JWT_SECRET environment variable is required");
+
     let metadata_protector = crypto::MetadataProtector::new(&metadata_secret);
 
     let edge_cache: Cache<String, axum::body::Bytes> = Cache::new(10_000);
@@ -85,6 +91,7 @@ async fn main() -> anyhow::Result<()> {
         edge_cache,
         geo: geo_manager,
         metadata_protector,
+        jwt_secret,
     });
 
 
@@ -133,11 +140,20 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/login", post(handlers::auth::login))
         .route("/api/login", post(handlers::auth::login))
         
-        .route("/s3/:bucket", get(handlers::s3::list_objects))
-        .route("/s3/:bucket/:key", put(handlers::s3::put_object))
-        .route("/s3/:bucket/:key", get(handlers::s3::get_object))
-        .route("/s3/deduplicate/:bucket/:key", post(handlers::s3::deduplicate_object))
-        .route("/zk/store/:bucket/:key", post(handlers::zk::zk_store))
+        // S3-Compatible API (Path Style)
+        .route("/:bucket", get(handlers::s3::list_objects))
+        .route("/:bucket/*key", 
+            get(handlers::s3::get_object)
+            .put(handlers::s3::put_object)
+            .delete(handlers::s3::delete_object)
+        )
+        
+        // Internal Extensions
+        .route("/api/deduplicate/:bucket/*key", post(handlers::s3::deduplicate_object))
+        .route("/api/reconstruct/:bucket/*key", post(handlers::s3::reconstruct_metadata))
+        .route("/api/compliance/sovereignty/:bucket", get(handlers::compliance::sovereignty_audit))
+        .route("/api/nodes/register", post(handlers::nodes::register_provider_node))
+        .route("/zk/store/:bucket/*key", post(handlers::zk::zk_store))
         .route("/zk/submit-proof", post(proofs::verify_zk_proof))
         .layer(cors)
         .with_state(shared_state);

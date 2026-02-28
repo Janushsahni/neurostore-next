@@ -23,6 +23,7 @@ rand = "0.8"
 sha2 = "0.10"
 hex = "0.4"
 bytes = "1"
+libp2p-identity = { version = "0.2", features = ["peerid"] }
 
 [profile.release]
 opt-level = 3

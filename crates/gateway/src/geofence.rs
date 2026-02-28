@@ -7,6 +7,12 @@ pub struct GeoFenceManager {
     reader: Option<Reader<Vec<u8>>>,
 }
 
+impl Default for GeoFenceManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GeoFenceManager {
     pub fn new() -> Self {
         // In a production environment, the MaxMind GeoLite2-Country.mmdb 

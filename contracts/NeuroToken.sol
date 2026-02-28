@@ -63,7 +63,8 @@ contract NeuroToken is ERC20, Ownable {
         uint256 activeGB = storageAllocationsGB[operator];
 
         // Autonomous Market Maker logic: Issue tokens sequentially based on rigorous PoSt runtime
-        uint256 rewardAmount = (timeDelta / SECONDS_PER_EPOCH) * activeGB * REWARD_PER_EPOCH_PER_GB;
+        // Multiply before divide to ensure 100% precision even for sub-epoch runtimes
+        uint256 rewardAmount = (timeDelta * activeGB * REWARD_PER_EPOCH_PER_GB) / SECONDS_PER_EPOCH;
 
         require(rewardAmount > 0, "Insufficient epoch runtime for streaming block.");
 

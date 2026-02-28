@@ -2736,6 +2736,7 @@ dependencies = [
 name = "neuro-node"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
  "anyhow",
  "async-trait",
  "base64 0.22.1",
@@ -2837,6 +2838,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "zeroize",
 ]
 
 [[package]]

@@ -1,75 +1,94 @@
 version: '3.8'
 
+x-logging:
+  &default-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   neurostore-db:
     image: postgres:16-alpine
     container_name: neurostore-postgres
-    command: postgres -c max_connections=1000
-    environment:
-      POSTGRES_USER: neuro_admin
-      POSTGRES_PASSWORD: neuro_dev_password_2026
-      POSTGRES_DB: neurostore_production
+    command: postgres -c max_connections=1000 -c shared_buffers=256MB
+    env_file:
+      - .env
     ports:
       - "5432:5432"
     volumes:
       - neurostore-db-data:/var/lib/postgresql/data
     restart: unless-stopped
+    logging: *default-logging
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U neuro_admin -d neurostore_production" ]
-      interval: 5s
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      interval: 10s
       timeout: 5s
       retries: 5
 
   neurostore-redis:
     image: redis:7-alpine
     container_name: neurostore-redis
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
+    volumes:
+      - neurostore-redis-data:/data
     restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # HA Gateway Mesh (Replicated stateless nodes)
   neurostore-gateway:
     build:
       context: ../
       dockerfile: deploy/Dockerfile.gateway
     deploy:
       replicas: 3
-    environment:
-      - DATABASE_URL=postgres://neuro_admin:neuro_dev_password_2026@neurostore-db:5432/neurostore_production
-      - REDIS_URL=redis://neurostore-redis:6379
-      - RUST_LOG=info
-      - METADATA_SECRET=neurostore_v9_production_secret_high_entropy
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+    env_file:
+      - .env
     depends_on:
       neurostore-db:
         condition: service_healthy
       neurostore-redis:
-        condition: service_started
+        condition: service_healthy
     restart: always
+    logging: *default-logging
 
+  # S3 Compatible HTTP Load Balancer
+  # Only handles HTTP traffic. P2P swarm traffic is directly handled by each gateway's LibP2P AutoNAT/Relay integration
   neurostore-lb:
     image: nginx:alpine
     container_name: neurostore-lb
     ports:
-      - "9009:80" # Load balanced API
-      - "9010:9010" # Load balanced P2P
+      - "9009:80" # Load balanced S3 API
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.ha.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - neurostore-gateway
     restart: always
+    logging: *default-logging
 
   neurostore-sentinel:
     build:
       context: ../
       dockerfile: deploy/Dockerfile.sentinel
     container_name: neurostore-ai-sentinel
-    environment:
-      - DATABASE_URL=postgres://neuro_admin:neuro_dev_password_2026@neurostore-db:5432/neurostore_production
+    env_file:
+      - .env
     depends_on:
       neurostore-db:
         condition: service_healthy
-      neurostore-gateway:
-        condition: service_started
     restart: always
+    logging: *default-logging
 
   neurostore-web:
     build:
@@ -77,8 +96,10 @@ services:
       dockerfile: deploy/Dockerfile.web
     container_name: neurostore-react-dashboard
     ports:
-      - "80:80" # Frontend UI Port
+      - "80:80" 
     restart: always
+    logging: *default-logging
 
 volumes:
   neurostore-db-data:
+  neurostore-redis-data:

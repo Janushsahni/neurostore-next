@@ -609,8 +609,11 @@ async fn run_upload(args: UploadArgs) -> Result<()> {
                 if let Some(state) = inflight.remove(&request_id) {
                     match response {
                         ChunkReply::Store(store_resp) => {
-                            let verified = store_resp
-                                .verify_receipt(&state.dispatch.cid, state.dispatch.len);
+                            let verified = store_resp.verify_receipt(
+                                &state.dispatch.peer_id,
+                                &state.dispatch.cid,
+                                state.dispatch.len,
+                            );
                             let now_ms = chrono::Utc::now().timestamp_millis() as u64;
                             let fresh = store_resp.is_fresh(now_ms, max_age_ms);
                             println!(
@@ -820,8 +823,11 @@ async fn run_retrieve(args: RetrieveArgs) -> Result<()> {
                         ChunkReply::Retrieve(reply) => {
                             let key = (state.chunk_index, state.shard_index);
                             if let std::collections::hash_map::Entry::Vacant(e) = completed.entry(key) {
+                                let Ok(peer_id) = extract_peer_id(&state.peers[state.attempt]) else {
+                                    return Err(anyhow!("invalid peer address in retrieve state"));
+                                };
                                 if reply.found
-                                    && reply.verify_proof(&state.cid)
+                                    && reply.verify_proof(&peer_id, &state.cid)
                                     && reply.is_fresh(
                                         chrono::Utc::now().timestamp_millis() as u64,
                                         max_age_ms,
@@ -1049,8 +1055,11 @@ async fn run_store_prepared(args: StorePreparedArgs) -> Result<()> {
                 if let Some(state) = inflight.remove(&request_id) {
                     match response {
                         ChunkReply::Store(store_resp) => {
-                            let verified = store_resp
-                                .verify_receipt(&state.dispatch.cid, state.dispatch.len);
+                            let verified = store_resp.verify_receipt(
+                                &state.dispatch.peer_id,
+                                &state.dispatch.cid,
+                                state.dispatch.len,
+                            );
                             let now_ms = chrono::Utc::now().timestamp_millis() as u64;
                             let fresh = store_resp.is_fresh(now_ms, max_age_ms);
                             println!(
@@ -1268,8 +1277,11 @@ async fn run_retrieve_raw(args: RetrieveRawArgs) -> Result<()> {
                         ChunkReply::Retrieve(reply) => {
                             let key = (state.chunk_index, state.shard_index);
                             if let std::collections::hash_map::Entry::Vacant(e) = completed.entry(key) {
+                                let Ok(peer_id) = extract_peer_id(&state.peers[state.attempt]) else {
+                                    return Err(anyhow!("invalid peer address in retrieve state"));
+                                };
                                 if reply.found
-                                    && reply.verify_proof(&state.cid)
+                                    && reply.verify_proof(&peer_id, &state.cid)
                                     && reply.is_fresh(
                                         chrono::Utc::now().timestamp_millis() as u64,
                                         max_age_ms,
@@ -1487,8 +1499,12 @@ async fn run_audit(args: AuditArgs) -> Result<()> {
                 if let Some(mut state) = inflight.remove(&request_id) {
                     match response {
                         ChunkReply::Audit(resp) => {
+                            let Ok(peer_id) = extract_peer_id(&state.peers[state.attempt]) else {
+                                return Err(anyhow!("invalid peer address in audit state"));
+                            };
                             let ok = resp.found
                                 && resp.verify_audit(
+                                    &peer_id,
                                     &state.cid,
                                     &state.challenge_hex,
                                     &state.nonce_hex,
@@ -1756,7 +1772,7 @@ async fn run_autopilot(args: AutopilotArgs) -> Result<()> {
             .await?;
             if let ChunkReply::Retrieve(resp) = reply {
                 if resp.found
-                    && resp.verify_proof(&shard.cid)
+                    && resp.verify_proof(&candidate_peer_id, &shard.cid)
                     && resp.is_fresh(chrono::Utc::now().timestamp_millis() as u64, max_age_ms)
                     && sha256_hex(&resp.data) == shard.cid
                 {
@@ -1797,7 +1813,7 @@ async fn run_autopilot(args: AutopilotArgs) -> Result<()> {
             let (ok, reason) = match store_reply {
                 ChunkReply::Store(resp)
                     if resp.stored
-                        && resp.verify_receipt(&shard.cid, data.len())
+                        && resp.verify_receipt(&target_peer_id, &shard.cid, data.len())
                         && resp
                             .is_fresh(chrono::Utc::now().timestamp_millis() as u64, max_age_ms) =>
                 {

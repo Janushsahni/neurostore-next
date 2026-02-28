@@ -64,6 +64,9 @@ let usedBytes = 0;
 const maxBytes = () => storageGb * 1024 * 1024 * 1024;
 
 function shardPath(cid) {
+    if (!/^[a-f0-9]{64}$/i.test(cid)) {
+        throw new Error("Invalid CID format: Security violation");
+    }
     return path.join(storagePath, "shards", cid.slice(0, 2), `${cid}.bin`);
 }
 

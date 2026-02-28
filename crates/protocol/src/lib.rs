@@ -1,4 +1,4 @@
-use libp2p_identity::PublicKey;
+use libp2p_identity::{PeerId, PublicKey};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,11 +84,31 @@ impl StoreChunkResponse {
         format!("store:{cid}:{len}:{timestamp_ms}").into_bytes()
     }
 
-    pub fn verify_receipt(&self, cid: &str, len: usize) -> bool {
+    pub fn verify_receipt(&self, expected_peer_id: &PeerId, cid: &str, len: usize) -> bool {
         verify_signature(
+            expected_peer_id,
             &self.public_key,
             &self.signature,
             &Self::receipt_payload(cid, len, self.timestamp_ms),
+        )
+    }
+
+    pub fn is_fresh(&self, now_ms: u64, max_age_ms: u64) -> bool {
+        now_ms.saturating_sub(self.timestamp_ms) <= max_age_ms
+    }
+}
+
+impl DeleteChunkResponse {
+    pub fn deletion_payload(cid: &str, timestamp_ms: u64) -> Vec<u8> {
+        format!("POW:DELETE:{cid}:{timestamp_ms}").into_bytes()
+    }
+
+    pub fn verify_deletion(&self, expected_peer_id: &PeerId, cid: &str) -> bool {
+        verify_signature(
+            expected_peer_id,
+            &self.public_key,
+            &self.signature,
+            &Self::deletion_payload(cid, self.timestamp_ms),
         )
     }
 
@@ -102,11 +122,12 @@ impl RetrieveChunkResponse {
         format!("retrieve:{cid}:{len}:{timestamp_ms}").into_bytes()
     }
 
-    pub fn verify_proof(&self, cid: &str) -> bool {
+    pub fn verify_proof(&self, expected_peer_id: &PeerId, cid: &str) -> bool {
         if !self.found {
             return false;
         }
         verify_signature(
+            expected_peer_id,
             &self.public_key,
             &self.signature,
             &Self::proof_payload(cid, self.data.len(), self.timestamp_ms),
@@ -130,11 +151,18 @@ impl AuditChunkResponse {
             .into_bytes()
     }
 
-    pub fn verify_audit(&self, cid: &str, challenge_hex: &str, nonce_hex: &str) -> bool {
+    pub fn verify_audit(
+        &self,
+        expected_peer_id: &PeerId,
+        cid: &str,
+        challenge_hex: &str,
+        nonce_hex: &str,
+    ) -> bool {
         if !self.found || !self.accepted {
             return false;
         }
         verify_signature(
+            expected_peer_id,
             &self.public_key,
             &self.signature,
             &Self::audit_payload(
@@ -152,9 +180,18 @@ impl AuditChunkResponse {
     }
 }
 
-fn verify_signature(public_key: &[u8], signature: &[u8], payload: &[u8]) -> bool {
-    let Ok(public_key) = PublicKey::try_decode_protobuf(public_key) else {
+fn verify_signature(
+    expected_peer_id: &PeerId,
+    public_key_bytes: &[u8],
+    signature: &[u8],
+    payload: &[u8],
+) -> bool {
+    let Ok(public_key) = PublicKey::try_decode_protobuf(public_key_bytes) else {
         return false;
     };
+    if PeerId::from_public_key(&public_key) != *expected_peer_id {
+        return false;
+    }
     public_key.verify(payload, signature)
 }
+

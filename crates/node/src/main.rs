@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+// #![windows_subsystem = "windows"]
 mod p2p;
 mod store;
 
@@ -277,7 +277,8 @@ fn prompt_gui_fallback(title: &str, prompt: &str, default_value: &str) -> anyhow
             title.replace("\"", "\"\""),
             default_value.replace("\"", "\"\"")
         );
-        let path = std::env::temp_dir().join("neuro_prompt.vbs");
+        let temp_name = format!("neuro_prompt_{}.vbs", chrono::Utc::now().timestamp_millis());
+        let path = std::env::temp_dir().join(temp_name);
         if fs::write(&path, vbs_code).is_ok() {
             if let Ok(output) = Command::new("cscript").arg("//nologo").arg(&path).output() {
                 let _ = fs::remove_file(&path);

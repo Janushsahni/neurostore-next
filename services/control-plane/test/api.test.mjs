@@ -119,9 +119,9 @@ describe("Node Registry", () => {
         assert.equal(json.status, "active");
 
         const { json: hb } = await api("POST", "/v1/nodes/heartbeat", {
-            peer_id: "QmTestPeer123", used_gb: 12.5, score: 87.5,
+            peer_id: "QmTestPeer123", used_gb: 12.5, latency_ms: 100
         });
-        assert.equal(hb.score, 87.5);
+        assert.equal(hb.score, 51);
     });
 
     it("GET /v1/nodes lists all nodes", async () => {

@@ -16,8 +16,6 @@ use chrono::{Utc, Duration};
 use crate::AppState;
 use crate::models::{LoginRequest, RegisterRequest, AuthResponse, UserProfile, Claims};
 
-const JWT_SECRET: &[u8] = b"neurostore-dev-jwt-secret-key-2026";
-
 pub async fn register(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RegisterRequest>,
@@ -63,7 +61,7 @@ pub async fn register(
 
     match insert_result {
         Ok(_) => {
-            let token = create_jwt(&email);
+            let token = create_jwt(&email, &state.jwt_secret);
             let response = AuthResponse {
                 token,
                 user: UserProfile { email, name },
@@ -105,7 +103,7 @@ pub async fn login(
         return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "error": "Invalid credentials" })));
     }
 
-    let token = create_jwt(&user_row.email);
+    let token = create_jwt(&user_row.email, &state.jwt_secret);
     let name = user_row.name.unwrap_or_else(|| user_row.email.clone());
 
     let response = AuthResponse {
@@ -115,7 +113,7 @@ pub async fn login(
     (StatusCode::OK, Json(serde_json::json!(response)))
 }
 
-fn create_jwt(email: &str) -> String {
+fn create_jwt(email: &str, secret: &str) -> String {
     let expiration = Utc::now()
         .checked_add_signed(Duration::days(1))
         .expect("valid timestamp")
@@ -127,6 +125,6 @@ fn create_jwt(email: &str) -> String {
         exp: expiration,
     };
 
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(JWT_SECRET))
+    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes()))
         .unwrap_or_default()
 }

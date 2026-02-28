@@ -40,6 +40,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 libp2p-identity = "0.2"
 base64 = "0.22"
+aes-gcm = "0.10.3"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7"

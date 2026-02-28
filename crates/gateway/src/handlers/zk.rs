@@ -35,6 +35,7 @@ pub async fn zk_store(
     Path((bucket, key)): Path<(String, String)>,
     Json(payload): Json<ZkPayload>,
 ) -> impl IntoResponse {
+    let key = key.trim_start_matches('/').to_string();
     let size = payload.total_bytes as i64;
     let etag = format!("\"zk-{}\"", payload.manifest_root);
     let cid = payload.manifest_root.clone();

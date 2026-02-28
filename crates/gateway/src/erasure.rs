@@ -19,7 +19,7 @@ impl ErasureEncoder {
         
         let mut shards: Vec<Vec<u8>> = vec![vec![0; shard_size]; self.data_shards + self.parity_shards];
         
-        for i in 0..self.data_shards {
+        for (i, shard) in shards.iter_mut().enumerate().take(self.data_shards) {
             let start = i * shard_size;
             let mut end = start + shard_size;
             if end > data.len() {
@@ -27,7 +27,7 @@ impl ErasureEncoder {
             }
             if start < data.len() {
                 let slice = &data[start..end];
-                shards[i][..slice.len()].copy_from_slice(slice);
+                shard[..slice.len()].copy_from_slice(slice);
             }
         }
         
@@ -40,10 +40,8 @@ impl ErasureEncoder {
         self.rs.reconstruct(&mut shards).map_err(|e| anyhow::anyhow!("RS Decode Error: {:?}", e))?;
         
         let mut result = Vec::new();
-        for i in 0..self.data_shards {
-            if let Some(ref shard) = shards[i] {
-                result.extend_from_slice(shard);
-            }
+        for shard in shards.iter().take(self.data_shards).flatten() {
+            result.extend_from_slice(shard);
         }
         
         Ok(result)

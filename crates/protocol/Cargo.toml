@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 serde = { workspace = true }
-libp2p-identity = { version = "0.2" }
+libp2p-identity = { version = "0.2", features = ["peerid"] }

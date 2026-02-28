@@ -286,17 +286,15 @@ impl P2pNode {
                         self.peer_ips.remove(&peer_id);
                     }
                     SwarmEvent::Behaviour(NeuroStoreBehaviourEvent::Chunk(request_response::Event::Message { 
-                        peer: _, message 
+                        peer: _, message: request_response::Message::Response { request_id, response } 
                     })) => {
-                        if let request_response::Message::Response { request_id, response } = message {
-                            if let Some(tx) = self.pending_retrievals.remove(&request_id) {
-                                if let ChunkReply::Retrieve(res) = response {
-                                    let _ = tx.send(if res.found { Some(res.data) } else { None });
-                                }
-                            } else if let Some(tx) = self.pending_deletions.remove(&request_id) {
-                                if let ChunkReply::Delete(res) = response {
-                                    let _ = tx.send(res.deleted);
-                                }
+                        if let Some(tx) = self.pending_retrievals.remove(&request_id) {
+                            if let ChunkReply::Retrieve(res) = response {
+                                let _ = tx.send(if res.found { Some(res.data) } else { None });
+                            }
+                        } else if let Some(tx) = self.pending_deletions.remove(&request_id) {
+                            if let ChunkReply::Delete(res) = response {
+                                let _ = tx.send(res.deleted);
                             }
                         }
                     }

@@ -35,6 +35,7 @@ rand = { workspace = true }
 sha2 = { workspace = true }
 aes-gcm = "0.10"
 aead = "0.5"
+zeroize = { version = "1.7", features = ["derive"] }
 
 
 # P2P & Erasure Coding (Phases 9 & 10)
