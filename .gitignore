@@ -31,3 +31,4 @@ services/control-plane/.env
 *.log
 *.zip
 peer_id.txt
+**/node_identity.key

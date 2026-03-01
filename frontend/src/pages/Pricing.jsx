@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Check, CreditCard, Lock, X, Loader2 } from 'lucide-react';
+import { isAuthenticated } from '../lib/authStorage';
 
 export const Pricing = () => {
     const navigate = useNavigate();
@@ -8,8 +9,7 @@ export const Pricing = () => {
     const [isProcessing, setIsProcessing] = useState(false);
 
     const handleSubscribe = () => {
-        const token = localStorage.getItem('neuro_token');
-        if (!token) {
+        if (!isAuthenticated()) {
             navigate('/login');
             return;
         }

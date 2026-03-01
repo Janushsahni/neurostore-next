@@ -4,26 +4,29 @@ import { encryptFile, decryptFile } from '../lib/crypto';
 import DOMPurify from 'dompurify';
 import { toast } from 'react-hot-toast';
 import { API_BASE } from '../lib/config';
+import { getCsrfToken } from '../lib/authStorage';
 
 export const DriveDashboard = () => {
     const [files, setFiles] = useState([]);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadState, setUploadState] = useState({ progress: 0, text: '' });
     const [storageUsed, setStorageUsed] = useState(0);
-    const [vaultPassword, setVaultPassword] = useState('neuro-hackathon-key'); // Default for demo
+    const [vaultPassword, setVaultPassword] = useState('');
     const [previewFile, setPreviewFile] = useState(null); // { url, type, name }
 
     const BUCKET_NAME = "user-drive";
     const S3_GATEWAY_URL = API_BASE;
+    const encodeKey = (name) => encodeURIComponent(name);
 
     const getAuthHeaders = () => {
-        const token = localStorage.getItem('neuro_token');
-        return { 'Authorization': `Bearer ${token}` };
+        const csrfToken = getCsrfToken();
+        return csrfToken ? { 'x-csrf-token': csrfToken } : {};
     };
 
     const fetchFiles = async () => {
         try {
-            const response = await fetch(`${S3_GATEWAY_URL}/s3/${BUCKET_NAME}`, {
+            const response = await fetch(`${S3_GATEWAY_URL}/${BUCKET_NAME}`, {
+                credentials: 'include',
                 headers: getAuthHeaders()
             });
             if (!response.ok) return;
@@ -73,12 +76,12 @@ export const DriveDashboard = () => {
         const cid = await generateCID(file);
 
         try {
-            const token = localStorage.getItem('neuro_token');
-            const dedupRes = await fetch(`${S3_GATEWAY_URL}/s3/deduplicate/${BUCKET_NAME}/${file.name}`, {
+            const dedupRes = await fetch(`${S3_GATEWAY_URL}/api/deduplicate/${BUCKET_NAME}/${encodeKey(file.name)}`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders(),
                 },
                 body: JSON.stringify({ cid })
             });
@@ -99,11 +102,14 @@ export const DriveDashboard = () => {
         return new Promise((resolve, reject) => {
             // 2. Real XHR Upload
             const xhr = new XMLHttpRequest();
-            xhr.open('PUT', `${S3_GATEWAY_URL}/s3/${BUCKET_NAME}/${file.name}`, true);
+            xhr.open('PUT', `${S3_GATEWAY_URL}/${BUCKET_NAME}/${encodeKey(file.name)}`, true);
+            xhr.withCredentials = true;
 
-            const token = localStorage.getItem('neuro_token');
-            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+            const csrfToken = getCsrfToken();
+            if (csrfToken) {
+                xhr.setRequestHeader('x-csrf-token', csrfToken);
+            }
 
             // Track real network progress
             xhr.upload.onprogress = (e) => {
@@ -167,7 +173,8 @@ export const DriveDashboard = () => {
             }
 
             // 1. Fetch Ciphertext
-            const response = await fetch(`${S3_GATEWAY_URL}/s3/${BUCKET_NAME}/${fileName}`, {
+            const response = await fetch(`${S3_GATEWAY_URL}/${BUCKET_NAME}/${encodeKey(fileName)}`, {
+                credentials: 'include',
                 headers: getAuthHeaders()
             });
 

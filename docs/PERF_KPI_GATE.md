@@ -1,46 +1,47 @@
 # Performance KPI Gate
 
-This benchmark harness measures local Option A control-plane + S3 gateway behavior and optionally enforces KPI gates.
+This benchmark script validates authenticated object PUT/GET performance through the deployed gateway.
+
+## Prerequisites
+
+Start the stack first:
+
+```bash
+docker compose -f deploy/docker-compose.yml up --build -d
+```
 
 ## Run
 
-Start stack first:
-
-```bash
-docker compose --env-file deploy/.env.option-a.prod -f deploy/docker-compose.option-a.yml up --build -d
-```
-
-Run benchmark report:
+Benchmark report only:
 
 ```bash
 scripts/perf-kpi-gate.sh
 ```
 
-Run strict KPI gate (non-zero exit on target miss):
+Strict gate (non-zero exit when thresholds are missed):
 
 ```bash
 scripts/perf-kpi-gate.sh --strict
 ```
 
-## What it measures
+## Script behavior
 
-- `PUT` latency and success ratio through S3 gateway.
-- `GET` latency and success ratio through S3 gateway (with payload integrity check).
-- `POST /v1/placement/suggest` latency and success ratio.
-- `GET /v1/ai/placement/strategy` latency and success ratio.
-- `GET /v1/ai/nodes/risk` latency and success ratio.
+- Registers a temporary user via `POST /auth/register`.
+- Uses session cookies + CSRF token to run authenticated S3-style requests.
+- Runs `PUT` and `GET` loops on `/:bucket/:key`.
+- Verifies payload integrity for each sample.
+- Deletes each object to avoid benchmark data growth.
 
-## KPI targets in strict mode
+## Default strict thresholds
 
+- `success_rate >= 1.0`
 - `put_p95_ms <= 700`
 - `get_p95_ms <= 400`
 - `get_p99_ms <= 900`
-- `placement_p95_ms <= 250`
-- `ai_strategy_p95_ms <= 200`
-- `ai_risk_p95_ms <= 180`
-- all operation success rates = `100%` for sampled runs
 
-## Notes
+You can override thresholds with:
 
-- Competitor values in the report are reference comparators only.
-- This harness validates local segment performance and release gates; it does not prove global network superiority by itself.
+- `--max-put-p95-ms`
+- `--max-get-p95-ms`
+- `--max-get-p99-ms`
+- `--min-success-rate`

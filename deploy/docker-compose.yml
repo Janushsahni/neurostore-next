@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-logging:
   &default-logging
   driver: "json-file"
@@ -47,12 +45,6 @@ services:
     build:
       context: ../
       dockerfile: deploy/Dockerfile.gateway
-    deploy:
-      replicas: 3
-      resources:
-        limits:
-          cpus: '2'
-          memory: 4G
     env_file:
       - .env
     depends_on:
@@ -60,6 +52,12 @@ services:
         condition: service_healthy
       neurostore-redis:
         condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9009/readyz || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: always
     logging: *default-logging
 
@@ -73,7 +71,14 @@ services:
     volumes:
       - ./nginx.ha.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - neurostore-gateway
+      neurostore-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/readyz || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: always
     logging: *default-logging
 

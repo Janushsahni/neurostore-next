@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="${ROOT_DIR}/deploy/.env.option-a.prod"
+ENV_FILE="${ROOT_DIR}/deploy/.env.option-a"
 STRICT=0
 KUBECTL_IMAGE="bitnami/kubectl:latest"
 KUBECONFORM_IMAGE="ghcr.io/yannh/kubeconform:v0.6.7"

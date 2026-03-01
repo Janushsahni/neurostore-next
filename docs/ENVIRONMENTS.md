@@ -1,16 +1,19 @@
 # Environment Strategy
 
 ## Local sandbox
-- Compose stack from `deploy/docker-compose.option-a.yml`
-- 2 local provider nodes + control plane + observability
-- used for developer iteration and protocol smoke tests
+- Primary stack: `deploy/docker-compose.yml`
+- Includes Postgres, Redis, gateway, load balancer, sentinel, and web UI.
+- Use for developer iteration and smoke/perf checks.
+
+## Compatibility stack
+- `deploy/docker-compose.option-a.yml` is a compatibility compose profile for control-plane + gateway + node flows.
+- Use only when validating legacy Option-A control-plane behavior.
 
 ## Testnet
-- open onboarding for providers with capped payouts
-- synthetic workload generators and chaos schedule
-- SLA is best-effort, not contractual
+- Open provider onboarding with capped payouts and synthetic load schedules.
+- SLA remains best-effort.
 
 ## Mainnet
-- staged provider onboarding with risk scoring
-- contractual SLOs for paid tenants
-- progressive regional expansion and capacity controls
+- Staged provider onboarding with risk scoring.
+- Contractual SLOs for paid tenants.
+- Progressive regional expansion with explicit capacity gates.

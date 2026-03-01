@@ -4,6 +4,7 @@ use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
     AeadCore, Aes256Gcm, Key, Nonce,
 };
+use sha2::Digest;
 
 const USED_BYTES_KEY: &[u8] = b"__meta:used_bytes";
 const ENCRYPTION_KEY: &[u8] = b"__meta:node_encryption_key";
@@ -59,9 +60,20 @@ impl SecureBlockStore {
 
         // Node-level End-to-End Encryption
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits
+        
+        // ── SELF-VERIFYING SHARD MERKLEIZATION (BIT-ROT PROTECTION) ──
+        // Over a 10-year lifespan, HDD platters and SSD gates experience bit-flips.
+        // We calculate a strict SHA-256 checksum of the RAW data before encryption.
+        // This ensures we can mathematically detect physical hardware corruption 
+        // later during retrieval.
+        let mut hasher = sha2::Sha256::new();
+        sha2::Digest::update(&mut hasher, raw_data);
+        let checksum = hasher.finalize();
+
         let encrypted_data = match self.cipher.encrypt(&nonce, raw_data) {
             Ok(enc) => {
                 let mut payload = nonce.to_vec();
+                payload.extend_from_slice(&checksum); // Append the 32-byte checksum
                 payload.extend_from_slice(&enc);
                 payload
             }
@@ -79,7 +91,6 @@ impl SecureBlockStore {
         self.db.insert(key, encrypted_data)?;
         write_used_bytes(&self.db, projected)?;
 
-        // REMOVED: self.db.flush()? to resolve I/O bottleneck
         Ok(true)
     }
 
@@ -91,13 +102,30 @@ impl SecureBlockStore {
         };
 
         if let Some(payload) = raw_lookup {
-            if payload.len() < 12 {
-                return Ok(Some(payload.to_vec())); // Legacy unencrypted fallback
+            if payload.len() < 12 + 32 { // 12 bytes nonce + 32 bytes checksum
+                // Legacy unencrypted fallback (or corrupt data)
+                return Ok(Some(payload.to_vec())); 
             }
             let nonce = Nonce::from_slice(&payload[0..12]);
-            let ciphertext = &payload[12..];
+            let stored_checksum = &payload[12..44];
+            let ciphertext = &payload[44..];
+            
             match self.cipher.decrypt(nonce, ciphertext) {
-                Ok(decrypted) => Ok(Some(decrypted)),
+                Ok(decrypted) => {
+                    // Verify the checksum to detect Bit-Rot
+                    let mut hasher = sha2::Sha256::new();
+                    sha2::Digest::update(&mut hasher, &decrypted);
+                    let computed_checksum = hasher.finalize();
+                    
+                    if computed_checksum.as_slice() != stored_checksum {
+                        // Data is decrypted but physically corrupted on disk.
+                        // In a full implementation, we trigger the Repair Daemon here.
+                        eprintln!("CRITICAL ALERT: Silent Bit-Rot detected for shard CID {}", cid);
+                        return Ok(None); // Treat as missing so the gateway asks another node
+                    }
+                    
+                    Ok(Some(decrypted))
+                },
                 Err(_) => Ok(Some(payload.to_vec())), // Legacy fallback
             }
         } else {

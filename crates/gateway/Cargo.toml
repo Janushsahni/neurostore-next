@@ -8,7 +8,6 @@ description = "NeuroStore V3 Enterprise S3 API Gateway & P2P Router"
 # Web Server & Async
 axum = { version = "0.7", features = ["multipart"] }
 tokio = { version = "1.36", features = ["full"] }
-tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
 moka = { version = "0.12", features = ["future"] }
 
@@ -33,6 +32,7 @@ jsonwebtoken = "9.3"
 argon2 = "0.5" # Industry standard password hashing (upgrade from bcrypt)
 rand = { workspace = true }
 sha2 = { workspace = true }
+hmac = "0.12"
 aes-gcm = "0.10"
 aead = "0.5"
 zeroize = { version = "1.7", features = ["derive"] }
@@ -48,5 +48,3 @@ bincode = "1.0"
 async-trait = "0.1"
 neuro-protocol = { path = "../protocol" }
 maxminddb = "0.24"
-
-

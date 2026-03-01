@@ -309,17 +309,25 @@ fn compute_churn_probability(model: &PeerModel, metrics: &NodeMetrics) -> f64 {
 }
 
 fn compute_dynamic_price(reputation: f64, action: &str) -> f64 {
-    let base = 0.005;
+    // ── PROFIT-ALIGNED PAYOUT MODEL (INR) ──
+    // User Charge: ₹1.00 / GB / Month
+    // Max COGS budget: ₹0.50 (for 2.0x redundancy)
+    // Target Physical Payout: ₹0.25 - ₹0.30 per GB
+    
+    let base_physical_payout = 0.25; 
+    
     let multiplier = match action {
-        "promote" => 1.5,
-        "hold" => 1.0,
-        "probation" => 0.5,
-        "proactive_evict" => 0.2, // Evicting early, lower payout
-        "quarantine" => 0.1,
-        "evict" => 0.0, // Slashed
+        "promote" => 1.2,         // Best nodes earn ₹0.30
+        "hold" => 1.0,            // Healthy nodes earn ₹0.25
+        "probation" => 0.5,       // At-risk nodes earn ₹0.12
+        "proactive_evict" => 0.2, // Graceful exit, lower payout
+        "quarantine" => 0.1,      // Poor nodes earn ₹0.02
+        "evict" => 0.0,           // Slashed
         _ => 1.0,
     };
-    (base * multiplier * (reputation / 100.0)).clamp(0.0, 0.05)
+
+    // Reputation scaling: A node with 50% reputation earns half its tier's payout
+    (base_physical_payout * multiplier * (reputation / 100.0)).clamp(0.0, 0.50)
 }
 
 fn compute_composite_score(factors: &ScoreFactors) -> f64 {

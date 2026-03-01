@@ -1,226 +1,309 @@
-import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { HardDrive, LogOut, Settings, Shield, Laptop, Key, CheckCircle, X, History } from 'lucide-react';
-import { Toaster, toast } from 'react-hot-toast';
+﻿import React, { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate } from "react-router-dom";
+import {
+  ArrowRight,
+  Cpu,
+  Database,
+  Globe,
+  HardDrive,
+  Lock,
+  LogOut,
+  Menu,
+  Server,
+  ShieldCheck,
+  Sparkles,
+  X,
+  Zap,
+} from "lucide-react";
+import { Toaster, toast } from "react-hot-toast";
 
-import { Login, Register } from './pages/Auth';
-import { DriveDashboard } from './pages/DriveDashboard';
-import { NodeDashboard } from './pages/NodeDashboard';
-import { FAQ } from './pages/FAQ';
-import { Download } from './pages/Download';
-import { Pricing } from './pages/Pricing';
+import { Login, Register } from "./pages/Auth";
+import { DriveDashboard } from "./pages/DriveDashboard";
+import { NodeDashboard } from "./pages/NodeDashboard";
+import { FAQ } from "./pages/FAQ";
+import { Download } from "./pages/Download";
+import { Pricing } from "./pages/Pricing";
+import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
+import { apiJson } from "./lib/apiClient";
 
-const SettingsModal = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
-
+const FeatureCard = ({ icon: Icon, title, description, badge }) => {
+  const iconEl = React.createElement(Icon, { size: 20 });
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-card w-full max-w-2xl rounded-2xl flex flex-col overflow-hidden border border-border shadow-2xl relative">
-        <div className="flex items-center justify-between p-6 border-b border-border bg-background/50">
-          <h3 className="text-xl font-bold flex items-center gap-2">
-            <Settings size={22} className="text-primary" />
-            Account & Security
-          </h3>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-            <X size={20} />
-          </button>
+    <article className="glass-card interactive-card p-6 md:p-8 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="hero-glow inline-flex rounded-xl bg-primary/15 p-3 text-primary">
+          {iconEl}
         </div>
-
-        <div className="p-6 md:p-8 space-y-8 overflow-y-auto max-h-[70vh]">
-          {/* MFA Section */}
-          <div className="space-y-4">
-            <h4 className="font-bold text-gray-200 flex items-center gap-2 border-b border-border/50 pb-2">
-              <Shield size={18} className="text-blue-400" /> Multi-Factor Authentication
-            </h4>
-            <div className="flex items-center justify-between bg-blue-500/5 border border-blue-500/20 p-4 rounded-xl">
-              <div>
-                <p className="font-semibold text-sm">Authenticator App (TOTP)</p>
-                <p className="text-xs text-muted mt-1">Use Google Authenticator or Authy to generate one-time codes.</p>
-              </div>
-              <button onClick={() => toast.success("MFA Setup instructions sent to email.")} className="bg-primary hover:bg-primary/90 text-background px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-[0_0_15px_rgba(0,240,255,0.3)]">
-                Enable 2FA
-              </button>
-            </div>
-            <div className="flex items-center justify-between bg-background/50 border border-border/50 p-4 rounded-xl opacity-75">
-              <div>
-                <p className="font-semibold text-sm">Hardware Security Key</p>
-                <p className="text-xs text-muted mt-1">Require a YubiKey or biometric passkey for access.</p>
-              </div>
-              <button disabled className="bg-white/5 text-muted px-4 py-2 rounded-lg text-sm font-medium border border-border">
-                Coming Soon
-              </button>
-            </div>
-          </div>
-
-          {/* Active Sessions */}
-          <div className="space-y-4">
-            <h4 className="font-bold text-gray-200 flex items-center gap-2 border-b border-border/50 pb-2">
-              <Laptop size={18} className="text-green-400" /> Active Sessions
-            </h4>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between bg-background/50 border border-border/50 p-4 rounded-xl">
-                <div className="flex items-start gap-4">
-                  <div className="mt-1"><Laptop size={20} className="text-muted" /></div>
-                  <div>
-                    <p className="font-medium text-sm flex items-center gap-2">MacBook Pro (Chrome) <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Current</span></p>
-                    <p className="text-xs text-muted mt-1">San Francisco, CA • IP: 192.168.1.1</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Local Vault Key */}
-          <div className="space-y-4">
-            <h4 className="font-bold text-gray-200 flex items-center gap-2 border-b border-border/50 pb-2">
-              <Key size={18} className="text-purple-400" /> API Access & Vault
-            </h4>
-            <div className="flex items-center justify-between bg-background/50 border border-border/50 p-4 rounded-xl">
-              <div>
-                <p className="font-semibold text-sm">Regenerate Web3 Vault Key</p>
-                <p className="text-xs text-muted mt-1 max-w-sm">Force expiration of the current background WebAssembly key. You will need to re-enter your master password.</p>
-              </div>
-              <button onClick={() => toast.success("Vault cache cleared successfully.")} className="border border-red-500/30 text-red-400 hover:bg-red-500/10 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                Reset Keys
-              </button>
-            </div>
-          </div>
-        </div>
+        {badge ? <span className="rounded-full border border-primary/35 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">{badge}</span> : null}
       </div>
+      <h3 className="mb-2 text-xl font-bold">{title}</h3>
+      <p className="text-sm text-muted leading-relaxed">{description}</p>
+    </article>
+  );
+};
+
+const StatCard = ({ label, value, accent }) => (
+  <div className="glass-card p-4 md:p-5">
+    <p className={`text-2xl md:text-3xl font-display font-extrabold ${accent}`}>{value}</p>
+    <p className="mt-1 text-xs uppercase tracking-wider text-muted">{label}</p>
+  </div>
+);
+
+const ProtectedRoute = ({ isAuthenticated, children }) => {
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
+const LandingPage = () => {
+  return (
+    <div className="selection:bg-primary/30">
+      <section className="relative overflow-hidden px-6 pb-18 pt-24 md:pt-30">
+        <div className="hero-orb absolute -left-24 top-20 h-56 w-56 rounded-full bg-primary/14 blur-3xl" />
+        <div className="hero-orb absolute -right-20 top-8 h-56 w-56 rounded-full bg-amber-300/12 blur-3xl" />
+
+        <div className="mx-auto max-w-6xl text-center">
+          <div className="appear-up mb-6 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/8 px-4 py-2 text-xs font-semibold text-primary">
+            <Sparkles size={14} /> Sovereign Cloud Storage, Rebuilt for High-Churn Networks
+          </div>
+
+          <h1 className="appear-up mb-6 font-display text-5xl font-extrabold leading-tight md:text-7xl">
+            Storage That Feels Fast,
+            <br />
+            <span className="text-gradient">Stays Sovereign, and Pays Node Operators</span>
+          </h1>
+
+          <p className="mx-auto mb-9 max-w-3xl text-base text-muted md:text-lg">
+            NeuroStore combines encrypted object storage, erasure coding, and dynamic shard placement into a deployable S3-style platform for modern applications.
+          </p>
+
+          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Link to="/register" className="btn-primary px-7 py-3.5 inline-flex items-center gap-2">
+              Create Account <ArrowRight size={18} />
+            </Link>
+            <Link to="/download" className="btn-ghost px-7 py-3.5 font-bold hover:border-primary/45 hover:text-white transition">
+              Run a Node and Earn
+            </Link>
+          </div>
+
+          <div className="mx-auto mt-12 grid max-w-4xl grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+            <StatCard label="Regional Latency Target" value="<= 400ms" accent="text-primary" />
+            <StatCard label="Retrieval Reliability" value="99.95%" accent="text-emerald-300" />
+            <StatCard label="Zero-Knowledge" value="Client-side" accent="text-amber-200" />
+            <StatCard label="S3-Style API" value="Drop-in" accent="text-sky-200" />
+          </div>
+        </div>
+      </section>
+
+      <section className="px-6 py-16">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-10 text-center">
+            <h2 className="mb-3 text-3xl font-display font-bold md:text-4xl">Built for Scale and Operator Confidence</h2>
+            <p className="mx-auto max-w-3xl text-muted">From multi-tenant object pipelines to provider earnings, every layer is designed for practical deployment and observable operations.</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <FeatureCard
+              icon={Zap}
+              badge="Performance"
+              title="Parallel Racing Retrieval"
+              description="Reads are issued across many shard peers and reconstruction completes as soon as the threshold is met, reducing tail-latency sensitivity."
+            />
+            <FeatureCard
+              icon={ShieldCheck}
+              badge="Security"
+              title="Client-First Encryption"
+              description="Files are encrypted in-browser before upload. Gateway-side checks enforce signed auth flow and CSRF protections for session operations."
+            />
+            <FeatureCard
+              icon={Server}
+              badge="Operations"
+              title="Provider-Centric Node Mesh"
+              description="Node operators contribute storage capacity, receive performance scoring, and participate in durable shard placement with policy controls."
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="px-6 pb-20 pt-6">
+        <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-2">
+          <div className="glass-card interactive-card p-7 md:p-8 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">For Builders</p>
+            <h3 className="mb-3 text-2xl font-display font-bold">Integrate in Minutes</h3>
+            <p className="mb-6 text-sm text-muted leading-relaxed">Use familiar bucket/object semantics and onboard existing workloads with minimal app rewrites.</p>
+            <div className="flex items-center gap-3 text-sm text-slate-300"><Database size={16} /> S3-style object routes</div>
+            <div className="mt-2 flex items-center gap-3 text-sm text-slate-300"><Cpu size={16} /> Erasure reconstruction pipeline</div>
+            <div className="mt-2 flex items-center gap-3 text-sm text-slate-300"><Lock size={16} /> CSRF-aware session API</div>
+            <Link to="/pricing" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-primary hover:text-emerald-200 transition">View Pricing <ArrowRight size={16} /></Link>
+          </div>
+
+          <div className="glass-card interactive-card p-7 md:p-8 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-200">For Node Operators</p>
+            <h3 className="mb-3 text-2xl font-display font-bold">Contribute Storage, Earn Rewards</h3>
+            <p className="mb-6 text-sm text-muted leading-relaxed">Run the node client, register peer identity, declare capacity, and stay online to maximize scoring and payout potential.</p>
+            <div className="flex items-center gap-3 text-sm text-slate-300"><HardDrive size={16} /> Configurable storage allocation</div>
+            <div className="mt-2 flex items-center gap-3 text-sm text-slate-300"><Globe size={16} /> Location-aware placement metadata</div>
+            <div className="mt-2 flex items-center gap-3 text-sm text-slate-300"><ShieldCheck size={16} /> Signed proof workflows</div>
+            <Link to="/download" className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-primary hover:text-emerald-200 transition">Download Node Tools <ArrowRight size={16} /></Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-white/8 px-6 py-10 text-center text-xs text-muted">
+        <p>NeuroStore platform UI. Secure-by-default session flow and protected dashboards enabled.</p>
+      </footer>
     </div>
   );
 };
 
-// Helper component for Navbar to wire fake Authentication status
-const Navbar = ({ isAuthenticated, setIsAuthenticated }) => {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+const Navbar = ({ isAuthenticated, onLogout }) => {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const closeMobile = () => setMobileOpen(false);
 
   return (
-    <>
-      <nav className="glass-nav sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 font-display font-bold text-xl">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-primary flex items-center justify-center text-background">
-            <HardDrive size={20} />
-          </div>
+    <header className="sticky top-0 z-50">
+      <nav className="glass-nav mx-auto flex max-w-7xl items-center justify-between px-5 py-3 md:px-7">
+        <Link to="/" onClick={closeMobile} className="inline-flex items-center gap-2 text-lg font-display font-bold">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-300 to-primary text-[#051319]">
+            <HardDrive size={18} />
+          </span>
           NeuroStore
         </Link>
-        <div className="hidden md:flex items-center gap-6 text-sm font-medium text-muted">
-          <Link to="/" className="hover:text-white transition-colors">Home</Link>
-          <Link to="/pricing" className="hover:text-white transition-colors">Pricing</Link>
-          <Link to="/faq" className="hover:text-white transition-colors">FAQ</Link>
-          <Link to="/download" className="hover:text-white transition-colors">Download</Link>
+
+        <div className="hidden items-center gap-6 text-sm font-semibold text-slate-300 md:flex">
+          <Link to="/" className="hover:text-primary transition-colors">Home</Link>
+          <Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link>
+          <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
+          <Link to="/download" className="hover:text-primary transition-colors">Run Node</Link>
         </div>
-        <div className="flex items-center gap-4">
+
+        <div className="hidden items-center gap-3 md:flex">
           {isAuthenticated ? (
             <>
-              <Link to="/dashboard/drive" className="hidden sm:block text-sm font-medium text-primary hover:text-primary/80 transition-colors">My Drive</Link>
-              <div className="h-6 w-px bg-border/50 mx-2 hidden sm:block"></div>
-
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="text-muted hover:text-primary transition-colors flex items-center gap-2 text-sm"
-                title="Account Settings"
-              >
-                <span className="hidden sm:block">john.doe@enterprise.io</span>
-                <Settings size={18} />
-              </button>
-
-              <button
-                onClick={() => {
-                  localStorage.removeItem('neuro_token');
-                  localStorage.removeItem('neuro_user');
-                  setIsAuthenticated(false);
-                  toast('Logged out successfully', { icon: '👋' });
-                }}
-                className="text-muted hover:text-red-400 transition-colors ml-2"
-                title="Sign Out"
-              >
-                <LogOut size={18} />
+              <Link to="/dashboard/drive" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-primary/40 hover:text-white transition">Dashboard</Link>
+              <button onClick={onLogout} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-red-300 hover:text-red-200 transition-colors">
+                <LogOut size={16} /> Logout
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className="text-sm font-medium hover:text-white transition-colors">Log In</Link>
-              <Link to="/register" className="bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/20 transition-colors">
-                Get Started
-              </Link>
+              <Link to="/login" className="px-2 py-2 text-sm font-semibold text-slate-300 hover:text-white transition">Log in</Link>
+              <Link to="/register" className="btn-primary px-4 py-2 text-sm">Get Started</Link>
             </>
           )}
         </div>
+
+        <button onClick={() => setMobileOpen((s) => !s)} className="inline-flex rounded-md border border-white/12 p-2 text-slate-200 md:hidden" aria-label="Toggle menu">
+          {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
       </nav>
 
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-    </>
+      {mobileOpen ? (
+        <div className="glass-nav mx-3 mt-2 rounded-xl border border-white/10 p-3 md:hidden">
+          <div className="flex flex-col gap-2 text-sm font-semibold text-slate-300">
+            <Link to="/" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Home</Link>
+            <Link to="/pricing" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Pricing</Link>
+            <Link to="/faq" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">FAQ</Link>
+            <Link to="/download" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Run Node</Link>
+            {isAuthenticated ? (
+              <>
+                <Link to="/dashboard/drive" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Dashboard</Link>
+                <button onClick={() => { closeMobile(); onLogout(); }} className="rounded-md px-3 py-2 text-left text-red-300 hover:bg-red-500/10">Logout</button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Log in</Link>
+                <Link to="/register" onClick={closeMobile} className="rounded-md px-3 py-2 text-primary hover:bg-primary/10">Get Started</Link>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </header>
   );
 };
 
-const LandingPage = () => (
-  <div className="min-h-screen">
-    <header className="pt-32 pb-20 px-6 text-center max-w-4xl mx-auto">
-      <div className="inline-block px-4 py-1.5 rounded-full border border-border bg-card/50 text-xs font-medium text-primary mb-8">
-        NeuroStore V2 — The Desco Protocol
-      </div>
-      <h1 className="text-5xl md:text-7xl font-display font-bold tracking-tight mb-8">
-        The Unstoppable <br />
-        <span className="text-gradient">Decentralized Cloud</span>
-      </h1>
-      <p className="text-lg text-muted mb-12 max-w-2xl mx-auto">
-        Replace AWS S3 and Google Drive with a hyper-resilient open network. Rent your idle storage to earn, or upload files securely with 100% data recovery guarantees.
-      </p>
-      <div className="flex items-center justify-center gap-4">
-        <Link to="/register" className="bg-white text-background px-8 py-3.5 rounded-xl font-bold hover:bg-gray-100 transition-colors">
-          Start Uploading
-        </Link>
-        <Link to="/download" className="glass-card px-8 py-3.5 rounded-xl font-bold hover:bg-secondary/80 transition-colors">
-          Run a Node & Earn
-        </Link>
-      </div>
-    </header>
-  </div>
-);
-
 const AppContent = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('neuro_token'));
+  const [isAuthenticated, setIsAuthenticated] = useState(hasAuthSession());
+  const [sessionChecked, setSessionChecked] = useState(false);
   const navigate = useNavigate();
 
-  // Receives user object from Login/Register upon success
+  useEffect(() => {
+    const bootstrapSession = async () => {
+      try {
+        const { response, data } = await apiJson("/auth/session", { method: "GET", timeoutMs: 9000 });
+        if (response.ok && data?.user) {
+          setAuthSession(data.user, data.csrf_token || "");
+          setIsAuthenticated(true);
+        } else {
+          clearAuthSession();
+          setIsAuthenticated(false);
+        }
+      } catch {
+        clearAuthSession();
+        setIsAuthenticated(false);
+      } finally {
+        setSessionChecked(true);
+      }
+    };
+
+    bootstrapSession();
+  }, []);
+
   const handleLogin = () => {
     setIsAuthenticated(true);
     navigate("/dashboard/drive");
   };
 
+  const handleLogout = async () => {
+    try {
+      await apiJson("/auth/logout", { method: "POST", timeoutMs: 9000 });
+    } catch {
+      // local session cleanup still continues
+    }
+    clearAuthSession();
+    setIsAuthenticated(false);
+    toast.success("Logged out");
+    navigate("/");
+  };
+
+  if (!sessionChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#070b14] text-slate-200">
+        <div className="glass-card px-6 py-5 text-sm">Loading secure session...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background text-white font-sans selection:bg-primary/20">
+    <div className="min-h-screen font-sans text-white">
       <Toaster
         position="bottom-right"
         toastOptions={{
           style: {
-            background: '#0B0F19',
-            color: '#fff',
-            border: '1px solid rgba(0,240,255,0.2)',
-            fontSize: '14px',
-            boxShadow: '0 4px 30px rgba(0,0,0,0.5)',
+            background: "#0f172a",
+            color: "#f8fafc",
+            border: "1px solid rgba(29,211,176,0.3)",
+            fontSize: "13px",
           },
-          success: { iconTheme: { primary: '#00f0ff', secondary: '#0B0F19' } }
         }}
       />
-      <Navbar isAuthenticated={isAuthenticated} setIsAuthenticated={setIsAuthenticated} />
+
+      <Navbar isAuthenticated={isAuthenticated} onLogout={handleLogout} />
+
       <main>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-
-          {/* Auth Routes */}
-          <Route path="/login" element={<Login onAuth={handleLogin} />} />
-          <Route path="/register" element={<Register onAuth={handleLogin} />} />
-
-          {/* Inner App Routes */}
-          <Route path="/dashboard/drive" element={<DriveDashboard />} />
-          <Route path="/dashboard/node" element={<NodeDashboard />} />
-
-          {/* Marketing & Info Routes */}
+          <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard/drive" replace /> : <Login onAuth={handleLogin} />} />
+          <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard/drive" replace /> : <Register onAuth={handleLogin} />} />
+          <Route path="/dashboard/drive" element={<ProtectedRoute isAuthenticated={isAuthenticated}><DriveDashboard /></ProtectedRoute>} />
+          <Route path="/dashboard/node" element={<ProtectedRoute isAuthenticated={isAuthenticated}><NodeDashboard /></ProtectedRoute>} />
           <Route path="/download" element={<Download />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/faq" element={<FAQ />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </div>
@@ -236,3 +319,4 @@ const App = () => {
 };
 
 export default App;
+

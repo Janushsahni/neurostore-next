@@ -16,9 +16,22 @@ import qrcode from "qrcode";
 import pg from "pg";
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
+const ENVIRONMENT = String(process.env.ENVIRONMENT || "development").toLowerCase();
+const IS_PRODUCTION = ENVIRONMENT === "production";
+const SESSION_TTL_SECS = parseInt(process.env.SESSION_TTL_SECS || "86400", 10);
+const RATE_LIMIT_RPS = parseInt(process.env.CP_RATE_LIMIT_RPS || "120", 10);
+const AUTH_LOCK_THRESHOLD = parseInt(process.env.CP_AUTH_LOCK_THRESHOLD || "8", 10);
+const AUTH_LOCK_SECS = parseInt(process.env.CP_AUTH_LOCK_SECS || "300", 10);
+const COOKIE_SECURE = String(process.env.COOKIE_SECURE || "false").toLowerCase() === "true" || process.env.COOKIE_SECURE === "1";
+const SESSION_COOKIE_NAME = "cp_session";
+const CSRF_COOKIE_NAME = "cp_csrf";
 const MACAROON_SECRET = process.env.MACAROON_SECRET;
 if (!MACAROON_SECRET) {
     throw new Error("MACAROON_SECRET environment variable is required");
+}
+const NODE_SHARED_SECRET = process.env.NODE_SHARED_SECRET;
+if (!NODE_SHARED_SECRET) {
+    throw new Error("NODE_SHARED_SECRET environment variable is required");
 }
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -65,7 +78,8 @@ async function initDb() {
             CREATE TABLE IF NOT EXISTS cp_sessions (
                 token TEXT PRIMARY KEY,
                 username TEXT NOT NULL REFERENCES cp_users(username) ON DELETE CASCADE,
-                created_at TIMESTAMPTZ DEFAULT NOW()
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '24 hours')
             );
             CREATE TABLE IF NOT EXISTS cp_audit_logs (
                 id SERIAL PRIMARY KEY,
@@ -75,6 +89,10 @@ async function initDb() {
                 target TEXT NOT NULL,
                 details JSONB
             );
+        `);
+        await client.query(`
+            ALTER TABLE cp_sessions
+            ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '24 hours');
         `);
     } finally {
         client.release();
@@ -86,6 +104,60 @@ const state = {
     wsClients: new Map(),       // peer_id → WebSocket (Cannot be persisted)
     pendingRequests: new Map(), // req_id → { resolve, reject, timeout }
 };
+const rateBuckets = new Map(); // ip => { second, count }
+const authFailures = new Map(); // ip => { count, blockedUntilMs }
+setInterval(() => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    for (const [ip, row] of rateBuckets.entries()) {
+        if (row.second < nowSec - 2) rateBuckets.delete(ip);
+    }
+    const nowMs = Date.now();
+    for (const [ip, row] of authFailures.entries()) {
+        if (!row.blockedUntilMs || row.blockedUntilMs < nowMs - 600000) {
+            authFailures.delete(ip);
+        }
+    }
+}, 60000).unref();
+
+function requestIp(req) {
+    const xfwd = req.headers["x-forwarded-for"];
+    if (typeof xfwd === "string" && xfwd.trim()) return xfwd.split(",")[0].trim();
+    return req.ip || req.socket?.remoteAddress || "unknown";
+}
+
+function rateLimit(req, res, next) {
+    const ip = requestIp(req);
+    const second = Math.floor(Date.now() / 1000);
+    const bucket = rateBuckets.get(ip);
+    if (!bucket || bucket.second !== second) {
+        rateBuckets.set(ip, { second, count: 1 });
+        return next();
+    }
+    bucket.count += 1;
+    if (bucket.count > RATE_LIMIT_RPS) {
+        return res.status(429).json({ error: "rate limit exceeded" });
+    }
+    next();
+}
+
+function isAuthBlocked(ip) {
+    const row = authFailures.get(ip);
+    return !!row && row.blockedUntilMs > Date.now();
+}
+
+function recordAuthFailure(ip) {
+    const row = authFailures.get(ip) || { count: 0, blockedUntilMs: 0 };
+    row.count += 1;
+    if (row.count >= AUTH_LOCK_THRESHOLD) {
+        row.blockedUntilMs = Date.now() + AUTH_LOCK_SECS * 1000;
+        row.count = 0;
+    }
+    authFailures.set(ip, row);
+}
+
+function clearAuthFailures(ip) {
+    authFailures.delete(ip);
+}
 
 // ── Audit Logging Helper ───────────────────────────────────────
 async function logAudit(action, actor, target, details = {}) {
@@ -105,15 +177,82 @@ function hashPassword(password, salt) {
     return crypto.pbkdf2Sync(password, salt, 150000, 32, "sha256").toString("hex");
 }
 
+function parseCookies(req) {
+    const raw = req.headers.cookie || "";
+    const map = {};
+    for (const part of raw.split(";")) {
+        const item = part.trim();
+        if (!item) continue;
+        const idx = item.indexOf("=");
+        if (idx <= 0) continue;
+        const key = item.slice(0, idx).trim();
+        const value = item.slice(idx + 1).trim();
+        map[key] = value;
+    }
+    return map;
+}
+
+function getSessionToken(req) {
+    const cookies = parseCookies(req);
+    return cookies[SESSION_COOKIE_NAME] || req.headers.authorization?.replace("Bearer ", "");
+}
+
+function setSessionCookies(res, token, csrfToken) {
+    const secure = COOKIE_SECURE ? "; Secure" : "";
+    res.append("Set-Cookie", `${SESSION_COOKIE_NAME}=${token}; Path=/; Max-Age=${SESSION_TTL_SECS}; HttpOnly; SameSite=Strict${secure}`);
+    res.append("Set-Cookie", `${CSRF_COOKIE_NAME}=${csrfToken}; Path=/; Max-Age=${SESSION_TTL_SECS}; SameSite=Strict${secure}`);
+}
+
+function clearSessionCookies(res) {
+    const secure = COOKIE_SECURE ? "; Secure" : "";
+    res.append("Set-Cookie", `${SESSION_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict${secure}`);
+    res.append("Set-Cookie", `${CSRF_COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Strict${secure}`);
+}
+
 async function requireUserSession(req, res, next) {
-    const token = req.headers.authorization?.replace("Bearer ", "");
+    const token = getSessionToken(req);
     if (!token) return res.status(401).json({ error: "unauthorized" });
 
-    const result = await pool.query("SELECT * FROM cp_sessions WHERE token = $1", [token]);
-    if (result.rows.length === 0) return res.status(401).json({ error: "unauthorized" });
+    const result = await pool.query(
+        "SELECT * FROM cp_sessions WHERE token = $1 AND expires_at > NOW()",
+        [token]
+    );
+    if (result.rows.length === 0) {
+        await pool.query("DELETE FROM cp_sessions WHERE token = $1", [token]);
+        return res.status(401).json({ error: "unauthorized" });
+    }
 
     const userRes = await pool.query("SELECT * FROM cp_users WHERE username = $1", [result.rows[0].username]);
+    if (userRes.rows.length === 0) return res.status(401).json({ error: "unauthorized" });
+    await pool.query(
+        "UPDATE cp_sessions SET expires_at = NOW() + make_interval(secs => $2::int) WHERE token = $1",
+        [token, SESSION_TTL_SECS]
+    );
     req.user = userRes.rows[0];
+    next();
+}
+
+function requireCsrf(req, res, next) {
+    const hasBearer = (req.headers.authorization || "").startsWith("Bearer ");
+    if (hasBearer) return next();
+
+    const cookies = parseCookies(req);
+    const sessionCookie = cookies[SESSION_COOKIE_NAME];
+    if (!sessionCookie) return next();
+
+    const csrfCookie = cookies[CSRF_COOKIE_NAME] || "";
+    const csrfHeader = req.headers["x-csrf-token"] || "";
+    if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+        return res.status(403).json({ error: "csrf mismatch" });
+    }
+    next();
+}
+
+function requireNodeSecret(req, res, next) {
+    const provided = req.headers["x-node-secret"];
+    if (!provided || provided !== NODE_SHARED_SECRET) {
+        return res.status(401).json({ error: "unauthorized node" });
+    }
     next();
 }
 
@@ -183,16 +322,38 @@ const PRICING = {
 
 // ── Express App ────────────────────────────────────────────────
 const app = express();
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
 app.use(express.json({ limit: "16mb" }));
+app.use(rateLimit);
+app.use((req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    next();
+});
 
 // ── Health & Topology ───────────────────────────────────────────
 app.get("/readyz", async (_req, res) => {
     const nodesCount = await pool.query("SELECT COUNT(*) FROM cp_nodes");
     const projCount = await pool.query("SELECT COUNT(*) FROM cp_projects");
+    const warnings = [];
+    if (MACAROON_SECRET.length < 32) warnings.push("MACAROON_SECRET is shorter than 32 characters");
+    if (NODE_SHARED_SECRET.length < 32) warnings.push("NODE_SHARED_SECRET is shorter than 32 characters");
+    if (!COOKIE_SECURE) warnings.push("COOKIE_SECURE is disabled");
+    if (IS_PRODUCTION && (DATABASE_URL.includes("localhost") || DATABASE_URL.includes("127.0.0.1"))) {
+        warnings.push("DATABASE_URL points to localhost while ENVIRONMENT=production");
+    }
+    const productionReady = warnings.length === 0;
     res.json({
         status: "ok",
+        ok: true,
+        production_ready: productionReady,
+        readiness_warnings: warnings,
         service: "neurostore-control-plane",
         version: "0.2.0-persistent",
+        environment: ENVIRONMENT,
         uptime_secs: Math.floor(process.uptime()),
         state_backend: "postgresql",
         nodes_registered: parseInt(nodesCount.rows[0].count, 10),
@@ -201,12 +362,12 @@ app.get("/readyz", async (_req, res) => {
     });
 });
 
-app.get("/v1/nodes", async (_req, res) => {
+app.get("/v1/nodes", requireUserSession, async (_req, res) => {
     const nodes = await pool.query("SELECT * FROM cp_nodes WHERE status = 'active' ORDER BY score DESC");
     res.json({ count: nodes.rows.length, nodes: nodes.rows });
 });
 
-app.get("/v1/nodes/earnings", async (req, res) => {
+app.get("/v1/nodes/earnings", requireUserSession, async (req, res) => {
     const { peer_id } = req.query;
     if (!peer_id) return res.status(400).json({ error: "peer_id required" });
 
@@ -250,10 +411,16 @@ app.post("/v1/auth/register", async (req, res) => {
 
 app.post("/v1/auth/login", async (req, res) => {
     const { username, password, totp_code } = req.body;
+    const ip = requestIp(req);
+    if (isAuthBlocked(ip)) {
+        await logAudit("LOGIN_BLOCKED_RATE", username || "unknown", "system", { ip });
+        return res.status(429).json({ error: "too many failed login attempts" });
+    }
     const result = await pool.query("SELECT * FROM cp_users WHERE username = $1", [username]);
     const user = result.rows[0];
 
     if (!user || user.password_hash !== hashPassword(password, user.salt)) {
+        recordAuthFailure(ip);
         await logAudit("LOGIN_FAILED", username || "unknown", "system");
         return res.status(401).json({ error: "invalid credentials" });
     }
@@ -267,19 +434,26 @@ app.post("/v1/auth/login", async (req, res) => {
             window: 1
         });
         if (!verified) {
+            recordAuthFailure(ip);
             await logAudit("LOGIN_MFA_FAILED", username, "system");
             return res.status(401).json({ error: "invalid MFA token" });
         }
     }
 
+    clearAuthFailures(ip);
     const token = crypto.randomBytes(32).toString("hex");
-    await pool.query("INSERT INTO cp_sessions (token, username) VALUES ($1, $2)", [token, username]);
+    const csrfToken = crypto.randomBytes(24).toString("hex");
+    await pool.query(
+        "INSERT INTO cp_sessions (token, username, expires_at) VALUES ($1, $2, NOW() + make_interval(secs => $3::int))",
+        [token, username, SESSION_TTL_SECS]
+    );
+    setSessionCookies(res, token, csrfToken);
     await logAudit("LOGIN_SUCCESS", username, "system");
-    res.json({ success: true, username, token });
+    res.json({ success: true, username, csrf_token: csrfToken, token: "" });
 });
 
 app.post("/v1/auth/logout", async (req, res) => {
-    const token = req.headers.authorization?.replace("Bearer ", "");
+    const token = getSessionToken(req);
     if (token) {
         const session = await pool.query("SELECT username FROM cp_sessions WHERE token = $1", [token]);
         if (session.rows.length > 0) {
@@ -287,10 +461,16 @@ app.post("/v1/auth/logout", async (req, res) => {
             await pool.query("DELETE FROM cp_sessions WHERE token = $1", [token]);
         }
     }
+    clearSessionCookies(res);
     res.json({ success: true });
 });
 
-app.post("/v1/auth/mfa/setup", requireUserSession, async (req, res) => {
+app.get("/v1/auth/session", requireUserSession, async (req, res) => {
+    const cookies = parseCookies(req);
+    res.json({ user: { username: req.user.username }, csrf_token: cookies[CSRF_COOKIE_NAME] || "" });
+});
+
+app.post("/v1/auth/mfa/setup", requireUserSession, requireCsrf, async (req, res) => {
     const secret = speakeasy.generateSecret({ name: `NeuroStore (${req.user.username})` });
     await pool.query("UPDATE cp_users SET mfa_secret = $1 WHERE username = $2", [secret.base32, req.user.username]);
     const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
@@ -298,7 +478,7 @@ app.post("/v1/auth/mfa/setup", requireUserSession, async (req, res) => {
     res.json({ secret: secret.base32, qr_code_url: qrCodeUrl });
 });
 
-app.post("/v1/auth/mfa/verify", requireUserSession, async (req, res) => {
+app.post("/v1/auth/mfa/verify", requireUserSession, requireCsrf, async (req, res) => {
     const { token } = req.body;
     if (!req.user.mfa_secret) return res.status(400).json({ error: "MFA setup not initiated" });
 
@@ -324,7 +504,7 @@ app.get("/v1/objects", requireUserSession, async (req, res) => {
 });
 
 // ── Store & Retrieve Proxies (WS handling) ──────────────────────
-app.post("/v1/store", requireUserSession, async (req, res) => {
+app.post("/v1/store", requireUserSession, requireCsrf, async (req, res) => {
     const { object_id, filename, total_bytes, root, shards } = req.body;
     if (!shards || !Array.isArray(shards)) return res.status(400).json({ error: "shards required" });
 
@@ -376,7 +556,7 @@ app.post("/v1/store", requireUserSession, async (req, res) => {
     res.json({ success: true, stored_chunks: storedCount, requested: shards.length, errors });
 });
 
-app.post("/v1/retrieve", requireUserSession, async (req, res) => {
+app.post("/v1/retrieve", requireUserSession, requireCsrf, async (req, res) => {
     const { object_id } = req.body;
     const obj = (req.user.objects || []).find(o => o.object_id === object_id);
     if (!obj) return res.status(404).json({ error: "object not found" });
@@ -403,30 +583,34 @@ app.post("/v1/retrieve", requireUserSession, async (req, res) => {
 });
 
 // ── Projects ────────────────────────────────────────────────────
-app.post("/v1/projects", async (req, res) => {
-    const { name, owner, tier = "free" } = req.body;
+app.post("/v1/projects", requireUserSession, requireCsrf, async (req, res) => {
+    const { name, tier = "free" } = req.body;
     if (!name) return res.status(400).json({ error: "name is required" });
     if (!PRICING[tier]) return res.status(400).json({ error: `invalid tier: ${tier}` });
 
     const id = randomUUID();
     const sigv4 = generateSigV4Keys();
+    const owner = req.user.username;
     await pool.query(
         "INSERT INTO cp_projects (id, name, owner, tier, api_keys) VALUES ($1, $2, $3, $4, $5)",
-        [id, name, owner || "anonymous", tier, JSON.stringify([sigv4.access_key])]
+        [id, name, owner, tier, JSON.stringify([sigv4.access_key])]
     );
     const macaroon = issueMacaroon(id);
-    await logAudit("PROJECT_CREATED", owner || "anonymous", id);
+    await logAudit("PROJECT_CREATED", owner, id);
     res.status(201).json({ project: { id, name, owner, tier }, macaroon, sigv4 });
 });
 
-app.get("/v1/projects/:id", async (req, res) => {
+app.get("/v1/projects/:id", requireUserSession, async (req, res) => {
     const result = await pool.query("SELECT * FROM cp_projects WHERE id = $1", [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: "project not found" });
+    if (result.rows[0].owner !== req.user.username) {
+        return res.status(403).json({ error: "forbidden" });
+    }
     res.json(result.rows[0]);
 });
 
 // ── Node Registry ───────────────────────────────────────────────
-app.post("/v1/nodes/register", async (req, res) => {
+app.post("/v1/nodes/register", requireNodeSecret, async (req, res) => {
     const { peer_id, addr, max_gb = 50 } = req.body;
     if (!peer_id) return res.status(400).json({ error: "peer_id is required" });
 
@@ -444,7 +628,7 @@ app.post("/v1/nodes/register", async (req, res) => {
     res.status(201).json(result.rows[0]);
 });
 
-app.post("/v1/nodes/heartbeat", async (req, res) => {
+app.post("/v1/nodes/heartbeat", requireNodeSecret, async (req, res) => {
     const { peer_id, used_gb, latency_ms = 50, failed_proofs = 0, metrics } = req.body;
     if (!peer_id) return res.status(400).json({ error: "peer_id is required" });
 
@@ -473,7 +657,7 @@ app.post("/v1/nodes/heartbeat", async (req, res) => {
 });
 
 // ── Payouts & Summary ───────────────────────────────────────────
-app.get("/v1/payouts/preview", async (_req, res) => {
+app.get("/v1/payouts/preview", requireUserSession, async (_req, res) => {
     const totalPool = 1000;
     const nodesRes = await pool.query("SELECT peer_id, score, used_gb FROM cp_nodes WHERE status = 'active'");
     const totalScore = nodesRes.rows.reduce((sum, n) => sum + n.score, 0) || 1;
@@ -484,7 +668,7 @@ app.get("/v1/payouts/preview", async (_req, res) => {
     res.json({ pool_usd: totalPool, nodes });
 });
 
-app.get("/v1/dashboard/summary", async (_req, res) => {
+app.get("/v1/dashboard/summary", requireUserSession, async (_req, res) => {
     const pCount = await pool.query("SELECT COUNT(*) FROM cp_projects");
     const nCount = await pool.query("SELECT COUNT(*) FROM cp_nodes");
     const nActive = await pool.query("SELECT COUNT(*) FROM cp_nodes WHERE status = 'active'");
@@ -512,7 +696,17 @@ wss.on("connection", (ws) => {
         try {
             const msg = JSON.parse(raw.toString());
             if (msg.type === "node:register") {
+                if (!msg.node_secret || msg.node_secret !== NODE_SHARED_SECRET) {
+                    ws.send(JSON.stringify({ type: "error", error: "unauthorized node registration" }));
+                    ws.close();
+                    return;
+                }
                 peerId = msg.node_id;
+                if (!peerId || typeof peerId !== "string") {
+                    ws.send(JSON.stringify({ type: "error", error: "invalid node_id" }));
+                    ws.close();
+                    return;
+                }
                 state.wsClients.set(peerId, ws);
                 await pool.query(`
                     INSERT INTO cp_nodes (peer_id, addr, max_gb, used_gb, status)

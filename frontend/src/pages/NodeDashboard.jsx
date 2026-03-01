@@ -1,30 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, HardDrive, DollarSign, Download, Server, Cpu, AlertTriangle } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { toast } from 'react-hot-toast';
-import { API_BASE } from '../lib/config';
+import { apiJson } from '../lib/apiClient';
 
 export const NodeDashboard = () => {
     const [nodes, setNodes] = useState([]);
     const [health, setHealth] = useState({ total_nodes: 0, online_nodes: 0, network_health: '0%', active_shards: 0 });
     const [isLoading, setIsLoading] = useState(true);
 
-    const S3_GATEWAY_URL = API_BASE;
-
     const fetchNodeData = async () => {
         try {
-            const [nodesRes, healthRes] = await Promise.all([
-                fetch(`${S3_GATEWAY_URL}/api/nodes`),
-                fetch(`${S3_GATEWAY_URL}/api/network-health`)
+            const [nodesResult, healthResult] = await Promise.all([
+                apiJson('/api/nodes', { method: 'GET', timeoutMs: 12000 }),
+                apiJson('/api/network-health', { method: 'GET', timeoutMs: 12000 }),
             ]);
 
-            if (nodesRes.ok) {
-                const data = await nodesRes.json();
-                setNodes(data.nodes);
+            if (nodesResult.response.ok) {
+                const nextNodes = Array.isArray(nodesResult.data?.nodes) ? nodesResult.data.nodes : [];
+                setNodes(nextNodes);
             }
-            if (healthRes.ok) {
-                const data = await healthRes.json();
-                setHealth(data);
+
+            if (healthResult.response.ok) {
+                setHealth(healthResult.data || health);
             }
         } catch (err) {
             console.error("Failed to fetch node telemetry", err);
@@ -61,32 +57,32 @@ export const NodeDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="glass-card p-6 relative overflow-hidden group">
+                <div className="glass-card p-6 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
                         <Activity size={64} />
                     </div>
                     <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Network Health</h3>
                     <div className="text-4xl font-display font-bold text-white mb-1 group-hover:text-green-400 transition-colors">{health.network_health}</div>
                     <p className="text-xs text-green-400 flex items-center gap-1">{health.online_nodes} / {health.total_nodes} Nodes Online</p>
-                </motion.div>
+                </div>
 
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="glass-card p-6 relative overflow-hidden group">
+                <div className="glass-card p-6 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
                         <HardDrive size={64} />
                     </div>
                     <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Global Shards</h3>
                     <div className="text-4xl font-display font-bold text-white mb-1">{health.active_shards} <span className="text-xl text-muted group-hover:text-white/70 transition-colors">pieces</span></div>
                     <p className="text-xs text-muted flex items-center gap-1">Distributed globally</p>
-                </motion.div>
+                </div>
 
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="glass-card p-6 relative overflow-hidden border-primary/30 bg-primary/5 group">
+                <div className="glass-card p-6 relative overflow-hidden border-primary/30 bg-primary/5 group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 text-primary group-hover:scale-110 transition-transform duration-500">
                         <DollarSign size={64} />
                     </div>
                     <h3 className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">Your Earnings</h3>
                     <div className="text-4xl font-display font-bold text-white mb-1 group-hover:text-primary transition-colors">$0.00</div>
                     <p className="text-xs text-primary flex items-center gap-1">Start a node to earn</p>
-                </motion.div>
+                </div>
             </div>
 
             {/* Neural Heatmap Visualizer */}
@@ -145,11 +141,8 @@ export const NodeDashboard = () => {
                                         </tr>
                                     ))}
                                 </>
-                            ) : nodes.map((node, index) => (
-                                <motion.tr
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ duration: 0.2, delay: index * 0.05 }}
+                            ) : nodes.map((node) => (
+                                <tr
                                     key={node.id}
                                     className={`border-t border-border/50 hover:bg-background/40 transition-colors ${node.status === 'Offline' ? 'opacity-50' : ''}`}
                                 >
@@ -181,7 +174,7 @@ export const NodeDashboard = () => {
                                         </span>
                                     </td>
                                     <td className="p-4 text-gray-300">{node.bandwidth} TB</td>
-                                </motion.tr>
+                                </tr>
                             ))}
                         </tbody>
                     </table>

@@ -2,12 +2,35 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILE="${ROOT_DIR}/deploy/docker-compose.option-a.yml"
+COMPOSE_FILE="${ROOT_DIR}/deploy/docker-compose.yml"
+ENV_FILE="${ROOT_DIR}/deploy/.env"
+BASE_URL="http://127.0.0.1:9009"
 STRICT=0
 
-if [[ "${1:-}" == "--strict" ]]; then
-  STRICT=1
-fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --strict)
+      STRICT=1
+      shift
+      ;;
+    --base-url)
+      BASE_URL="$2"
+      shift 2
+      ;;
+    --compose-file)
+      COMPOSE_FILE="$2"
+      shift 2
+      ;;
+    --env-file)
+      ENV_FILE="$2"
+      shift 2
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -16,9 +39,34 @@ require_cmd() {
   fi
 }
 
+env_value() {
+  local key="$1"
+  local line
+  line="$(grep -E "^${key}=" "${ENV_FILE}" | tail -n 1 || true)"
+  if [[ -z "${line}" ]]; then
+    return 1
+  fi
+  printf '%s' "${line#*=}"
+}
+
 require_cmd curl
 require_cmd jq
 require_cmd docker
+require_cmd grep
+require_cmd diff
+require_cmd mktemp
+
+if [[ ! -f "${COMPOSE_FILE}" ]]; then
+  echo "compose file not found: ${COMPOSE_FILE}" >&2
+  exit 1
+fi
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "env file not found: ${ENV_FILE}" >&2
+  exit 1
+fi
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "${tmpdir}"' EXIT
 
 echo "[1/6] Checking compose service status"
 PS_OUTPUT="$(docker compose -f "${COMPOSE_FILE}" ps -a)"
@@ -28,104 +76,174 @@ if printf '%s\n' "${PS_OUTPUT}" | grep -E 'Exited \(|Restarting|Dead' >/dev/null
   exit 1
 fi
 
-echo "[2/6] Checking readiness endpoints"
-CP_READY="$(curl -sS http://127.0.0.1:8080/readyz)"
-S3_READY="$(curl -sS http://127.0.0.1:9009/readyz)"
-printf 'control-plane readyz: %s\n' "${CP_READY}"
-printf 's3-gateway readyz: %s\n' "${S3_READY}"
+RUNNING_SERVICES="$(docker compose -f "${COMPOSE_FILE}" ps --status running --services || true)"
+for svc in neurostore-db neurostore-redis neurostore-gateway neurostore-lb neurostore-sentinel neurostore-web; do
+  if ! grep -qx "${svc}" <<<"${RUNNING_SERVICES}"; then
+    echo "required service is not running: ${svc}" >&2
+    exit 1
+  fi
+done
 
-jq -e '.ok == true' <<<"${CP_READY}" >/dev/null
-jq -e '.ok == true' <<<"${S3_READY}" >/dev/null
+echo "[2/6] Validating environment policy"
+required_keys=(
+  POSTGRES_USER
+  POSTGRES_PASSWORD
+  POSTGRES_DB
+  DATABASE_URL
+  REDIS_URL
+  METADATA_SECRET
+  JWT_SECRET
+  PROOF_SUBMIT_TOKEN
+  COMPLIANCE_SIGNING_KEY
+  MACAROON_SECRET
+  NODE_SHARED_SECRET
+)
+for key in "${required_keys[@]}"; do
+  if ! value="$(env_value "${key}")"; then
+    echo "missing required key in env file: ${key}" >&2
+    exit 1
+  fi
+  if [[ -z "${value}" ]]; then
+    echo "empty required key in env file: ${key}" >&2
+    exit 1
+  fi
+done
 
-CP_PROD_READY="$(jq -r '.production_ready // false' <<<"${CP_READY}")"
-S3_PROD_READY="$(jq -r '.production_ready // false' <<<"${S3_READY}")"
-
-if [[ "${CP_PROD_READY}" != "true" ]]; then
-  echo "warning: control-plane production_ready=false"
-  jq -r '.readiness_warnings[]? // empty' <<<"${CP_READY}" | sed 's/^/  - /'
-fi
-if [[ "${S3_PROD_READY}" != "true" ]]; then
-  echo "warning: s3-gateway production_ready=false"
-  jq -r '.readiness_warnings[]? // empty' <<<"${S3_READY}" | sed 's/^/  - /'
-fi
-if [[ "${STRICT}" == "1" && ( "${CP_PROD_READY}" != "true" || "${S3_PROD_READY}" != "true" ) ]]; then
-  echo "strict mode failed: production readiness warnings detected" >&2
-  exit 1
-fi
-
-echo "[3/6] Bearer token upload/download/list"
-PROJECT_JSON="$(curl -sS -X POST http://127.0.0.1:8080/v1/projects -H 'content-type: application/json' -d '{"name":"deploy-readiness","billing_email":"ops@acme.test","tier":"archive"}')"
-PROJECT_ID="$(jq -r '.project.project_id // .project_id' <<<"${PROJECT_JSON}")"
-TOKEN="$(curl -sS -X POST http://127.0.0.1:8080/v1/tokens/macaroon -H 'content-type: application/json' -d "{\"project_id\":\"${PROJECT_ID}\",\"bucket\":\"acme-bucket\",\"prefix\":\"datasets/\",\"ops\":[\"put\",\"get\",\"head\",\"list\",\"delete\"],\"ttl_seconds\":3600}" | jq -r '.token')"
-
-echo "deploy-ready-$(date +%s)" > /tmp/neurostore-deploy-ready.txt
-
-PUT_CODE="$(curl -sS -o /tmp/neurostore-put.txt -w '%{http_code}' -X PUT "http://127.0.0.1:9009/s3/acme-bucket/datasets/deploy-ready.txt" -H "authorization: Bearer ${TOKEN}" --data-binary @/tmp/neurostore-deploy-ready.txt)"
-HEAD_CODE="$(curl -sS -o /tmp/neurostore-head.txt -w '%{http_code}' -I "http://127.0.0.1:9009/s3/acme-bucket/datasets/deploy-ready.txt" -H "authorization: Bearer ${TOKEN}")"
-GET_BODY="$(curl -sS "http://127.0.0.1:9009/s3/acme-bucket/datasets/deploy-ready.txt" -H "authorization: Bearer ${TOKEN}")"
-LIST_XML="$(curl -sS "http://127.0.0.1:9009/s3/acme-bucket?list-type=2&prefix=datasets/" -H "authorization: Bearer ${TOKEN}")"
-EXPECTED="$(cat /tmp/neurostore-deploy-ready.txt)"
-
-if [[ "${PUT_CODE}" != "200" || "${HEAD_CODE}" != "200" || "${GET_BODY}" != "${EXPECTED}" ]]; then
-  echo "bearer flow failed" >&2
-  exit 1
-fi
-if ! grep -q 'datasets/deploy-ready.txt' <<<"${LIST_XML}"; then
-  echo "list operation failed" >&2
-  exit 1
-fi
-
-echo "[4/6] SigV4 flow"
-AWS_BIN=""
-if command -v aws >/dev/null 2>&1; then
-  AWS_BIN="$(command -v aws)"
-elif [[ -x /tmp/awscli-venv/bin/aws ]]; then
-  AWS_BIN="/tmp/awscli-venv/bin/aws"
-fi
-
-if [[ -n "${AWS_BIN}" ]]; then
-  SIGV4_KEY_JSON="$(curl -sS -X POST http://127.0.0.1:8080/v1/sigv4/keys \
-    -H 'content-type: application/json' \
-    -d "{\"project_id\":\"${PROJECT_ID}\",\"label\":\"deploy-readiness\",\"bucket\":\"acme-bucket\",\"prefix\":\"datasets/\",\"ops\":[\"put\",\"get\",\"head\",\"list\",\"delete\"],\"region\":\"us-east-1\",\"service\":\"s3\",\"ttl_seconds\":3600}")"
-  SIGV4_ACCESS_KEY="$(jq -r '.key.access_key // empty' <<<"${SIGV4_KEY_JSON}")"
-  SIGV4_SECRET_KEY="$(jq -r '.key.secret_key // empty' <<<"${SIGV4_KEY_JSON}")"
-  if [[ -z "${SIGV4_ACCESS_KEY}" || -z "${SIGV4_SECRET_KEY}" ]]; then
-    echo "failed to issue dynamic sigv4 key: ${SIGV4_KEY_JSON}" >&2
+if [[ "${STRICT}" == "1" ]]; then
+  if grep -Ei 'change-me|change_this|generate_a_|dev-secret-change|CHANGE_ME' "${ENV_FILE}" >/dev/null; then
+    echo "strict mode failed: env file still contains placeholder secrets" >&2
     exit 1
   fi
 
-  AWS_ACCESS_KEY_ID="${SIGV4_ACCESS_KEY}" \
-  AWS_SECRET_ACCESS_KEY="${SIGV4_SECRET_KEY}" \
-  AWS_DEFAULT_REGION=us-east-1 \
-  "${AWS_BIN}" s3api put-object \
-    --endpoint-url http://127.0.0.1:9009/s3 \
-    --bucket acme-bucket \
-    --key datasets/deploy-sigv4.txt \
-    --body /tmp/neurostore-deploy-ready.txt >/tmp/neurostore-sigv4-put.json
-
-  AWS_ACCESS_KEY_ID="${SIGV4_ACCESS_KEY}" \
-  AWS_SECRET_ACCESS_KEY="${SIGV4_SECRET_KEY}" \
-  AWS_DEFAULT_REGION=us-east-1 \
-  "${AWS_BIN}" s3api get-object \
-    --endpoint-url http://127.0.0.1:9009/s3 \
-    --bucket acme-bucket \
-    --key datasets/deploy-sigv4.txt \
-    /tmp/neurostore-sigv4-downloaded.txt >/tmp/neurostore-sigv4-get.json
-
-  diff -q /tmp/neurostore-deploy-ready.txt /tmp/neurostore-sigv4-downloaded.txt >/dev/null
-else
-  echo "warning: aws cli not found; skipping SigV4 aws-cli check"
+  database_url="$(env_value DATABASE_URL || true)"
+  cookie_secure="$(env_value COOKIE_SECURE || true)"
+  if [[ "${database_url}" == *"localhost"* || "${database_url}" == *"127.0.0.1"* ]]; then
+    echo "strict mode failed: DATABASE_URL points to localhost, which breaks container-to-container access" >&2
+    exit 1
+  fi
+  if [[ "${cookie_secure}" != "true" && "${cookie_secure}" != "1" ]]; then
+    echo "strict mode failed: COOKIE_SECURE must be true for production traffic" >&2
+    exit 1
+  fi
 fi
 
-echo "[5/6] Usage and payout endpoints"
-USAGE_JSON="$(curl -sS "http://127.0.0.1:8080/v1/usage/${PROJECT_ID}?period=$(date +%Y-%m)")"
-PAYOUT_JSON="$(curl -sS "http://127.0.0.1:8080/v1/payouts/preview?period=$(date +%Y-%m)")"
-jq -e '.ok == true' <<<"${USAGE_JSON}" >/dev/null
-jq -e '.ok == true' <<<"${PAYOUT_JSON}" >/dev/null
+echo "[3/6] Checking gateway readiness endpoint"
+READY_JSON="$(curl -fsS "${BASE_URL}/readyz")"
+printf 'gateway readyz: %s\n' "${READY_JSON}"
+jq -e '.status == "ok" and .ok == true' <<<"${READY_JSON}" >/dev/null
+if [[ "${STRICT}" == "1" ]]; then
+  jq -e '.production_ready == true' <<<"${READY_JSON}" >/dev/null || {
+    echo "strict mode failed: gateway production_ready=false" >&2
+    jq -r '.readiness_warnings[]? // empty' <<<"${READY_JSON}" | sed 's/^/  - /' >&2
+    exit 1
+  }
+fi
+
+echo "[4/6] Creating authenticated session"
+EMAIL="deploy-readiness-$(date +%s)-$RANDOM@example.com"
+PASSWORD="DeployReadiness123!"
+REGISTER_PAYLOAD="$(jq -n --arg email "${EMAIL}" --arg password "${PASSWORD}" '{email:$email,password:$password}')"
+
+REGISTER_CODE="$(curl -sS -o "${tmpdir}/register.json" -w '%{http_code}' \
+  -c "${tmpdir}/cookies.txt" \
+  -X POST "${BASE_URL}/auth/register" \
+  -H 'content-type: application/json' \
+  -d "${REGISTER_PAYLOAD}")"
+if [[ "${REGISTER_CODE}" != "201" ]]; then
+  echo "failed to register readiness user (http ${REGISTER_CODE})" >&2
+  cat "${tmpdir}/register.json" >&2
+  exit 1
+fi
+CSRF_TOKEN="$(jq -r '.csrf_token // empty' "${tmpdir}/register.json")"
+if [[ -z "${CSRF_TOKEN}" ]]; then
+  echo "missing csrf_token in auth response" >&2
+  cat "${tmpdir}/register.json" >&2
+  exit 1
+fi
+
+echo "[5/6] Verifying S3-style object flow (PUT/GET/LIST/DELETE)"
+BUCKET="deploy-ready-${RANDOM}${RANDOM}"
+KEY="smoke/deploy-ready.txt"
+PAYLOAD_FILE="${tmpdir}/payload.txt"
+DOWNLOADED_FILE="${tmpdir}/downloaded.txt"
+printf 'deploy-ready-%s\n' "$(date +%s)" > "${PAYLOAD_FILE}"
+
+PUT_CODE="$(curl -sS -o "${tmpdir}/put.out" -w '%{http_code}' \
+  -X PUT "${BASE_URL}/${BUCKET}/${KEY}" \
+  -b "${tmpdir}/cookies.txt" \
+  -H "x-csrf-token: ${CSRF_TOKEN}" \
+  -H 'content-type: text/plain' \
+  --data-binary @"${PAYLOAD_FILE}")"
+if [[ "${PUT_CODE}" != "200" ]]; then
+  echo "put flow failed (http ${PUT_CODE})" >&2
+  cat "${tmpdir}/put.out" >&2
+  exit 1
+fi
+
+GET_CODE="$(curl -sS -o "${DOWNLOADED_FILE}" -w '%{http_code}' \
+  -X GET "${BASE_URL}/${BUCKET}/${KEY}" \
+  -b "${tmpdir}/cookies.txt")"
+if [[ "${GET_CODE}" != "200" ]]; then
+  echo "get flow failed (http ${GET_CODE})" >&2
+  exit 1
+fi
+diff -q "${PAYLOAD_FILE}" "${DOWNLOADED_FILE}" >/dev/null
+
+LIST_XML="$(curl -sS \
+  -X GET "${BASE_URL}/${BUCKET}?prefix=smoke/" \
+  -b "${tmpdir}/cookies.txt")"
+if ! grep -q "${KEY}" <<<"${LIST_XML}"; then
+  echo "list flow failed to include uploaded key" >&2
+  echo "${LIST_XML}" >&2
+  exit 1
+fi
+
+DELETE_CODE="$(curl -sS -o "${tmpdir}/delete.out" -w '%{http_code}' \
+  -X DELETE "${BASE_URL}/${BUCKET}/${KEY}" \
+  -b "${tmpdir}/cookies.txt" \
+  -H "x-csrf-token: ${CSRF_TOKEN}")"
+if [[ "${DELETE_CODE}" != "204" ]]; then
+  echo "delete flow failed (http ${DELETE_CODE})" >&2
+  cat "${tmpdir}/delete.out" >&2
+  exit 1
+fi
+
+AFTER_DELETE_CODE="$(curl -sS -o "${tmpdir}/after-delete.out" -w '%{http_code}' \
+  -X GET "${BASE_URL}/${BUCKET}/${KEY}" \
+  -b "${tmpdir}/cookies.txt")"
+if [[ "${AFTER_DELETE_CODE}" != "404" ]]; then
+  echo "expected 404 after delete, got ${AFTER_DELETE_CODE}" >&2
+  exit 1
+fi
+
+echo "[5b/6] Verifying node registration secret enforcement"
+NODE_REG_UNAUTH_CODE="$(curl -sS -o "${tmpdir}/node-reg-unauth.out" -w '%{http_code}' \
+  -X POST "${BASE_URL}/api/nodes/register" \
+  -H 'content-type: application/json' \
+  -d '{"peer_id":"ReadinessNode123","wallet_address":"0x1111111111111111111111111111111111111111","capacity_gb":50,"declared_location":"IN-KA"}')"
+if [[ "${NODE_REG_UNAUTH_CODE}" != "401" ]]; then
+  echo "node registration should reject missing x-node-secret, got ${NODE_REG_UNAUTH_CODE}" >&2
+  exit 1
+fi
+
+NODE_SHARED_SECRET_VALUE="$(env_value NODE_SHARED_SECRET || true)"
+if [[ -z "${NODE_SHARED_SECRET_VALUE}" ]]; then
+  echo "NODE_SHARED_SECRET missing from env file" >&2
+  exit 1
+fi
+NODE_REG_AUTH_CODE="$(curl -sS -o "${tmpdir}/node-reg-auth.out" -w '%{http_code}' \
+  -X POST "${BASE_URL}/api/nodes/register" \
+  -H 'content-type: application/json' \
+  -H "x-node-secret: ${NODE_SHARED_SECRET_VALUE}" \
+  -d '{"peer_id":"ReadinessNode123","wallet_address":"0x1111111111111111111111111111111111111111","capacity_gb":50,"declared_location":"IN-KA"}')"
+if [[ "${NODE_REG_AUTH_CODE}" != "200" ]]; then
+  echo "node registration with secret failed (http ${NODE_REG_AUTH_CODE})" >&2
+  cat "${tmpdir}/node-reg-auth.out" >&2
+  exit 1
+fi
 
 echo "[6/6] Completed"
-printf 'project_id=%s\n' "${PROJECT_ID}"
-printf 'usage_api_ops=%s\n' "$(jq -r '.usage.api_ops // 0' <<<"${USAGE_JSON}")"
-printf 'payout_total_usd=%s\n' "$(jq -r '.total_payout_usd // 0' <<<"${PAYOUT_JSON}")"
-
+printf 'base_url=%s\n' "${BASE_URL}"
+printf 'bucket=%s\n' "${BUCKET}"
+printf 'key=%s\n' "${KEY}"
 echo "deploy readiness checks passed"
