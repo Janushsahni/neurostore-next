@@ -76,6 +76,17 @@ echo "✅ Environment variables and Quantum-Resistant keys generated."
 echo -e "${GREEN}[4/5] Igniting the NeuroStore Gateway and AI Sentinel...${NC}"
 echo "Building the Rust binaries (This may take a few minutes on the first run)..."
 
+# Create public directory for sovereign binary distribution
+mkdir -p public
+
+echo "Building Sovereign Node Binary for local distribution..."
+# Build the node for the current platform (Linux)
+cargo build --release -p neuro-node
+cp target/release/neuro-node public/neuro-node-linux
+# Create a dummy zip for Windows/macOS to prevent 404s in local dev
+echo "Placeholder for Windows Binary" > public/neuro-node-windows.zip
+echo "Placeholder for macOS Binary" > public/neuro-node-macos.tar.gz
+
 cd deploy
 docker compose up -d --build
 

@@ -8,6 +8,7 @@ use axum::{
     Json,
 };
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::services::ServeDir;
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -183,6 +184,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/zk/store/:bucket/*key", post(handlers::zk::zk_store))
         .route("/zk/issue-challenge", post(proofs::issue_zk_challenge))
         .route("/zk/submit-proof", post(proofs::verify_zk_proof))
+        .fallback_service(ServeDir::new("public"))
         .layer(cors)
         .layer(from_fn(security_headers))
         .with_state(shared_state);

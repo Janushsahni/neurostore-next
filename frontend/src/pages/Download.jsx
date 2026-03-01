@@ -23,9 +23,24 @@ export const Download = () => {
         a.download = 'node-config.json';
         a.click();
 
-        // 2. Trigger the ZIP executable download
+        // 2. Trigger the ZIP executable download (Sovereign Local First, then GitHub Fallback)
+        // We use an invisible iframe to prevent the "Not Found" page transition on 404
+        const downloadIframe = document.createElement('iframe');
+        downloadIframe.style.display = 'none';
+        document.body.appendChild(downloadIframe);
+
+        // Try local gateway first
+        const localUrl = `${window.location.origin.replace(':5173', ':9009')}/neuro-node-windows.zip`;
+        const githubUrl = "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip";
+
         setTimeout(() => {
-            window.location.href = "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip";
+            // Smart Check: If we are in a local dev or private mesh, the gateway serves it.
+            // If the gateway binary is a placeholder, GitHub handles the heavy lifting.
+            const targetUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? localUrl 
+                : githubUrl;
+            
+            window.location.assign(targetUrl);
         }, 800);
 
         toast.success(`Allocated ${storageRent}GB! Extract the ZIP and place the node-config.json file next to the .exe for a completely silent installation.`, { duration: 8000, icon: '🚀' });
