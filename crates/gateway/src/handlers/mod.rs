@@ -4,3 +4,4 @@ pub mod compliance;
 pub mod zk;
 pub mod webhooks;
 pub mod features;
+pub mod nodes;

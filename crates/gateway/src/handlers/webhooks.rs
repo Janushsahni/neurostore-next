@@ -7,6 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use crate::AppState;
+use hmac::Mac;
 
 // ── WEBHOOK NOTIFICATION SYSTEM ──
 // Allows customers to register webhook URLs that get called when
