@@ -60,6 +60,8 @@ pub struct Claims {
     pub email: String,
     pub role: String,
     pub exp: usize,
+    pub aud: String,
+    pub iss: String,
 }
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Node {

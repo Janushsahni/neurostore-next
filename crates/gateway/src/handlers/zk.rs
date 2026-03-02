@@ -49,6 +49,14 @@ pub async fn zk_store(
         return err.into_response();
     }
 
+    // SECURITY: Limit shard count and size to prevent OOM attacks
+    const MAX_SHARDS_PER_UPLOAD: usize = 200;
+    const MAX_SHARD_BYTES: usize = 50 * 1024 * 1024; // 50 MB per shard
+
+    if payload.shards.len() > MAX_SHARDS_PER_UPLOAD {
+        return (StatusCode::BAD_REQUEST, format!("Too many shards: {}. Maximum is {}", payload.shards.len(), MAX_SHARDS_PER_UPLOAD)).into_response();
+    }
+
     let key = key.trim_start_matches('/').to_string();
     let size = payload.total_bytes as i64;
     let etag = format!("\"zk-{}\"", payload.manifest_root);
@@ -66,11 +74,13 @@ pub async fn zk_store(
             Err(_) => return (StatusCode::BAD_REQUEST, "Invalid Base64 Shard").into_response(),
         };
 
+        if decoded_bytes.len() > MAX_SHARD_BYTES {
+            return (StatusCode::BAD_REQUEST, format!("Shard too large: {} bytes. Maximum is {} bytes", decoded_bytes.len(), MAX_SHARD_BYTES)).into_response();
+        }
+
         recovery_threshold = shard.data_shards as i32;
 
-        // Phase 19 INJECTION POINT - CDN Edge Caching Layer
-        // Immediately pin this "hot" shard to the fast RAM memory cache.
-        // This allows other clients (or the same client) to pull the shard instantly
+        // CDN Edge Caching: Pin hot shard to RAM cache for fast retrieval
         // without orchestrating a 10-node LibP2P Kademlia lookup.
         state.edge_cache.insert(shard.cid.clone(), axum::body::Bytes::from(decoded_bytes.clone())).await;
 

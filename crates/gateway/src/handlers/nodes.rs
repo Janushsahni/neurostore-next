@@ -7,6 +7,7 @@ use axum::{
 };
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use subtle::ConstantTimeEq;
 use crate::AppState;
 
 #[derive(Deserialize)]
@@ -35,7 +36,9 @@ pub async fn register_provider_node(
         .and_then(|v| v.to_str().ok())
         .unwrap_or_default();
 
-    if provided_secret.is_empty() || provided_secret != state.node_shared_secret {
+    // SECURITY: Use constant-time comparison to prevent timing attacks
+    let secrets_match = provided_secret.as_bytes().ct_eq(state.node_shared_secret.as_bytes());
+    if provided_secret.is_empty() || !bool::from(secrets_match) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized node registration").into_response();
     }
 

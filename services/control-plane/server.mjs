@@ -173,7 +173,15 @@ async function logAudit(action, actor, target, details = {}) {
 }
 
 // ── End-User Auth Helpers ──────────────────────────────────────
+// SECURITY (#27): Using scrypt (memory-hard, GPU-resistant) instead of PBKDF2.
+// scrypt is built into Node.js crypto — no extra dependencies needed.
+// Parameters: N=16384 (CPU/mem cost), r=8 (block size), p=1 (parallelization)
 function hashPassword(password, salt) {
+    return crypto.scryptSync(password, salt, 32, { N: 16384, r: 8, p: 1 }).toString("hex");
+}
+
+// Legacy PBKDF2 verification for existing accounts (migration path)
+function hashPasswordLegacy(password, salt) {
     return crypto.pbkdf2Sync(password, salt, 150000, 32, "sha256").toString("hex");
 }
 
@@ -323,7 +331,13 @@ const PRICING = {
 // ── Express App ────────────────────────────────────────────────
 const app = express();
 app.disable("x-powered-by");
-app.set("trust proxy", 1);
+// SECURITY (#29): Only trust proxy headers when ENVIRONMENT=production (behind nginx/LB)
+// In development, don't trust proxy headers to prevent IP spoofing
+if (IS_PRODUCTION) {
+    app.set("trust proxy", "loopback, linklocal, uniquelocal"); // Only trust private IPs
+} else {
+    app.set("trust proxy", false);
+}
 app.use(express.json({ limit: "16mb" }));
 app.use(rateLimit);
 app.use((req, res, next) => {
@@ -346,11 +360,14 @@ app.get("/readyz", async (_req, res) => {
         warnings.push("DATABASE_URL points to localhost while ENVIRONMENT=production");
     }
     const productionReady = warnings.length === 0;
+    // SECURITY: Hide detailed warnings in production
+    const exposedWarnings = IS_PRODUCTION ? [] : warnings;
     res.json({
         status: "ok",
         ok: true,
         production_ready: productionReady,
-        readiness_warnings: warnings,
+        readiness_warnings: exposedWarnings,
+        warning_count: warnings.length,
         service: "neurostore-control-plane",
         version: "0.2.0-persistent",
         environment: ENVIRONMENT,
@@ -393,18 +410,29 @@ app.get("/v1/nodes/earnings", requireUserSession, async (req, res) => {
 app.post("/v1/auth/register", async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: "username and password required" });
-    
+
+    // Password policy: min 8 chars, at least 1 uppercase, 1 number
+    if (password.length < 8 || password.length > 128) {
+        return res.status(400).json({ error: "Password must be between 8 and 128 characters" });
+    }
+    if (!/[A-Z]/.test(password)) {
+        return res.status(400).json({ error: "Password must contain at least one uppercase letter" });
+    }
+    if (!/[0-9]/.test(password)) {
+        return res.status(400).json({ error: "Password must contain at least one number" });
+    }
+
     const existing = await pool.query("SELECT username FROM cp_users WHERE username = $1", [username]);
     if (existing.rows.length > 0) return res.status(400).json({ error: "username taken" });
-    
+
     const salt = crypto.randomBytes(16).toString("hex");
     const passwordHash = hashPassword(password, salt);
-    
+
     await pool.query(
         "INSERT INTO cp_users (username, salt, password_hash) VALUES ($1, $2, $3)",
         [username, salt, passwordHash]
     );
-    
+
     await logAudit("USER_REGISTER", username, username);
     res.status(201).json({ success: true, username });
 });
@@ -419,10 +447,17 @@ app.post("/v1/auth/login", async (req, res) => {
     const result = await pool.query("SELECT * FROM cp_users WHERE username = $1", [username]);
     const user = result.rows[0];
 
-    if (!user || user.password_hash !== hashPassword(password, user.salt)) {
+    // Support both new scrypt and legacy PBKDF2 hashes for migration
+    const scryptHash = hashPassword(password, user?.salt || "");
+    const legacyHash = hashPasswordLegacy(password, user?.salt || "");
+    if (!user || (user.password_hash !== scryptHash && user.password_hash !== legacyHash)) {
         recordAuthFailure(ip);
         await logAudit("LOGIN_FAILED", username || "unknown", "system");
         return res.status(401).json({ error: "invalid credentials" });
+    }
+    // Auto-migrate legacy PBKDF2 hashes to scrypt on successful login
+    if (user.password_hash === legacyHash && user.password_hash !== scryptHash) {
+        await pool.query("UPDATE cp_users SET password_hash = $1 WHERE username = $2", [scryptHash, username]);
     }
 
     if (user.mfa_enabled) {
@@ -690,9 +725,29 @@ const server = app.listen(PORT, async () => {
 });
 
 const wss = new WebSocketServer({ server, path: "/v1/nodes/ws" });
+
+// SECURITY (#28): Per-connection WebSocket rate limiting
+const WS_MAX_MESSAGES_PER_SEC = 100;
+const wsRateLimits = new Map(); // ws → { count, resetTime }
+
 wss.on("connection", (ws) => {
     let peerId = null;
+    wsRateLimits.set(ws, { count: 0, resetTime: Date.now() + 1000 });
+
+    ws.on("close", () => wsRateLimits.delete(ws));
     ws.on("message", async (raw) => {
+        // Rate limit check
+        const rl = wsRateLimits.get(ws);
+        if (rl) {
+            const now = Date.now();
+            if (now > rl.resetTime) { rl.count = 0; rl.resetTime = now + 1000; }
+            rl.count++;
+            if (rl.count > WS_MAX_MESSAGES_PER_SEC) {
+                ws.send(JSON.stringify({ type: "error", error: "rate limit exceeded" }));
+                ws.close(1008, "Rate limit exceeded");
+                return;
+            }
+        }
         try {
             const msg = JSON.parse(raw.toString());
             if (msg.type === "node:register") {

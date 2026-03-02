@@ -184,9 +184,20 @@ async fn main() -> anyhow::Result<()> {
         .route("/zk/store/:bucket/*key", post(handlers::zk::zk_store))
         .route("/zk/issue-challenge", post(proofs::issue_zk_challenge))
         .route("/zk/submit-proof", post(proofs::verify_zk_proof))
+        // Webhook API
+        .route("/api/webhooks", post(handlers::webhooks::register_webhook))
+        .route("/api/webhooks/:bucket", get(handlers::webhooks::list_webhooks))
+        // Feature API — PII Detection, Versioning, WORM, AI, Billing
+        .route("/api/pii/scan/:bucket/*key", post(handlers::features::scan_object_pii))
+        .route("/api/pii/scan-text", post(handlers::features::scan_text_pii))
+        .route("/api/versions/:bucket/*key", get(handlers::features::list_versions))
+        .route("/api/worm/configure", post(handlers::features::configure_worm))
+        .route("/api/ai/auto-tag/:bucket/*key", post(handlers::features::auto_tag_object))
+        .route("/api/billing/usage", get(handlers::features::get_usage_summary))
         .fallback_service(ServeDir::new("public"))
         .layer(cors)
         .layer(from_fn(security_headers))
+        .layer(from_fn(rate_limit))
         .with_state(shared_state);
 
     // Bind server (supporting Railway/Heroku dynamic PORT)
@@ -242,11 +253,21 @@ async fn health_check(
 
     let production_ready = db_ok && warnings.is_empty();
 
+    // SECURITY: In production, do NOT expose specific readiness warnings
+    // (they reveal which secrets are weak and what is misconfigured)
+    let is_production = state.environment.eq_ignore_ascii_case("production");
+    let exposed_warnings = if is_production {
+        vec![] // Hide details in production
+    } else {
+        warnings.clone()
+    };
+
     Json(serde_json::json!({
         "status": if db_ok { "ok" } else { "degraded" },
         "ok": db_ok,
         "production_ready": production_ready,
-        "readiness_warnings": warnings,
+        "readiness_warnings": exposed_warnings,
+        "warning_count": warnings.len(),
         "service": "neurostore-rust-gateway-v3",
         "version": "0.3.0",
         "environment": state.environment,
@@ -275,7 +296,56 @@ async fn security_headers(
         "permissions-policy",
         HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
     );
+    headers.insert(
+        "content-security-policy",
+        HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"),
+    );
     response
+}
+
+/// Per-IP rate limiter using a moka cache with 60-second TTL.
+/// Limits each IP to 200 requests per minute.
+static RATE_LIMIT_CACHE: std::sync::LazyLock<moka::future::Cache<String, u32>> =
+    std::sync::LazyLock::new(|| {
+        moka::future::Cache::builder()
+            .time_to_live(std::time::Duration::from_secs(60))
+            .max_capacity(100_000)
+            .build()
+    });
+
+const MAX_REQUESTS_PER_MINUTE: u32 = 200;
+
+async fn rate_limit(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let client_ip = request
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .map(|s| s.trim().to_string())
+        .or_else(|| {
+            request
+                .headers()
+                .get("x-real-ip")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| "127.0.0.1".to_string());
+
+    let count = RATE_LIMIT_CACHE.get(&client_ip).await.unwrap_or(0);
+
+    if count >= MAX_REQUESTS_PER_MINUTE {
+        return (
+            axum::http::StatusCode::TOO_MANY_REQUESTS,
+            "Rate limit exceeded. Try again in 60 seconds.",
+        )
+            .into_response();
+    }
+
+    RATE_LIMIT_CACHE.insert(client_ip, count + 1).await;
+    next.run(request).await
 }
 
 fn parse_allowed_origins() -> Vec<HeaderValue> {

@@ -12,8 +12,6 @@ services:
     command: postgres -c max_connections=1000 -c shared_buffers=256MB
     env_file:
       - .env
-    ports:
-      - "5432:5432"
     volumes:
       - neurostore-db-data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -27,9 +25,7 @@ services:
   neurostore-redis:
     image: redis:7-alpine
     container_name: neurostore-redis
-    command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-changeme_redis_2026}
     volumes:
       - neurostore-redis-data:/data
     restart: unless-stopped

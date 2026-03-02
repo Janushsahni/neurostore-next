@@ -74,6 +74,8 @@ fn create_jwt(email: &str, secret: &str) -> String {
         email: email.to_owned(),
         role: "user".to_owned(),
         exp: expiration,
+        aud: "neurostore".to_owned(),
+        iss: "neurostore-gateway".to_owned(),
     };
 
     encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes()))

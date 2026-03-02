@@ -134,8 +134,18 @@ export const Register = ({ onAuth }) => {
             setIsLoading(false);
             return;
         }
-        if (password.length < 8) {
-            setError("Password must be at least 8 characters.");
+        if (password.length < 8 || password.length > 128) {
+            setError("Password must be between 8 and 128 characters.");
+            setIsLoading(false);
+            return;
+        }
+        if (!/[A-Z]/.test(password)) {
+            setError("Password must contain at least one uppercase letter.");
+            setIsLoading(false);
+            return;
+        }
+        if (!/[0-9]/.test(password)) {
+            setError("Password must contain at least one number.");
             setIsLoading(false);
             return;
         }

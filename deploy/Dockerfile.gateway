@@ -13,7 +13,9 @@ RUN cargo build --release --bin neurostore-gateway
 # Stage 2: Production Runtime
 FROM alpine:3.19
 
-RUN apk add --no-cache ca-certificates libgcc
+RUN apk add --no-cache ca-certificates libgcc \
+    && addgroup -g 1001 appgroup \
+    && adduser -D -u 1001 -G appgroup appuser
 
 WORKDIR /app
 
@@ -26,5 +28,7 @@ EXPOSE 9010
 
 # Configure default Production variables (these should be overridden in ECS/docker-compose)
 ENV RUST_LOG=info
+
+USER appuser
 
 ENTRYPOINT ["neurostore-gateway"]

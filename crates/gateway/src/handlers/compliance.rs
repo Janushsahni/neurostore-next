@@ -27,8 +27,15 @@ pub struct ComplianceAuditResponse {
 pub async fn sovereignty_audit(
     State(state): State<Arc<AppState>>,
     Path(bucket): Path<String>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
+    // Allow configurable jurisdiction (default: India)
+    let jurisdiction = params.get("jurisdiction").map(|s| s.to_uppercase()).unwrap_or_else(|| "IN".to_string());
+    if jurisdiction.len() != 2 || !jurisdiction.chars().all(|c| c.is_ascii_uppercase()) {
+        return (StatusCode::BAD_REQUEST, "Invalid jurisdiction code. Use ISO 3166-1 alpha-2 (e.g., IN, US, DE)").into_response();
+    }
+
     let user_email = match crate::handlers::s3::validate_s3_auth(&headers, &state) {
         Ok(email) => email,
         Err(err) => return err.into_response(),
@@ -67,10 +74,11 @@ pub async fn sovereignty_audit(
         SELECT
             COALESCE((SELECT COUNT(*) FROM object_shards WHERE object_cid IN (SELECT cid FROM bucket_cids)), 0) AS total_shards,
             COALESCE((SELECT COUNT(*) FROM latest_evidence), 0) AS verified_shards,
-            COALESCE((SELECT COUNT(*) FROM latest_evidence WHERE country_code = 'IN'), 0) AS in_jurisdiction_shards
+            COALESCE((SELECT COUNT(*) FROM latest_evidence WHERE country_code = $2), 0) AS in_jurisdiction_shards
         "#,
     )
     .bind(&bucket)
+    .bind(&jurisdiction)
     .fetch_one(&state.db)
     .await
     .unwrap_or((0, 0, 0));
@@ -100,8 +108,8 @@ pub async fn sovereignty_audit(
 
     let timestamp = chrono::Utc::now().to_rfc3339();
     let signing_payload = format!(
-        "bucket={};compliant={};region=IN;in_pct={:.2};evidence={};ts={}",
-        bucket, compliant, percentage, evidence_level, timestamp
+        "bucket={};compliant={};region={};in_pct={:.2};evidence={};ts={}",
+        bucket, compliant, jurisdiction, percentage, evidence_level, timestamp
     );
     let mut mac = HmacSha256::new_from_slice(state.compliance_signing_key.as_bytes())
         .expect("HMAC key length is valid");
@@ -111,7 +119,7 @@ pub async fn sovereignty_audit(
     let report = ComplianceAuditResponse {
         bucket: bucket.clone(),
         compliant,
-        region_enforced: "IN".to_string(),
+        region_enforced: jurisdiction,
         shards_in_jurisdiction_percentage: percentage,
         evidence_level,
         timestamp,

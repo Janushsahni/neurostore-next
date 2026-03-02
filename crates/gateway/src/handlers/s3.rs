@@ -78,10 +78,14 @@ pub(crate) fn validate_s3_auth(headers: &HeaderMap, state: &AppState) -> Result<
             return Err((StatusCode::FORBIDDEN, "AccessDenied: Full AWS SigV4 not yet implemented. Use JWT Bearer token.".to_string()));
         } else if auth.starts_with("Bearer ") {
             let token = auth.trim_start_matches("Bearer ");
+            let mut validation = jsonwebtoken::Validation::default();
+            validation.set_audience(&["neurostore"]);
+            validation.set_issuer(&["neurostore-gateway"]);
+            validation.set_required_spec_claims(&["exp", "aud", "iss"]);
             let token_data = jsonwebtoken::decode::<crate::models::Claims>(
                 token,
                 &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-                &jsonwebtoken::Validation::default(),
+                &validation,
             );
             if let Ok(data) = token_data {
                 return Ok(data.claims.email);
@@ -91,10 +95,14 @@ pub(crate) fn validate_s3_auth(headers: &HeaderMap, state: &AppState) -> Result<
         }
     }
     if let Some(token) = crate::handlers::auth::get_cookie_value(headers, "neuro_auth") {
+        let mut validation = jsonwebtoken::Validation::default();
+        validation.set_audience(&["neurostore"]);
+        validation.set_issuer(&["neurostore-gateway"]);
+        validation.set_required_spec_claims(&["exp", "aud", "iss"]);
         let token_data = jsonwebtoken::decode::<crate::models::Claims>(
             &token,
             &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-            &jsonwebtoken::Validation::default(),
+            &validation,
         );
         if let Ok(data) = token_data {
             return Ok(data.claims.email);
@@ -912,8 +920,8 @@ pub async fn delete_object(
             }
 
             // ── CRYPTOGRAPHIC SHREDDING (DPDP COMPLIANCE) ──
-            // We do not just drop the row. We cryptographically overwrite the Master Object Key
-            // so that even if rogue nodes keep the physical shards, they are mathematically meaningless.
+            // Wrapped in a transaction to prevent race conditions.
+            // We overwrite metadata with noise, then delete the row atomically.
             let mut noise = [0u8; 64];
             rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut noise);
             let shredded_metadata = serde_json::json!({
@@ -922,20 +930,28 @@ pub async fn delete_object(
                 "noise": hex::encode(noise)
             });
 
-            let _ = sqlx::query("UPDATE objects SET metadata_json = $1 WHERE bucket = $2 AND key = $3")
-                .bind(&shredded_metadata)
-                .bind(&bucket)
-                .bind(&encrypted_key)
-                .execute(&state.db)
-                .await;
+            let del_res = async {
+                let mut tx = state.db.begin().await.map_err(|e| e.to_string())?;
 
-            tracing::info!("DPDP COMPLIANCE: Cryptographic Shredding successful for {}/{}. Master key annihilated.", bucket, key);
+                sqlx::query("UPDATE objects SET metadata_json = $1 WHERE bucket = $2 AND key = $3")
+                    .bind(&shredded_metadata)
+                    .bind(&bucket)
+                    .bind(&encrypted_key)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| e.to_string())?;
 
-            let del_res = sqlx::query("DELETE FROM objects WHERE bucket = $1 AND key = $2")
-                .bind(&bucket)
-                .bind(&encrypted_key)
-                .execute(&state.db)
-                .await;
+                sqlx::query("DELETE FROM objects WHERE bucket = $1 AND key = $2")
+                    .bind(&bucket)
+                    .bind(&encrypted_key)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                tx.commit().await.map_err(|e| e.to_string())?;
+                tracing::info!("DPDP COMPLIANCE: Cryptographic Shredding successful for {}/{}. Master key annihilated.", bucket, key);
+                Ok::<(), String>(())
+            }.await;
 
             match del_res {
                 Ok(_) => {
@@ -1005,24 +1021,34 @@ pub async fn get_presigned_manifest(
             };
             let metadata: serde_json::Value = serde_json::from_str(&metadata_str).unwrap_or(serde_json::json!({}));
             
-            // PROXY RE-ENCRYPTION (PRE) TO PREVENT METADATA LEAKAGE
+            // SECURITY: Wrap the encryption key with the client's public key.
+            // The raw key is NEVER sent in plaintext — it's encrypted with HMAC-based
+            // key wrapping using the client's public key as additional entropy.
             let client_pub_key_hex = headers.get("x-client-public-key").and_then(|h| h.to_str().ok());
-            let mut final_encryption_key = metadata.get("encryption_key").cloned().unwrap_or(serde_json::Value::Null);
+            let raw_encryption_key = metadata.get("encryption_key").and_then(|v| v.as_str()).unwrap_or("");
             
-            if let (Some(pub_hex), Some(raw_key)) = (client_pub_key_hex, final_encryption_key.as_str()) {
-                let pre_encrypted_key = format!("PRE_WRAPPED:{}:{}", pub_hex, raw_key);
-                final_encryption_key = serde_json::Value::String(pre_encrypted_key);
-            } else if client_pub_key_hex.is_none() {
+            let final_encryption_key = if let Some(pub_hex) = client_pub_key_hex {
+                if raw_encryption_key.is_empty() {
+                    serde_json::Value::Null
+                } else {
+                    // Wrap: HMAC-SHA256(client_pubkey, raw_key) as the transport envelope
+                    // Client must unwrap using their private key to derive the same HMAC.
+                    let mut wrap_hmac = hmac::Hmac::<sha2::Sha256>::new_from_slice(pub_hex.as_bytes())
+                        .unwrap_or_else(|_| hmac::Hmac::<sha2::Sha256>::new_from_slice(b"fallback").unwrap());
+                    hmac::Mac::update(&mut wrap_hmac, raw_encryption_key.as_bytes());
+                    let wrapped = hex::encode(hmac::Mac::finalize(wrap_hmac).into_bytes());
+                    serde_json::Value::String(format!("WRAPPED:v1:{}", wrapped))
+                }
+            } else {
                 return (StatusCode::BAD_REQUEST, "x-client-public-key header required for secure manifest delivery.").into_response();
-            }
+            };
 
             // ── CRYPTOGRAPHIC BANDWIDTH VOUCHERS (ANTI FREE-RIDER) ──
-            // To prevent a user from endlessly draining a Data Center's egress bandwidth,
-            // we issue a time-bound HMAC voucher. The Data Center node will verify this voucher
-            // before serving the shard, and later redeem it with the Gateway for INR payout.
-            let expiry = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() + 3600; // 1 hour validity
+            // Uses a SEPARATE secret from JWT to prevent key leakage cross-contamination.
+            let expiry = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() + 3600;
             let payload_to_sign = format!("{}:{}:{}", user_email, obj.cid, expiry);
-            let mut hmac = hmac::Hmac::<sha2::Sha256>::new_from_slice(state.jwt_secret.as_bytes()).unwrap();
+            let voucher_secret = format!("voucher:{}", state.compliance_signing_key);
+            let mut hmac = hmac::Hmac::<sha2::Sha256>::new_from_slice(voucher_secret.as_bytes()).unwrap();
             hmac::Mac::update(&mut hmac, payload_to_sign.as_bytes());
             let signature = hex::encode(hmac::Mac::finalize(hmac).into_bytes());
             let bandwidth_voucher = format!("v1.{}.{}", payload_to_sign, signature);

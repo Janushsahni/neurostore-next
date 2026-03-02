@@ -154,8 +154,15 @@ impl RepairDaemon {
     }
 
     async fn sweep(&self) {
-        // Query Postgres for objects where the quantity of healthy shards has fallen below 20, 
-        // but is still above the recovery_threshold (usually 10).
+        // Scan for objects where shard count has degraded below the target (20).
+        // NOTE: This daemon currently IDENTIFIES degraded objects and flags them.
+        // Full self-healing requires:
+        //   1. Retrieve remaining shards from swarm via P2P
+        //   2. RS-decode to reconstruct the original data
+        //   3. RS-encode new parity shards
+        //   4. Distribute new shards to fresh nodes
+        //   5. Only THEN update the DB shard count
+        // Until that pipeline is implemented, we log warnings and mark objects.
         
         let degraded_objects_res = sqlx::query_as::<_, DegradedObject>(
             r#"
@@ -173,24 +180,29 @@ impl RepairDaemon {
                     return;
                 }
 
-                warn!("Repair Daemon detected {} degraded objects in the Swarm.", objects.len());
+                warn!("Repair Daemon detected {} degraded objects requiring attention.", objects.len());
 
                 for obj in objects {
                     let missing = 20 - obj.shards;
-                    info!("Initiating Self-Healing Protocol for Object {}/{}. Reconstructing {} missing shards.", obj.bucket, obj.key, missing);
-                    
-                    let update_res = sqlx::query(
-                        "UPDATE objects SET shards = 20 WHERE bucket = $1 AND key = $2"
+                    warn!(
+                        "DEGRADED: Object {}/{} has {}/{} shards ({} missing). Manual intervention or P2P repair pipeline needed.",
+                        obj.bucket, obj.key, obj.shards, 20, missing
+                    );
+
+                    // Mark the object as degraded in metadata for dashboard visibility
+                    let _ = sqlx::query(
+                        "UPDATE objects SET metadata_json = jsonb_set(COALESCE(metadata_json, '{}'::jsonb), '{repair_status}', $1::jsonb) WHERE bucket = $2 AND key = $3"
                     )
+                    .bind(serde_json::json!({
+                        "status": "degraded",
+                        "healthy_shards": obj.shards,
+                        "target_shards": 20,
+                        "detected_at": chrono::Utc::now().to_rfc3339()
+                    }).to_string())
                     .bind(&obj.bucket)
                     .bind(&obj.key)
                     .execute(&self.state.db)
                     .await;
-
-                    match update_res {
-                        Ok(_) => info!("Self-Healing Complete. Object {}/{} is restored to 20 physical shards.", obj.bucket, obj.key),
-                        Err(e) => error!("Failed to update database after healing object: {}", e),
-                    }
                 }
             }
             Err(e) => {
