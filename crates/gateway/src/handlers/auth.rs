@@ -326,7 +326,7 @@ pub async fn setup_escrow(
     headers: HeaderMap,
     Json(payload): Json<EscrowRequest>,
 ) -> impl IntoResponse {
-    let email = match validate_s3_auth(&headers, &state) {
+    let email = match crate::handlers::s3::validate_s3_auth(&headers, &state) {
         Ok(e) => e,
         Err(e) => return e.into_response(),
     };

@@ -11,7 +11,7 @@ use chrono::Utc;
 use libp2p::PeerId;
 use rand::RngCore;
 use tokio::time::{sleep, timeout};
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 use futures::stream::{FuturesUnordered, StreamExt};
 use sha2::Digest;
 
@@ -72,7 +72,7 @@ impl ProofOfSpacetimeDaemon {
                 let state_clone = Arc::clone(&self.state);
                 audit_futures.push(async move {
                     let issued = create_challenge_for_target(&state_clone, &target).await;
-                    let (challenge_id, challenge_hex, nonce_hex) = match issued {
+                    let (challenge_id, _challenge_hex, _nonce_hex) = match issued {
                         Ok(v) => v,
                         Err(e) => {
                             warn!("Failed to create challenge for {}: {}", target.shard_cid, e);
