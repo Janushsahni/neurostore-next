@@ -167,6 +167,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/session", get(handlers::auth::session))
         .route("/api/session", get(handlers::auth::session))
         
+        // Enterprise Auth Routes
+        .route("/api/auth/escrow", post(handlers::auth::setup_escrow))
+        .route("/api/auth/sso/saml", post(handlers::auth::sso_saml_login))
+        .route("/api/auth/sso/oauth", post(handlers::auth::sso_oauth_login))
+        
         // S3-Compatible API (Path Style)
         .route("/:bucket", get(handlers::s3::list_objects))
         .route("/:bucket/*key", 
@@ -193,6 +198,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/versions/:bucket/*key", get(handlers::features::list_versions))
         .route("/api/worm/configure", post(handlers::features::configure_worm))
         .route("/api/ai/auto-tag/:bucket/*key", post(handlers::features::auto_tag_object))
+        .route("/api/ai/search", post(handlers::features::ai_semantic_search))
         .route("/api/billing/usage", get(handlers::features::get_usage_summary))
         .fallback_service(ServeDir::new("public"))
         .layer(cors)

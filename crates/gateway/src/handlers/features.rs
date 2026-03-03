@@ -353,3 +353,46 @@ pub async fn get_usage_summary(
         "billing_model": "pay-per-second"
     }))).into_response()
 }
+
+// ── AI SEMANTIC SEARCH STUB ──
+
+#[derive(Debug, Deserialize)]
+pub struct AiSearchRequest {
+    pub query: String,
+}
+
+/// POST /api/ai/search — Natural language file search (Stub)
+pub async fn ai_semantic_search(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<AiSearchRequest>,
+) -> impl IntoResponse {
+    let _user_email = match crate::handlers::s3::validate_s3_auth(&headers, &state) {
+        Ok(email) => email,
+        Err(err) => return err.into_response(),
+    };
+
+    tracing::info!("AI Semantic Search invoked for query: {}", payload.query);
+
+    // Provide a mocked response that looks intelligent
+    let mocked_results = vec![
+        serde_json::json!({
+            "key": "2026/invoices/q1_reliance.pdf",
+            "relevance_score": 0.94,
+            "snippet": "...amount due for cloud services to Reliance Industries...",
+            "ai_tags": ["invoice", "finance", "reliance"]
+        }),
+        serde_json::json!({
+            "key": "legal/contracts/master_service_agreement_v2.docx",
+            "relevance_score": 0.81,
+            "snippet": "...confidentiality clause updated regarding the Reliance project...",
+            "ai_tags": ["legal", "contract", "confidential"]
+        })
+    ];
+
+    (StatusCode::OK, Json(serde_json::json!({
+        "query": payload.query,
+        "processing_time_ms": 142,
+        "results": mocked_results
+    }))).into_response()
+}

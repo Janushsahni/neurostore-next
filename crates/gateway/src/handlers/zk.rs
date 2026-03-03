@@ -89,10 +89,17 @@ pub async fn zk_store(
             data: decoded_bytes,
         });
 
+        // ── ENTERPRISE: Multi-Region Replication ──
+        // Ensure shards are distributed across minimum 3 distinct physical data centers
+        // IN-MH (Mumbai), IN-DL (Delhi), IN-TG (Hyderabad), IN-KA (Bangalore)
+        let regions = ["IN-MH", "IN-DL", "IN-TG", "IN-KA"];
+        let target_region = regions[shard.shard_index % regions.len()].to_string();
+        tracing::debug!("Dispatching shard {} to Enterprise Region {}", shard.shard_index, target_region);
+
         let (tx, rx) = tokio::sync::oneshot::channel();
         if let Err(e) = state.p2p_tx.send(SwarmRequest::Store {
             command: cmd,
-            geofence: "".to_string(),
+            geofence: target_region,
             tx,
         }).await {
             tracing::error!("Failed to route ZK shard to LibP2P Swarm: {}", e);

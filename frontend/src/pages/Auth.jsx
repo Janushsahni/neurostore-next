@@ -64,6 +64,22 @@ export const Login = ({ onAuth }) => {
                     </div>
                 )}
 
+                <div className="flex gap-2 mb-6">
+                    <button type="button" onClick={() => window.alert('Entra ID SSO flow not configured in environment.')} className="flex-1 bg-white/5 border border-white/10 rounded-lg py-2 text-sm font-semibold hover:bg-white/10 transition flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4" viewBox="0 0 23 23" fill="none"><path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z" fill="#00a4ef" /></svg>
+                        Entra ID
+                    </button>
+                    <button type="button" onClick={() => window.alert('Okta SSO flow not configured in environment.')} className="flex-1 bg-white/5 border border-white/10 rounded-lg py-2 text-sm font-semibold hover:bg-white/10 transition flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4" viewBox="0 0 2500 2500" fill="#007dc1"><path d="M1250 0C559.5 0 0 559.5 0 1250s559.5 1250 1250 1250 1250-559.5 1250-1250S1940.5 0 1250 0zm0 1860.5c-337.3 0-610.5-273.2-610.5-610.5 0-337.3 273.2-610.5 610.5-610.5 337.3 0 610.5 273.2 610.5 610.5 0 337.3-273.2 610.5-610.5 610.5z" /></svg>
+                        Okta
+                    </button>
+                </div>
+
+                <div className="relative mb-6 text-center">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border"></div></div>
+                    <span className="relative z-10 bg-[#070b14] px-3 text-xs text-muted uppercase tracking-wider">Or continue with email</span>
+                </div>
+
                 <form className="space-y-4" onSubmit={handleSubmit}>
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Email Address</label>
@@ -185,6 +201,22 @@ export const Register = ({ onAuth }) => {
                     </div>
                 )}
 
+                <div className="flex gap-2 mb-6">
+                    <button type="button" onClick={() => window.alert('Entra ID SSO flow not configured in environment.')} className="flex-1 bg-white/5 border border-white/10 rounded-lg py-2 text-sm font-semibold hover:bg-white/10 transition flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4" viewBox="0 0 23 23" fill="none"><path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z" fill="#00a4ef" /></svg>
+                        Entra ID
+                    </button>
+                    <button type="button" onClick={() => window.alert('Okta SSO flow not configured in environment.')} className="flex-1 bg-white/5 border border-white/10 rounded-lg py-2 text-sm font-semibold hover:bg-white/10 transition flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4" viewBox="0 0 2500 2500" fill="#007dc1"><path d="M1250 0C559.5 0 0 559.5 0 1250s559.5 1250 1250 1250 1250-559.5 1250-1250S1940.5 0 1250 0zm0 1860.5c-337.3 0-610.5-273.2-610.5-610.5 0-337.3 273.2-610.5 610.5-610.5 337.3 0 610.5 273.2 610.5 610.5 0 337.3-273.2 610.5-610.5 610.5z" /></svg>
+                        Okta
+                    </button>
+                </div>
+
+                <div className="relative mb-6 text-center">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border"></div></div>
+                    <span className="relative z-10 bg-[#070b14] px-3 text-xs text-muted uppercase tracking-wider">Or continue with email</span>
+                </div>
+
                 <form className="space-y-4" onSubmit={handleSubmit}>
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Full Name</label>
@@ -232,6 +264,13 @@ export const Register = ({ onAuth }) => {
                                 required
                             />
                         </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 mt-4 p-3 bg-white/5 border border-white/10 rounded-lg">
+                        <input type="checkbox" id="escrow" className="mt-1" defaultChecked />
+                        <label htmlFor="escrow" className="text-sm text-gray-300 leading-relaxed">
+                            Enable <strong className="text-white">Enterprise Key Escrow</strong>. Securely split and backup my master key using Shamir's Secret Sharing so my company can recover it if lost.
+                        </label>
                     </div>
 
                     <button

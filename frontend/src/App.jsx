@@ -15,6 +15,7 @@ import { FAQ } from "./pages/FAQ";
 import { Download } from "./pages/Download";
 import { Pricing } from "./pages/Pricing";
 import { ComplianceDashboard } from "./pages/ComplianceDashboard";
+import { S3Migration } from "./pages/S3Migration";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
 
@@ -361,6 +362,7 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
             <>
               <Link to="/dashboard/drive" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-primary/40 hover:text-white transition">Dashboard</Link>
               <Link to="/dashboard/compliance" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-emerald-400/40 hover:text-emerald-300 transition">Compliance</Link>
+              <Link to="/s3-migration" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-orange-400/40 hover:text-orange-300 transition">AWS Sync</Link>
               <button onClick={onLogout} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-red-300 hover:text-red-200 transition-colors">
                 <LogOut size={16} /> Logout
               </button>
@@ -460,6 +462,7 @@ const AppContent = () => {
           <Route path="/dashboard/drive" element={<ProtectedRoute isAuthenticated={isAuthenticated}><DriveDashboard /></ProtectedRoute>} />
           <Route path="/dashboard/compliance" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ComplianceDashboard /></ProtectedRoute>} />
           <Route path="/dashboard/node" element={<ProtectedRoute isAuthenticated={isAuthenticated}><NodeDashboard /></ProtectedRoute>} />
+          <Route path="/s3-migration" element={<ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute>} />
           <Route path="/download" element={<Download />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/faq" element={<FAQ />} />
