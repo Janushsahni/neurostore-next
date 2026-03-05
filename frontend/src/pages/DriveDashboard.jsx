@@ -255,10 +255,10 @@ export const DriveDashboard = () => {
                 <div className="glass-card p-6 border-blue-500/30 bg-blue-500/5">
                     <div className="flex flex-col gap-3">
                         <div className="flex items-center gap-2 text-blue-400 font-bold text-sm uppercase tracking-wider">
-                            <Lock size={16} /> Zero-Knowledge Vault
+                            <Lock size={16} /> Private Encryption Key
                         </div>
                         <p className="text-xs text-muted leading-relaxed">
-                            Your password never leaves this browser. Files are AES-256-GCM encrypted locally before being sharded to the network.
+                            Your key never leaves your device. Your files are locked locally before they ever touch the internet, meaning neither we nor anyone else can see your data.
                         </p>
                         <input
                             type="password"
@@ -274,9 +274,9 @@ export const DriveDashboard = () => {
                     <div className="flex items-start gap-3">
                         <ShieldCheck className="text-green-400 mt-1" size={24} />
                         <div>
-                            <h3 className="font-bold text-green-400">100% Network Health</h3>
+                            <h3 className="font-bold text-green-400">Your files are completely safe</h3>
                             <p className="text-xs text-green-200/70 mt-1 leading-relaxed">
-                                Your local ciphertext is mathematically split into 15 shards. Zero data loss even if 5 nodes fail.
+                                Your files are securely backed up across 15 separate locations worldwide. Even if 5 locations go offline at once, your data remains perfectly intact.
                             </p>
                         </div>
                     </div>
@@ -313,10 +313,10 @@ export const DriveDashboard = () => {
                                 <UploadCloud size={32} />
                             </div>
                             <h3 className="text-xl font-bold">Drag & Drop files here</h3>
-                            <p className="text-muted text-sm px-4">Support for multiple file uploads. Assets are encrypted client-side instantly.</p>
+                            <p className="text-muted text-sm px-4">Support for multiple file uploads. Your files are secured instantly before uploading.</p>
                             <div className="flex gap-4 mt-2">
-                                <span className="text-xs bg-background/50 px-2 py-1 rounded border border-border flex items-center gap-1"><Lock size={12} /> WebCrypto API</span>
-                                <span className="text-xs bg-background/50 px-2 py-1 rounded border border-border flex items-center gap-1"><Zap size={12} /> Sharded</span>
+                                <span className="text-xs bg-background/50 px-2 py-1 rounded border border-border flex items-center gap-1"><Lock size={12} /> Military-grade Encryption</span>
+                                <span className="text-xs bg-background/50 px-2 py-1 rounded border border-border flex items-center gap-1"><Zap size={12} /> Distributed Backup</span>
                             </div>
                         </div>
                     )}
@@ -342,17 +342,25 @@ export const DriveDashboard = () => {
                         <table className="w-full text-left border-collapse min-w-[600px]">
                             <thead>
                                 <tr className="text-xs uppercase text-muted border-b border-border/50">
-                                    <th className="font-semibold p-4">Name</th>
-                                    <th className="font-semibold p-4">Size (Cipher)</th>
-                                    <th className="font-semibold p-4">Uploaded</th>
-                                    <th className="font-semibold p-4">Network Status</th>
+                                    <th className="font-semibold p-4">File Name</th>
+                                    <th className="font-semibold p-4">Size</th>
+                                    <th className="font-semibold p-4">Uploaded On</th>
+                                    <th className="font-semibold p-4">Security Status</th>
                                     <th className="font-semibold p-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="text-sm">
                                 {files.length === 0 ? (
                                     <tr>
-                                        <td colSpan="5" className="text-center p-8 text-muted">No files in your secure vault.</td>
+                                        <td colSpan="5" className="text-center p-12">
+                                            <div className="flex flex-col items-center justify-center space-y-3 opacity-60">
+                                                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 mb-2">
+                                                    <HardDrive size={32} className="text-muted" />
+                                                </div>
+                                                <h4 className="font-bold text-lg text-gray-300">Your Vault is Empty</h4>
+                                                <p className="text-muted text-sm max-w-sm mx-auto">Drag and drop any files into the area above to encrypt and secure them forever.</p>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ) : (
                                     files.map(file => (

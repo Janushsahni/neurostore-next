@@ -93,14 +93,13 @@ const LandingPage = () => (
         </div>
 
         <h1 className="appear-up mb-6 font-display text-5xl font-extrabold leading-tight md:text-7xl">
-          Store Data in India.
+          Secure Cloud Storage.
           <br />
-          <span className="text-gradient">Prove It Cryptographically.</span>
+          <span className="text-gradient">Never Worry About Hacks.</span>
         </h1>
 
         <p className="mx-auto mb-9 max-w-3xl text-base text-muted md:text-lg leading-relaxed">
-          NeuroStore is India's only S3-compatible storage platform with <strong className="text-white">built-in DPDP Act compliance</strong>,
-          cryptographic data residency proof, and AI-powered PII detection — at <strong className="text-emerald-300">40% lower cost</strong> than AWS.
+          NeuroStore is the ultimate secure cloud storage for everyone. Like Google Drive, but <strong className="text-white">100% private</strong>, completely un-hackable, and <strong className="text-emerald-300">40% cheaper</strong> than traditional clouds.
         </p>
 
         <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -132,31 +131,15 @@ const LandingPage = () => (
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <FeatureCard icon={ShieldCheck} badge="DPDP Act" title="One-Click Compliance Dashboard"
-            description="Get a real-time compliance score with cryptographically signed proof reports. Export PDF audits that hold up in court — no consultant needed." />
-          <FeatureCard icon={Fingerprint} badge="PII Detection" title="AI-Powered PII Scanner"
-            description="Automatically detect Aadhaar numbers, PAN cards, phone numbers, and email addresses in uploaded files. Flag, quarantine, or auto-encrypt." color="text-rose-400" />
-          <FeatureCard icon={Globe} badge="Sovereignty" title="Provable Indian Data Residency"
-            description="Every shard's location is verified with challenge-response proofs. Get a signed certificate proving 100% of your data is in India." />
+          <FeatureCard icon={ShieldCheck} badge="Privacy First" title="100% Private Vault"
+            description="Your files are locked with a password only you know BEFORE they leave your device. We can't see your data, and neither can hackers." />
+          <FeatureCard icon={HardDrive} badge="Safety" title="Unhackable Backup"
+            description="Instead of storing your file in one centralized data center, we shatter it into 15 secure pieces across the globe. Total redundancy." color="text-amber-400" />
+          <FeatureCard icon={Zap} badge="Speed" title="Lightning Fast Downloads"
+            description="When you download a file, your device fetches the pieces from the closest and fastest servers all at once, maximizing speed." />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 mt-4">
-          <FeatureCard icon={Zap} badge="Performance" title="Parallel Shard Retrieval"
-            description="Files are split into erasure-coded shards across multiple nodes. Retrieval starts from all nodes simultaneously — fastest response wins." />
-          <FeatureCard icon={Eye} badge="Security" title="Zero-Knowledge Architecture"
-            description="Files encrypted client-side before upload. Even we can't read your data. AES-256-GCM encryption at rest, TLS 1.3 in transit." />
-          <FeatureCard icon={FileSearch} badge="AI" title="Smart Auto-Tagging"
-            description="Upload a document and AI automatically classifies it — invoice, contract, medical record, legal filing. Search across thousands of files instantly." color="text-amber-300" />
-        </div>
 
-        <div className="grid gap-4 md:grid-cols-3 mt-4">
-          <FeatureCard icon={Clock} badge="Billing" title="Pay-Per-Second Pricing"
-            description="Don't pay for idle storage. Our per-second billing means startups with spiky workloads save 40-70% compared to AWS monthly billing." color="text-sky-300" />
-          <FeatureCard icon={BarChart3} badge="Webhooks" title="Event-Driven Architecture"
-            description="Get HMAC-signed webhook notifications on file upload, delete, or access. Trigger Slack alerts, Lambda functions, or custom workflows." />
-          <FeatureCard icon={Brain} badge="Compliance" title="Immutable Audit Trail"
-            description="WORM (Write Once Read Many) mode for legal, financial, and regulatory documents. Once written, data can't be deleted for the configured retention period." color="text-purple-400" />
-        </div>
       </div>
     </section>
 
