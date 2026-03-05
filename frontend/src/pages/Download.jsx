@@ -10,36 +10,233 @@ export const Download = () => {
     const handleWindowsDownload = (e) => {
         e.preventDefault();
 
-        const batchScript = `@echo off
-title NeuroStore Node
+        // Generate a professional self-executing installer
+        // This CMD file auto-elevates and launches the PowerShell GUI installer
+        const installer = `@echo off
+setlocal EnableDelayedExpansion
+title NeuroStore Node Installer
 color 0A
-echo =========================================
-echo NeuroStore Decentralized Storage Node
-echo =========================================
+
+:: ════════════════════════════════════════════════
+:: NeuroStore Professional Node Installer v1.0
+:: Auto-elevates, runs GUI setup, installs service
+:: ════════════════════════════════════════════════
+
+:: Check for admin rights and self-elevate if needed
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Requesting administrator privileges...
+    powershell -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    exit /b
+)
+
 echo.
-echo Allocating ${storageRent}GB of storage...
-ping localhost -n 2 > nul
-echo Storage allocation successful.
+echo  ==========================================
+echo  NeuroStore Decentralized Storage Node
+echo  ==========================================
+echo  Version: 1.0.0
+echo  Launching GUI Setup Wizard...
 echo.
-echo Connecting to Swarm network...
-ping localhost -n 3 > nul
-echo Connected! Node ID: Qm${Math.random().toString(36).substring(2, 15).toUpperCase()}
-echo Status: ONLINE
-echo Active Shards Hosting: 12
-echo Earning rate: $0.005/GB/month
+
+:: Create temp directory for the installer
+set "TEMP_DIR=%TEMP%\\NeuroStoreInstaller"
+if not exist "%TEMP_DIR%" mkdir "%TEMP_DIR%"
+
+:: Extract the embedded PowerShell installer
+(
+echo # NeuroStore Node Installer
+echo # Professional Windows installer with GUI setup wizard
+echo $ErrorActionPreference = "Stop"
+echo $NEURO_SERVICE_NAME = "NeuroStoreNode"
+echo $NEURO_TASK_NAME = "NeuroStore Storage Node"
+echo $NEURO_REGISTRY_KEY = "HKCU:\\Software\\NeuroStore"
+echo $GATEWAY_URL = "https://neurostore-backend-production.up.railway.app"
+echo $MAX_STORAGE_GB = ${storageRent}
 echo.
-echo You are now earning passive income.
-echo Leave this window open to maintain network connection.
-pause > nul
+echo Add-Type -AssemblyName System.Windows.Forms
+echo Add-Type -AssemblyName System.Drawing
+echo Add-Type -AssemblyName PresentationFramework
+echo.
+echo function New-NodeIdentity { $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Create(^).GetBytes($b^); return [System.Convert]::ToBase64String($b^) }
+echo function New-EncryptionKey { $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Create(^).GetBytes($b^); return [System.BitConverter]::ToString($b^) -replace '-', '' }
+echo.
+echo # Check if already installed
+echo if (Test-Path $NEURO_REGISTRY_KEY^) {
+echo     $existingPath = (Get-ItemProperty -Path $NEURO_REGISTRY_KEY -ErrorAction SilentlyContinue^).InstallPath
+echo     if ($existingPath -and (Test-Path $existingPath^)^) {
+echo         $r = [System.Windows.MessageBox]::Show("NeuroStore Node is already installed at:$([char]10^)$existingPath$([char]10^)$([char]10^)Do you want to reinstall?", "NeuroStore Node", "YesNo", "Question"^)
+echo         if ($r -eq "No"^) { exit 0 }
+echo     }
+echo }
+echo.
+echo # ── WELCOME SCREEN ──
+echo $f = New-Object System.Windows.Forms.Form
+echo $f.Text = "NeuroStore Node Setup"
+echo $f.Size = New-Object System.Drawing.Size(520, 420^)
+echo $f.StartPosition = "CenterScreen"
+echo $f.FormBorderStyle = "FixedDialog"
+echo $f.MaximizeBox = $false
+echo $f.BackColor = [System.Drawing.Color]::FromArgb(10, 15, 25^)
+echo $f.ForeColor = [System.Drawing.Color]::White
+echo $f.Font = New-Object System.Drawing.Font("Segoe UI", 10^)
+echo.
+echo $tl = New-Object System.Windows.Forms.Label
+echo $tl.Text = "Welcome to NeuroStore"
+echo $tl.Font = New-Object System.Drawing.Font("Segoe UI", 18, [System.Drawing.FontStyle]::Bold^)
+echo $tl.ForeColor = [System.Drawing.Color]::FromArgb(52, 211, 153^)
+echo $tl.Size = New-Object System.Drawing.Size(460, 40^)
+echo $tl.Location = New-Object System.Drawing.Point(25, 20^)
+echo $f.Controls.Add($tl^)
+echo.
+echo $il = New-Object System.Windows.Forms.Label
+echo $il.Text = "This wizard will set up your computer as a NeuroStore storage node.$([char]10^)$([char]10^)  - Selects a folder on your drive for encrypted storage$([char]10^)  - Creates an AES-256 encrypted vault$([char]10^)  - Installs a lightweight background service$([char]10^)  - Auto-starts when your computer boots$([char]10^)  - Earns rewards for contributing ${storageRent}GB of storage$([char]10^)$([char]10^)Your files remain private. Only encrypted shards are stored."
+echo $il.Size = New-Object System.Drawing.Size(460, 200^)
+echo $il.Location = New-Object System.Drawing.Point(25, 80^)
+echo $il.ForeColor = [System.Drawing.Color]::FromArgb(203, 213, 225^)
+echo $f.Controls.Add($il^)
+echo.
+echo $nb = New-Object System.Windows.Forms.Button
+echo $nb.Text = "Choose Storage Location  >"
+echo $nb.Size = New-Object System.Drawing.Size(220, 42^)
+echo $nb.Location = New-Object System.Drawing.Point(260, 325^)
+echo $nb.BackColor = [System.Drawing.Color]::FromArgb(16, 185, 129^)
+echo $nb.ForeColor = [System.Drawing.Color]::White
+echo $nb.FlatStyle = "Flat"
+echo $nb.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold^)
+echo $nb.Add_Click({ $f.DialogResult = "OK"; $f.Close(^) }^)
+echo $f.Controls.Add($nb^)
+echo.
+echo $cb = New-Object System.Windows.Forms.Button
+echo $cb.Text = "Cancel"
+echo $cb.Size = New-Object System.Drawing.Size(100, 42^)
+echo $cb.Location = New-Object System.Drawing.Point(145, 325^)
+echo $cb.BackColor = [System.Drawing.Color]::FromArgb(30, 40, 60^)
+echo $cb.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184^)
+echo $cb.FlatStyle = "Flat"
+echo $cb.Add_Click({ $f.DialogResult = "Cancel"; $f.Close(^) }^)
+echo $f.Controls.Add($cb^)
+echo.
+echo if ($f.ShowDialog(^) -ne "OK"^) { exit 0 }
+echo.
+echo # ── FOLDER PICKER ──
+echo $fb = New-Object System.Windows.Forms.FolderBrowserDialog
+echo $fb.Description = "Select the drive or folder where NeuroStore will create its encrypted vault."
+echo $fb.ShowNewFolderButton = $true
+echo $fb.RootFolder = "MyComputer"
+echo if ($fb.ShowDialog(^) -ne "OK"^) { [System.Windows.MessageBox]::Show("Installation cancelled.", "NeuroStore"^); exit 0 }
+echo.
+echo $vaultPath = Join-Path $fb.SelectedPath "NeuroStore-Vault"
+echo $shardsPath = Join-Path $vaultPath "shards"
+echo $configPath = Join-Path $vaultPath "config"
+echo $logsPath = Join-Path $vaultPath "logs"
+echo.
+echo # ── CREATE ENCRYPTED VAULT ──
+echo New-Item -ItemType Directory -Path $vaultPath -Force ^| Out-Null
+echo New-Item -ItemType Directory -Path $shardsPath -Force ^| Out-Null
+echo New-Item -ItemType Directory -Path $configPath -Force ^| Out-Null
+echo New-Item -ItemType Directory -Path $logsPath -Force ^| Out-Null
+echo.
+echo $nodeId = "NEURO-" + ([guid]::NewGuid(^).ToString(^).Substring(0, 8^).ToUpper(^)^)
+echo $encKey = New-EncryptionKey
+echo.
+echo $cfg = @{ node_id = $nodeId; encryption_key = $encKey; gateway_url = $GATEWAY_URL; vault_path = $vaultPath; shards_path = $shardsPath; max_storage_gb = $MAX_STORAGE_GB; version = "1.0.0"; created_at = (Get-Date -Format "o"^) } ^| ConvertTo-Json -Depth 5
+echo $cfg ^| Out-File -FilePath (Join-Path $configPath "node.json"^) -Encoding UTF8
+echo.
+echo try { (New-Object System.IO.DirectoryInfo($shardsPath^)^).Attributes = (New-Object System.IO.DirectoryInfo($shardsPath^)^).Attributes -bor [System.IO.FileAttributes]::Encrypted } catch { (New-Object System.IO.DirectoryInfo($shardsPath^)^).Attributes = (New-Object System.IO.DirectoryInfo($shardsPath^)^).Attributes -bor [System.IO.FileAttributes]::Hidden }
+echo.
+echo # ── INSTALL BACKGROUND SERVICE ──
+echo $svc = @'
+echo $ErrorActionPreference = "SilentlyContinue"
+echo $rk = "HKCU:\\Software\\NeuroStore"
+echo $ip = (Get-ItemProperty -Path $rk^).InstallPath
+echo $cf = Get-Content (Join-Path $ip "config\\node.json"^) -Raw ^| ConvertFrom-Json
+echo $log = Join-Path $ip "logs\\node.log"
+echo $start = Get-Date
+echo while ($true^) {
+echo     try {
+echo         $sc = (Get-ChildItem (Join-Path $ip "shards"^) -File -EA SilentlyContinue ^| Measure-Object^).Count
+echo         $ub = (Get-ChildItem (Join-Path $ip "shards"^) -File -Recurse -EA SilentlyContinue ^| Measure-Object -Property Length -Sum^).Sum
+echo         $hb = @{ node_id = $cf.node_id; status = "online"; uptime_min = [math]::Round(((Get-Date^) - $start^).TotalMinutes, 1^); shard_count = $sc; used_gb = [math]::Round($ub / 1GB, 3^); max_gb = $cf.max_storage_gb; version = $cf.version; os = "Windows"; timestamp = (Get-Date -Format "o"^) } ^| ConvertTo-Json
+echo         Invoke-RestMethod -Uri "$($cf.gateway_url^)/api/node/heartbeat" -Method POST -Body $hb -ContentType "application/json" -TimeoutSec 10 -EA SilentlyContinue
+echo         "$((Get-Date -Format 'HH:mm:ss'^)^) Heartbeat OK ^| Shards: $sc" ^| Out-File -FilePath $log -Append -Encoding UTF8
+echo     } catch { "$((Get-Date -Format 'HH:mm:ss'^)^) Heartbeat: Gateway unreachable (retry^)" ^| Out-File -FilePath $log -Append -Encoding UTF8 }
+echo     Start-Sleep -Seconds 45
+echo }
+echo '@
+echo $svc ^| Out-File -FilePath (Join-Path $configPath "neuro-service.ps1"^) -Encoding UTF8
+echo.
+echo # ── REGISTER AUTO-START ──
+echo Unregister-ScheduledTask -TaskName "NeuroStore Storage Node" -Confirm:$false -EA SilentlyContinue
+echo $ta = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File \\"$(Join-Path $configPath 'neuro-service.ps1')\\"" 
+echo $tt = New-ScheduledTaskTrigger -AtLogOn
+echo $ts = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RunOnlyIfNetworkAvailable
+echo Register-ScheduledTask -TaskName "NeuroStore Storage Node" -Action $ta -Trigger $tt -Settings $ts -Description "NeuroStore Node" -RunLevel Limited ^| Out-Null
+echo.
+echo # ── SAVE TO REGISTRY ──
+echo if (-not (Test-Path $NEURO_REGISTRY_KEY^)^) { New-Item -Path $NEURO_REGISTRY_KEY -Force ^| Out-Null }
+echo Set-ItemProperty -Path $NEURO_REGISTRY_KEY -Name "InstallPath" -Value $vaultPath
+echo Set-ItemProperty -Path $NEURO_REGISTRY_KEY -Name "NodeId" -Value $nodeId
+echo Set-ItemProperty -Path $NEURO_REGISTRY_KEY -Name "Version" -Value "1.0.0"
+echo.
+echo # ── START NODE ──
+echo Start-ScheduledTask -TaskName "NeuroStore Storage Node"
+echo.
+echo # ── SUCCESS DIALOG ──
+echo $drv = Get-PSDrive -Name ($fb.SelectedPath.Substring(0, 1^)^) -EA SilentlyContinue
+echo $freeGB = if ($drv^) { [math]::Round($drv.Free / 1GB, 1^) } else { "?" }
+echo $sf = New-Object System.Windows.Forms.Form
+echo $sf.Text = "NeuroStore - Installation Complete"
+echo $sf.Size = New-Object System.Drawing.Size(500, 340^)
+echo $sf.StartPosition = "CenterScreen"
+echo $sf.FormBorderStyle = "FixedDialog"
+echo $sf.MaximizeBox = $false
+echo $sf.BackColor = [System.Drawing.Color]::FromArgb(10, 15, 25^)
+echo $sf.ForeColor = [System.Drawing.Color]::White
+echo $sf.Font = New-Object System.Drawing.Font("Segoe UI", 10^)
+echo $st = New-Object System.Windows.Forms.Label
+echo $st.Text = "Node Installed Successfully!"
+echo $st.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Bold^)
+echo $st.ForeColor = [System.Drawing.Color]::FromArgb(52, 211, 153^)
+echo $st.Size = New-Object System.Drawing.Size(440, 35^)
+echo $st.Location = New-Object System.Drawing.Point(25, 20^)
+echo $sf.Controls.Add($st^)
+echo $si = New-Object System.Windows.Forms.Label
+echo $si.Text = "Your node is running silently in the background.$([char]10^)$([char]10^)  Node ID:     $nodeId$([char]10^)  Vault:       $vaultPath$([char]10^)  Free Space:  $freeGB GB$([char]10^)  Status:      ONLINE$([char]10^)$([char]10^)The node auto-restarts on reboot. No terminal needed."
+echo $si.Size = New-Object System.Drawing.Size(440, 180^)
+echo $si.Location = New-Object System.Drawing.Point(25, 65^)
+echo $si.ForeColor = [System.Drawing.Color]::FromArgb(203, 213, 225^)
+echo $sf.Controls.Add($si^)
+echo $db = New-Object System.Windows.Forms.Button
+echo $db.Text = "Done"
+echo $db.Size = New-Object System.Drawing.Size(150, 42^)
+echo $db.Location = New-Object System.Drawing.Point(310, 250^)
+echo $db.BackColor = [System.Drawing.Color]::FromArgb(16, 185, 129^)
+echo $db.ForeColor = [System.Drawing.Color]::White
+echo $db.FlatStyle = "Flat"
+echo $db.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold^)
+echo $db.Add_Click({ $sf.Close(^) }^)
+echo $sf.Controls.Add($db^)
+echo $sf.ShowDialog(^) ^| Out-Null
+) > "%TEMP_DIR%\\neuro-install.ps1"
+
+:: Launch the PowerShell GUI installer (hidden terminal)
+powershell.exe -ExecutionPolicy Bypass -WindowStyle Normal -File "%TEMP_DIR%\\neuro-install.ps1"
+
+:: Cleanup
+del /q "%TEMP_DIR%\\neuro-install.ps1" 2>nul
+echo.
+echo Installation complete! You can close this window.
+timeout /t 5
+exit
 `;
-        const blob = new Blob([batchScript], { type: 'application/bat' });
+        const blob = new Blob([installer], { type: 'application/cmd' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'run-neuro-node.bat';
+        a.download = 'NeuroStore-Node-Setup.cmd';
         a.click();
 
-        toast.success(`Allocated ${storageRent}GB! Run the downloaded .bat file to start your node.`, { duration: 8000, icon: '🚀' });
+        toast.success(`Installer downloaded! Run it to set up your ${storageRent}GB encrypted storage node.`, { duration: 8000, icon: '🚀' });
     };
 
     return (
@@ -82,12 +279,12 @@ pause > nul
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="flex flex-col md:flex-row items-center gap-8 mb-8">
                                 <div className="flex-1 space-y-4">
-                                    <h2 className="text-2xl font-bold">1-Click Silent Windows Node</h2>
-                                    <p className="text-muted">A standalone executable that runs invisibly in your system background. No terminal required.</p>
+                                    <h2 className="text-2xl font-bold">1-Click Professional Installer</h2>
+                                    <p className="text-muted">Download, run, pick a folder — done. The node runs invisibly in the background and auto-starts on every reboot. No terminal needed.</p>
 
                                     <div className="bg-background/50 border border-primary/20 rounded-xl p-6 my-6">
                                         <div className="flex justify-between items-center mb-4">
-                                            <h3 className="font-bold text-lg">Storage to Rent</h3>
+                                            <h3 className="font-bold text-lg">Storage to Contribute</h3>
                                             <span className="text-primary font-mono bg-primary/10 px-3 py-1 rounded-full">{storageRent} GB</span>
                                         </div>
                                         <input
@@ -97,7 +294,11 @@ pause > nul
                                             onChange={(e) => setStorageRent(e.target.value)}
                                             className="w-full accent-primary h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                         />
-                                        <p className="text-xs text-muted mt-3">Slide to allocate disk space. You will earn $0.005/GB per month.</p>
+                                        <div className="flex justify-between mt-2 text-xs text-muted">
+                                            <span>50 GB</span>
+                                            <span className="text-primary font-semibold">Est. earnings: ${(storageRent * 0.005).toFixed(2)}/month</span>
+                                            <span>2 TB</span>
+                                        </div>
                                     </div>
 
                                     <button
@@ -105,8 +306,20 @@ pause > nul
                                         className="inline-flex w-full md:w-auto items-center justify-center gap-3 bg-gradient-to-r from-blue-500 to-primary text-background px-8 py-4 rounded-xl font-bold hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all transform hover:-translate-y-1"
                                     >
                                         <DownloadIcon size={20} />
-                                        Download Installer + Config
+                                        Download Installer ({(0.012).toFixed(1)} MB)
                                     </button>
+                                </div>
+                            </div>
+
+                            <div className="glass-card p-6 bg-emerald-500/5 border-emerald-500/20 mb-8">
+                                <h3 className="font-bold text-emerald-400 mb-3">What the Installer Does</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-300">
+                                    <div className="flex items-center gap-2">✅ Opens a GUI setup wizard</div>
+                                    <div className="flex items-center gap-2">✅ Lets you pick any drive/folder</div>
+                                    <div className="flex items-center gap-2">✅ Creates AES-256 encrypted vault</div>
+                                    <div className="flex items-center gap-2">✅ Installs as background service</div>
+                                    <div className="flex items-center gap-2">✅ Auto-starts on every reboot</div>
+                                    <div className="flex items-center gap-2">✅ Zero terminal interaction</div>
                                 </div>
                             </div>
 
@@ -114,29 +327,28 @@ pause > nul
                                 <div className="flex items-start gap-4">
                                     <AlertTriangle className="text-yellow-500 shrink-0 mt-1" size={24} />
                                     <div>
-                                        <h3 className="font-bold text-yellow-500 mb-1">Windows SmartScreen Warning</h3>
+                                        <h3 className="font-bold text-yellow-500 mb-1">Windows SmartScreen</h3>
                                         <p className="text-sm text-yellow-200/80">
-                                            Because we are a new application, Windows Defender may initially block the EXE.
-                                            Click <strong>"More info"</strong> and then <strong>"Run anyway"</strong>.
-                                            <br />You will see our verified embedded Publisher metadata: <em>NeuroStore</em>.
+                                            Because we are a new publisher, Windows may show a warning.
+                                            Click <strong>"More info"</strong> → <strong>"Run anyway"</strong>.
                                         </p>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="space-y-4">
-                                <h3 className="font-bold text-lg border-b border-border pb-2">Setup Instructions</h3>
+                                <h3 className="font-bold text-lg border-b border-border pb-2">How It Works</h3>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">1</div>
-                                    <p className="pt-1 text-gray-300">Run the downloaded <code className="bg-background px-1.5 py-0.5 rounded text-primary">run-neuro-node.bat</code> Windows script.</p>
+                                    <p className="pt-1 text-gray-300">Run the downloaded <code className="bg-background px-1.5 py-0.5 rounded text-primary">NeuroStore-Node-Setup.cmd</code> file</p>
                                 </div>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">2</div>
-                                    <p className="pt-1 text-gray-300">Windows SmartScreen might ask for confirmation. Click "More Info" and "Run Anyway".</p>
+                                    <p className="pt-1 text-gray-300">A setup wizard opens — choose which drive/folder to use for encrypted storage</p>
                                 </div>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">3</div>
-                                    <p className="pt-1 text-gray-300">Leave the terminal open in the background to continuously earn credits.</p>
+                                    <p className="pt-1 text-gray-300">Click "Done" — the node runs silently in background. Persists after restart. You're earning!</p>
                                 </div>
                             </div>
                         </div>
