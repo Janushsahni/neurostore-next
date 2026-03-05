@@ -55,18 +55,33 @@ async fn main() -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("setting default subscriber failed");
 
-    // Connect to PostgreSQL
+    // Connect to PostgreSQL with retry logic (Railway may start DB after gateway)
     let database_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL environment variable is required");
 
     info!("Connecting to PostgreSQL...");
     
-    let pool = PgPoolOptions::new()
-        .max_connections(500)
-        .connect(&database_url)
-        .await?;
-
-    info!("Connected to database.");
+    let mut pool_result = None;
+    for attempt in 1..=5u32 {
+        match PgPoolOptions::new()
+            .max_connections(25)
+            .acquire_timeout(std::time::Duration::from_secs(10))
+            .connect(&database_url)
+            .await
+        {
+            Ok(p) => {
+                info!("Connected to database on attempt {}.", attempt);
+                pool_result = Some(p);
+                break;
+            }
+            Err(e) => {
+                let wait = 2u64.pow(attempt);
+                tracing::warn!("DB connection attempt {} failed: {}. Retrying in {}s...", attempt, e, wait);
+                tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+            }
+        }
+    }
+    let pool = pool_result.expect("Failed to connect to PostgreSQL after 5 attempts");
 
     // Run Migrations (Ensuring production schema is provisioned)
     sqlx::migrate!("./migrations").run(&pool).await?;
