@@ -306,13 +306,16 @@ pub async fn put_object(
 
     tracing::info!("ENHANCED REDUNDANCY: Sliced {} bytes into 20 Galios Shards (RS 10+10)", size);
 
+    // ── HYBRID SHARD STORAGE: P2P-first with Cloud DB Fallback ──
+    // Try to store shards via the P2P swarm. If that fails (cloud mode / no peers),
+    // fall back to storing shard data directly in PostgreSQL.
     let (tx_ack, mut rx_ack) = tokio::sync::mpsc::channel(total_shards);
 
     for (i, shard_bytes) in physical_shards.into_iter().enumerate() {
         let shard_cid = format!("{}-shard-{}", cid, i);
         let cmd = ChunkCommand::Store(StoreChunkRequest {
             cid: shard_cid.clone(),
-            data: shard_bytes,
+            data: shard_bytes.clone(),
         });
         let (tx, rx) = oneshot::channel();
         
@@ -326,48 +329,94 @@ pub async fn put_object(
         let tx_ack_clone = tx_ack.clone();
         let db_clone = state.db.clone();
         let object_cid_clone = cid.clone();
+        let shard_data_for_fallback = shard_bytes;
         tokio::spawn(async move {
-            let res = if p2p_tx.send(swarm_req).await.is_err() {
+            // Attempt P2P storage first
+            let p2p_result = if p2p_tx.send(swarm_req).await.is_err() {
                 Err("Storage network queue unavailable")
             } else {
-                match timeout(Duration::from_secs(15), rx).await {
-                    Ok(Ok(ack)) => {
-                        if ack.stored {
-                            // Insert directly to DB asynchronously
-                            let _ = sqlx::query(
-                                r#"
-                                INSERT INTO object_shards (
-                                    object_cid, shard_cid, shard_index, peer_id, country_code,
-                                    receipt_timestamp_ms, receipt_signature_valid, last_verified_at
-                                ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-                                ON CONFLICT (object_cid, shard_index) DO UPDATE SET
-                                    shard_cid = excluded.shard_cid,
-                                    peer_id = excluded.peer_id,
-                                    country_code = excluded.country_code,
-                                    receipt_timestamp_ms = excluded.receipt_timestamp_ms,
-                                    receipt_signature_valid = excluded.receipt_signature_valid,
-                                    last_verified_at = NOW()
-                                "#
-                            )
-                            .bind(&object_cid_clone)
-                            .bind(&shard_cid)
-                            .bind(i as i32)
-                            .bind(&ack.peer_id)
-                            .bind(&ack.country_code)
-                            .bind(ack.timestamp_ms as i64)
-                            .bind(ack.signature_valid)
-                            .execute(&db_clone)
-                            .await;
-
-                            Ok(())
-                        } else {
-                            Err("Shard storage rejected by node")
-                        }
+                match timeout(Duration::from_secs(5), rx).await {
+                    Ok(Ok(ack)) if ack.stored => {
+                        let _ = sqlx::query(
+                            r#"
+                            INSERT INTO object_shards (
+                                object_cid, shard_cid, shard_index, peer_id, country_code,
+                                receipt_timestamp_ms, receipt_signature_valid, last_verified_at
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                            ON CONFLICT (object_cid, shard_index) DO UPDATE SET
+                                shard_cid = excluded.shard_cid,
+                                peer_id = excluded.peer_id,
+                                country_code = excluded.country_code,
+                                receipt_timestamp_ms = excluded.receipt_timestamp_ms,
+                                receipt_signature_valid = excluded.receipt_signature_valid,
+                                last_verified_at = NOW()
+                            "#
+                        )
+                        .bind(&object_cid_clone)
+                        .bind(&shard_cid)
+                        .bind(i as i32)
+                        .bind(&ack.peer_id)
+                        .bind(&ack.country_code)
+                        .bind(ack.timestamp_ms as i64)
+                        .bind(ack.signature_valid)
+                        .execute(&db_clone)
+                        .await;
+                        Ok(())
                     }
-                    _ => Err("Shard storage acknowledgement timeout"),
+                    _ => Err("P2P timeout or rejection"),
                 }
             };
-            let _ = tx_ack_clone.send(res).await;
+
+            // ── CLOUD FALLBACK: Store shard directly in Postgres ──
+            let final_result = match p2p_result {
+                Ok(()) => Ok(()),
+                Err(_reason) => {
+                    tracing::info!("Cloud fallback: storing shard {} in Postgres", i);
+                    let db_res = sqlx::query(
+                        "INSERT INTO shard_data (shard_cid, object_cid, shard_index, data) \
+                         VALUES ($1, $2, $3, $4) \
+                         ON CONFLICT (shard_cid) DO UPDATE SET data = excluded.data"
+                    )
+                    .bind(&shard_cid)
+                    .bind(&object_cid_clone)
+                    .bind(i as i32)
+                    .bind(&shard_data_for_fallback)
+                    .execute(&db_clone)
+                    .await;
+
+                    // Also insert a synthetic object_shards row so GET can find it
+                    let _ = sqlx::query(
+                        r#"
+                        INSERT INTO object_shards (
+                            object_cid, shard_cid, shard_index, peer_id, country_code,
+                            receipt_timestamp_ms, receipt_signature_valid, last_verified_at
+                        ) VALUES ($1, $2, $3, 'cloud-postgres', 'CLOUD', $4, true, NOW())
+                        ON CONFLICT (object_cid, shard_index) DO UPDATE SET
+                            shard_cid = excluded.shard_cid,
+                            peer_id = excluded.peer_id,
+                            last_verified_at = NOW()
+                        "#
+                    )
+                    .bind(&object_cid_clone)
+                    .bind(&shard_cid)
+                    .bind(i as i32)
+                    .bind(std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as i64)
+                    .execute(&db_clone)
+                    .await;
+
+                    match db_res {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            tracing::error!("Cloud shard DB insert failed: {}", e);
+                            Err("Cloud DB fallback failed")
+                        }
+                    }
+                }
+            };
+            let _ = tx_ack_clone.send(final_result).await;
         });
     }
 
@@ -380,7 +429,6 @@ pub async fn put_object(
         if result.is_ok() {
             successful_store_acks += 1;
             if successful_store_acks >= required_optimistic_shards {
-                // OPTIMISTIC SUCCESS: We don't wait for the slowest 6 nodes.
                 break;
             }
         }
@@ -639,7 +687,7 @@ pub async fn get_object(
                return (StatusCode::OK, cached_bytes).into_response();
             }
 
-            // ── PARALLEL RACING RETRIEVAL ──
+            // ── HYBRID SHARD RETRIEVAL: Cloud DB + P2P ──
             let mut preferred_peers: HashMap<usize, String> = HashMap::new();
             let shard_rows = sqlx::query_as::<_, (i32, String)>(
                 "SELECT shard_index, peer_id FROM object_shards WHERE object_cid = $1"
@@ -654,66 +702,63 @@ pub async fn get_object(
                 }
             }
 
-            let mut futures = FuturesUnordered::new();
-            
-            for i in 0..obj.shards {
-                let shard_cid = format!("{}-shard-{}", obj.cid, i);
-                let (tx, rx) = oneshot::channel();
-                let p2p_tx = state.p2p_tx.clone();
-                let preferred_peer_id = preferred_peers.get(&(i as usize)).cloned();
-                
-                futures.push(async move {
-                    // ── TRAFFIC JITTER (ANTI-CORRELATION) ──
-                    // Adds 1-15ms of random delay before dispatching the shard request.
-                    // This breaks the exact "10 simultaneous requests" timing signature
-                    // that ISPs or state actors look for when fingerprinting decentralized storage.
-                    let jitter = rand::RngCore::next_u32(&mut rand::thread_rng()) % 15 + 1;
-                    tokio::time::sleep(Duration::from_millis(jitter as u64)).await;
-
-                    let req = SwarmRequest::Retrieve { cid: shard_cid, preferred_peer_id, tx };
-                    if p2p_tx.send(req).await.is_ok() {
-                        if let Ok(Ok(ack)) = timeout(Duration::from_secs(8), rx).await {
-                            if let Some(data) = ack.data {
-                                return Some((i as usize, data));
-                            }
-                        }
-                    }
-                    None
-                });
-            }
-
-            // ── TRAFFIC CHAFF (SNIPER PROTECTION) ──
-            // We fire a "Garbage Request" for a non-existent CID to an 11th random node.
-            // Even if an ISP is logging the packet sizes and counts, the total number
-            // of parallel connections is randomized (10 + 1 chaff), completely
-            // ruining their heuristic model for tracing NeuroStore retrieval.
-            let p2p_tx_chaff = state.p2p_tx.clone();
-            tokio::spawn(async move {
-                let jitter = rand::RngCore::next_u32(&mut rand::thread_rng()) % 15 + 1;
-                tokio::time::sleep(Duration::from_millis(jitter as u64)).await;
-                
-                let mut dummy_bytes = [0u8; 8];
-                rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut dummy_bytes);
-                let dummy_cid = format!("QmChaff{}", hex::encode(dummy_bytes));
-                
-                let (tx, _rx) = oneshot::channel();
-                let _ = p2p_tx_chaff.send(SwarmRequest::Retrieve { 
-                    cid: dummy_cid, 
-                    preferred_peer_id: None, 
-                    tx 
-                }).await;
-            });
+            // Check if any shards are stored in cloud-postgres mode
+            let has_cloud_shards = preferred_peers.values().any(|p| p == "cloud-postgres");
 
             let mut retrieved_shards = vec![None; obj.shards as usize];
             let mut success_count = 0;
 
-            while let Some(result) = futures.next().await {
-                if let Some((index, data)) = result {
-                    retrieved_shards[index] = Some(data);
-                    success_count += 1;
+            if has_cloud_shards {
+                // ── CLOUD MODE: Retrieve shards directly from PostgreSQL ──
+                let cloud_rows = sqlx::query_as::<_, (i32, Vec<u8>)>(
+                    "SELECT shard_index, data FROM shard_data WHERE object_cid = $1 ORDER BY shard_index"
+                )
+                .bind(&obj.cid)
+                .fetch_all(&state.db)
+                .await
+                .unwrap_or_default();
+
+                for (index, data) in cloud_rows {
+                    if (index as usize) < retrieved_shards.len() {
+                        retrieved_shards[index as usize] = Some(data);
+                        success_count += 1;
+                    }
+                }
+                tracing::info!("Cloud DB retrieval: got {}/{} shards from Postgres", success_count, obj.shards);
+            } else {
+                // ── P2P MODE: Original parallel racing retrieval ──
+                let mut futures = FuturesUnordered::new();
+                
+                for i in 0..obj.shards {
+                    let shard_cid = format!("{}-shard-{}", obj.cid, i);
+                    let (tx, rx) = oneshot::channel();
+                    let p2p_tx = state.p2p_tx.clone();
+                    let preferred_peer_id = preferred_peers.get(&(i as usize)).cloned();
                     
-                    if success_count >= obj.recovery_threshold as usize {
-                        break;
+                    futures.push(async move {
+                        let jitter = rand::RngCore::next_u32(&mut rand::thread_rng()) % 15 + 1;
+                        tokio::time::sleep(Duration::from_millis(jitter as u64)).await;
+
+                        let req = SwarmRequest::Retrieve { cid: shard_cid, preferred_peer_id, tx };
+                        if p2p_tx.send(req).await.is_ok() {
+                            if let Ok(Ok(ack)) = timeout(Duration::from_secs(8), rx).await {
+                                if let Some(data) = ack.data {
+                                    return Some((i as usize, data));
+                                }
+                            }
+                        }
+                        None
+                    });
+                }
+
+                while let Some(result) = futures.next().await {
+                    if let Some((index, data)) = result {
+                        retrieved_shards[index] = Some(data);
+                        success_count += 1;
+                        
+                        if success_count >= obj.recovery_threshold as usize {
+                            break;
+                        }
                     }
                 }
             }
