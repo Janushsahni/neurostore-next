@@ -86,31 +86,44 @@ async fn main() -> anyhow::Result<()> {
     // Run Migrations (Ensuring production schema is provisioned)
     sqlx::migrate!("./migrations").run(&pool).await?;
 
-    // Phase 10: Ignite the LibP2P Swarm Network
+    // Phase 10: Ignite the LibP2P Swarm Network (non-fatal on cloud platforms)
     let (p2p_tx, p2p_rx) = mpsc::channel(100);
-    let mut swarm_node = p2p::P2pNode::new().await?;
     let geo_manager = geofence::GeoFenceManager::new();
-    let geo_manager_clone = geofence::GeoFenceManager::new(); // For the p2p loop
     
-    let db_for_p2p = pool.clone();
-    tokio::spawn(async move {
-        info!("Igniting LibP2P Kademlia DHT Swarm...");
-        if let Err(e) = swarm_node.start(9010, p2p_rx, geo_manager_clone, db_for_p2p).await {
-            tracing::error!("Fatal P2P Swarm crash: {}", e);
+    match p2p::P2pNode::new().await {
+        Ok(mut swarm_node) => {
+            let geo_manager_clone = geofence::GeoFenceManager::new();
+            let db_for_p2p = pool.clone();
+            tokio::spawn(async move {
+                info!("Igniting LibP2P Kademlia DHT Swarm...");
+                if let Err(e) = swarm_node.start(9010, p2p_rx, geo_manager_clone, db_for_p2p).await {
+                    tracing::error!("P2P Swarm error: {}", e);
+                }
+            });
         }
-    });
+        Err(e) => {
+            tracing::warn!("P2P Swarm disabled (cloud mode): {}. HTTP API will still function.", e);
+            // Drain the rx channel so senders don't block
+            tokio::spawn(async move {
+                let mut rx = p2p_rx;
+                while rx.recv().await.is_some() {}
+            });
+        }
+    }
 
-    let metadata_secret = std::env::var("METADATA_SECRET")
-        .expect("METADATA_SECRET environment variable is required");
-    
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .expect("JWT_SECRET environment variable is required");
-    let proof_submit_token = std::env::var("PROOF_SUBMIT_TOKEN")
-        .expect("PROOF_SUBMIT_TOKEN environment variable is required");
-    let compliance_signing_key = std::env::var("COMPLIANCE_SIGNING_KEY")
-        .expect("COMPLIANCE_SIGNING_KEY environment variable is required");
-    let node_shared_secret = std::env::var("NODE_SHARED_SECRET")
-        .expect("NODE_SHARED_SECRET environment variable is required");
+    fn env_or_random(name: &str) -> String {
+        std::env::var(name).unwrap_or_else(|_| {
+            let val: String = (0..32).map(|_| format!("{:02x}", rand::random::<u8>())).collect();
+            tracing::warn!("{} not set — using generated default. Set this in production!", name);
+            val
+        })
+    }
+
+    let metadata_secret = env_or_random("METADATA_SECRET");
+    let jwt_secret = env_or_random("JWT_SECRET");
+    let proof_submit_token = env_or_random("PROOF_SUBMIT_TOKEN");
+    let compliance_signing_key = env_or_random("COMPLIANCE_SIGNING_KEY");
+    let node_shared_secret = env_or_random("NODE_SHARED_SECRET");
     let cookie_secure = std::env::var("COOKIE_SECURE")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
