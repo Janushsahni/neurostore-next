@@ -1,8 +1,12 @@
 # Stage 1: Build Environment
 FROM rust:alpine as builder
 
-# Install build dependencies for Alpine (musl libc, openssl, protobuf, libp2p needs)
-RUN apk add --no-cache musl-dev gcc make pkgconfig openssl-dev
+# Install build dependencies for Alpine (musl libc, openssl static libs, libp2p needs)
+RUN apk add --no-cache musl-dev gcc make pkgconfig openssl-dev openssl-libs-static perl
+
+# Force static OpenSSL linking for musl
+ENV OPENSSL_STATIC=1
+ENV OPENSSL_DIR=/usr
 
 WORKDIR /app
 COPY . .
