@@ -1,5 +1,9 @@
+export function getAuthToken() {
+    return localStorage.getItem('neuro_jwt') || '';
+}
+
 export function getAuthUser() {
-    const raw = sessionStorage.getItem('neuro_user');
+    const raw = localStorage.getItem('neuro_user');
     if (!raw) return null;
     try {
         return JSON.parse(raw);
@@ -9,30 +13,35 @@ export function getAuthUser() {
 }
 
 export function getCsrfToken() {
-    return sessionStorage.getItem('neuro_csrf') || '';
+    return localStorage.getItem('neuro_csrf') || '';
 }
 
 export function isAuthenticated() {
-    return !!getAuthUser();
+    return !!getAuthToken() && !!getAuthUser();
 }
 
-export function setAuthSession(user, csrfToken) {
+export function setAuthSession(user, csrfToken, jwtToken) {
+    if (jwtToken) {
+        localStorage.setItem('neuro_jwt', jwtToken);
+    }
     if (user) {
-        sessionStorage.setItem('neuro_user', JSON.stringify(user));
+        localStorage.setItem('neuro_user', JSON.stringify(user));
     }
     if (csrfToken) {
-        sessionStorage.setItem('neuro_csrf', csrfToken);
+        localStorage.setItem('neuro_csrf', csrfToken);
     }
-    // Remove legacy bearer token storage.
+    // Clean up legacy session storage
+    sessionStorage.removeItem('neuro_user');
+    sessionStorage.removeItem('neuro_csrf');
     sessionStorage.removeItem('neuro_token');
-    localStorage.removeItem('neuro_token');
-    localStorage.removeItem('neuro_user');
 }
 
 export function clearAuthSession() {
+    localStorage.removeItem('neuro_jwt');
+    localStorage.removeItem('neuro_user');
+    localStorage.removeItem('neuro_csrf');
     sessionStorage.removeItem('neuro_user');
     sessionStorage.removeItem('neuro_csrf');
     sessionStorage.removeItem('neuro_token');
     localStorage.removeItem('neuro_token');
-    localStorage.removeItem('neuro_user');
 }

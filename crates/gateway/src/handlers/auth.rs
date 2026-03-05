@@ -100,14 +100,37 @@ fn is_reasonable_email(email: &str) -> bool {
         && !domain.ends_with('.')
 }
 
-fn decode_email_from_cookie(headers: &HeaderMap, state: &AppState) -> Result<String, (StatusCode, Json<serde_json::Value>)> {
+fn decode_email_from_request(headers: &HeaderMap, state: &AppState) -> Result<String, (StatusCode, Json<serde_json::Value>)> {
+    // 1. Try Bearer token first (cross-domain friendly)
+    if let Some(auth_header) = headers.get("Authorization").and_then(|h| h.to_str().ok()) {
+        if auth_header.starts_with("Bearer ") {
+            let token = auth_header.trim_start_matches("Bearer ");
+            let mut validation = jsonwebtoken::Validation::default();
+            validation.set_audience(&["neurostore"]);
+            validation.set_issuer(&["neurostore-gateway"]);
+            validation.set_required_spec_claims(&["exp", "aud", "iss"]);
+            if let Ok(data) = jsonwebtoken::decode::<crate::models::Claims>(
+                token,
+                &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+                &validation,
+            ) {
+                return Ok(data.claims.email);
+            }
+        }
+    }
+
+    // 2. Fallback to cookie (backwards compatibility)
     let token = get_cookie_value(headers, AUTH_COOKIE)
         .ok_or((StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "error": "unauthorized" }))))?;
 
+    let mut validation = jsonwebtoken::Validation::default();
+    validation.set_audience(&["neurostore"]);
+    validation.set_issuer(&["neurostore-gateway"]);
+    validation.set_required_spec_claims(&["exp", "aud", "iss"]);
     let token_data = jsonwebtoken::decode::<crate::models::Claims>(
         &token,
         &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &jsonwebtoken::Validation::default(),
+        &validation,
     )
     .map_err(|_| (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "error": "unauthorized" }))))?;
 
@@ -118,6 +141,8 @@ fn auth_response(status: StatusCode, token: String, user: UserProfile, secure_co
     let csrf_token = generate_csrf_token();
     let mut headers = HeaderMap::new();
 
+    // Still set cookies for backwards compatibility, but the frontend
+    // should prefer the JWT token from the response body.
     let auth_cookie = build_cookie(AUTH_COOKIE, &token, 24 * 60 * 60, secure_cookie, true);
     let csrf_cookie = build_cookie(CSRF_COOKIE, &csrf_token, 24 * 60 * 60, secure_cookie, false);
 
@@ -128,8 +153,9 @@ fn auth_response(status: StatusCode, token: String, user: UserProfile, secure_co
         headers.append(SET_COOKIE, v);
     }
 
+    // Return the actual JWT token so the frontend can use Bearer auth
     let body = serde_json::json!({
-        "token": "",
+        "token": token,
         "user": user,
         "csrf_token": csrf_token,
     });
@@ -270,7 +296,7 @@ pub async fn session(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let email = match decode_email_from_cookie(&headers, &state) {
+    let email = match decode_email_from_request(&headers, &state) {
         Ok(email) => email,
         Err(err) => return err.into_response(),
     };

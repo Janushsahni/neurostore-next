@@ -1,5 +1,5 @@
 import { API_BASE } from "./config";
-import { clearAuthSession, getCsrfToken } from "./authStorage";
+import { clearAuthSession, getAuthToken } from "./authStorage";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 
@@ -18,22 +18,16 @@ function withTimeout(timeoutMs, externalSignal) {
     };
 }
 
-function shouldAttachCsrf(method) {
-    const m = method.toUpperCase();
-    return m === "POST" || m === "PUT" || m === "PATCH" || m === "DELETE";
-}
-
 export async function apiRequest(path, options = {}) {
     const method = (options.method || "GET").toUpperCase();
     const headers = new Headers(options.headers || {});
     const timeoutMs = Number(options.timeoutMs || DEFAULT_TIMEOUT_MS);
     const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
 
-    if (shouldAttachCsrf(method)) {
-        const csrfToken = getCsrfToken();
-        if (csrfToken && !headers.has("x-csrf-token")) {
-            headers.set("x-csrf-token", csrfToken);
-        }
+    // Attach JWT Bearer token for all requests (cross-domain safe)
+    const jwt = getAuthToken();
+    if (jwt && !headers.has("Authorization")) {
+        headers.set("Authorization", `Bearer ${jwt}`);
     }
 
     let body = options.body;
@@ -51,7 +45,6 @@ export async function apiRequest(path, options = {}) {
             headers,
             body,
             signal: timeout.signal,
-            credentials: options.credentials || "include",
             mode: "cors",
             cache: "no-store",
         });

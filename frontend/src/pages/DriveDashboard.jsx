@@ -4,7 +4,7 @@ import { encryptFile, decryptFile } from '../lib/crypto';
 import DOMPurify from 'dompurify';
 import { toast } from 'react-hot-toast';
 import { API_BASE } from '../lib/config';
-import { getCsrfToken } from '../lib/authStorage';
+import { getAuthToken } from '../lib/authStorage';
 
 export const DriveDashboard = () => {
     const [files, setFiles] = useState([]);
@@ -19,14 +19,15 @@ export const DriveDashboard = () => {
     const encodeKey = (name) => encodeURIComponent(name);
 
     const getAuthHeaders = () => {
-        const csrfToken = getCsrfToken();
-        return csrfToken ? { 'x-csrf-token': csrfToken } : {};
+        const token = getAuthToken();
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        return headers;
     };
 
     const fetchFiles = async () => {
         try {
             const response = await fetch(`${S3_GATEWAY_URL}/${BUCKET_NAME}`, {
-                credentials: 'include',
                 headers: getAuthHeaders()
             });
             if (!response.ok) return;
@@ -78,7 +79,6 @@ export const DriveDashboard = () => {
         try {
             const dedupRes = await fetch(`${S3_GATEWAY_URL}/api/deduplicate/${BUCKET_NAME}/${encodeKey(file.name)}`, {
                 method: 'POST',
-                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     ...getAuthHeaders(),
@@ -103,12 +103,11 @@ export const DriveDashboard = () => {
             // 2. Real XHR Upload
             const xhr = new XMLHttpRequest();
             xhr.open('PUT', `${S3_GATEWAY_URL}/${BUCKET_NAME}/${encodeKey(file.name)}`, true);
-            xhr.withCredentials = true;
 
             xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-            const csrfToken = getCsrfToken();
-            if (csrfToken) {
-                xhr.setRequestHeader('x-csrf-token', csrfToken);
+            const token = getAuthToken();
+            if (token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
 
             // Track real network progress
@@ -174,7 +173,6 @@ export const DriveDashboard = () => {
 
             // 1. Fetch Ciphertext
             const response = await fetch(`${S3_GATEWAY_URL}/${BUCKET_NAME}/${encodeKey(fileName)}`, {
-                credentials: 'include',
                 headers: getAuthHeaders()
             });
 

@@ -32,7 +32,7 @@ export const Login = ({ onAuth }) => {
 
             if (!response.ok) throw new Error(data.error || "Login failed");
 
-            setAuthSession(data.user, data.csrf_token || "");
+            setAuthSession(data.user, data.csrf_token || "", data.token || "");
             onAuth(data.user);
         } catch (err) {
             const safeMessage = err?.name === "AbortError"
@@ -175,7 +175,7 @@ export const Register = ({ onAuth }) => {
 
             if (!response.ok) throw new Error(data.error || "Registration failed");
 
-            setAuthSession(data.user, data.csrf_token || "");
+            setAuthSession(data.user, data.csrf_token || "", data.token || "");
             onAuth(data.user);
         } catch (err) {
             const safeMessage = err?.name === "AbortError"
