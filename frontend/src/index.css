@@ -4,11 +4,16 @@
 @theme {
   --color-background: #ffffff;
   --color-card: #ffffff;
-  --color-primary: #10b981; /* Emerald 500 */
-  --color-secondary: #047857; /* Emerald 700 */
-  --color-accent: #059669; /* Emerald 600 */
-  --color-muted: #64748b; /* Slate 500 */
-  --color-border: #e2e8f0; /* Slate 200 */
+  --color-primary: #10b981;
+  /* Emerald 500 */
+  --color-secondary: #047857;
+  /* Emerald 700 */
+  --color-accent: #059669;
+  /* Emerald 600 */
+  --color-muted: #64748b;
+  /* Slate 500 */
+  --color-border: #e2e8f0;
+  /* Slate 200 */
   --font-sans: "Manrope", sans-serif;
   --font-display: "Sora", sans-serif;
 }
@@ -26,8 +31,10 @@
 
   body {
     margin: 0;
-    color: #0f172a; /* Slate 900 for text */
-    background: #f8fafc; /* Slate 50 for background */
+    color: #0f172a;
+    /* Slate 900 for text */
+    background: #f8fafc;
+    /* Slate 50 for background */
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -96,50 +103,81 @@
   color: #0f172a;
 }
 
-/* 3D Button Utilities */
-@utility btn-3d {
-  position: relative;
-  background: #10b981;
-  color: white;
-  font-weight: 800;
-  border-radius: 1rem;
-  padding: 1rem 2rem;
-  transform-style: preserve-3d;
-  transition: transform 150ms cubic-bezier(0, 0, 0.58, 1), background 150ms cubic-bezier(0, 0, 0.58, 1);
-  box-shadow: 0 0.5rem 0 #047857, 0 0.5rem 0.5rem rgba(0, 0, 0, 0.15);
-}
+/* 3D Button Components */
+@layer components {
+  .btn-3d {
+    position: relative;
+    background: #10b981;
+    color: white;
+    font-weight: 800;
+    border-radius: 1rem;
+    padding: 1rem 2rem;
+    transform-style: preserve-3d;
+    transition: transform 150ms cubic-bezier(0, 0, 0.58, 1), background 150ms cubic-bezier(0, 0, 0.58, 1);
+    box-shadow: 0 0.5rem 0 #047857, 0 0.5rem 0.5rem rgba(0, 0, 0, 0.15);
+  }
 
-@utility btn-3d:hover {
-  transform: translateY(0.15rem);
-  box-shadow: 0 0.35rem 0 #047857, 0 0.5rem 0.5rem rgba(0, 0, 0, 0.15);
-}
+  .btn-3d:hover {
+    transform: translateY(0.15rem);
+    box-shadow: 0 0.35rem 0 #047857, 0 0.5rem 0.5rem rgba(0, 0, 0, 0.15);
+  }
 
-@utility btn-3d:active {
-  transform: translateY(0.5rem);
-  box-shadow: 0 0 0 #047857, 0 0 0 rgba(0, 0, 0, 0.15);
+  .btn-3d:active {
+    transform: translateY(0.5rem);
+    box-shadow: 0 0 0 #047857, 0 0 0 rgba(0, 0, 0, 0.15);
+  }
 }
 
 @keyframes floatY {
-  0% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-15px) rotate(2deg); }
-  100% { transform: translateY(0px) rotate(0deg); }
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-15px) rotate(2deg);
+  }
+
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
 }
 
 @keyframes floatOrb {
-  0% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
-  100% { transform: translate(0, 0) scale(1); }
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
 }
 
 @keyframes dash {
-  0% { stroke-dashoffset: 1000; }
-  100% { stroke-dashoffset: 0; }
+  0% {
+    stroke-dashoffset: 1000;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+  }
 }
 
 @keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .hero-orb {
@@ -163,9 +201,9 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
-
