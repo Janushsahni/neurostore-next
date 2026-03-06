@@ -80,240 +80,124 @@ const ProtectedRoute = ({ isAuthenticated, children }) => {
 
 // ═══════ LANDING PAGE ═══════
 const LandingPage = () => (
-  <div className="selection:bg-primary/30">
+  <div className="selection:bg-emerald-500/20 bg-slate-50 text-slate-800 min-h-screen">
     {/* ── HERO ── */}
     <section className="relative overflow-hidden px-6 pb-20 pt-24 md:pt-32">
-      <div className="hero-orb absolute -left-24 top-20 h-72 w-72 rounded-full bg-primary/14 blur-3xl animate-pulse" />
-      <div className="hero-orb absolute -right-20 top-8 h-56 w-56 rounded-full bg-amber-300/12 blur-3xl" />
-      <div className="hero-orb absolute left-1/2 top-1/2 h-96 w-96 rounded-full bg-blue-500/5 blur-3xl" />
+      <div className="absolute -left-20 top-10 h-96 w-96 rounded-full bg-emerald-100/50 blur-[80px]" />
+      <div className="absolute -right-20 top-40 h-80 w-80 rounded-full bg-emerald-200/40 blur-[80px]" style={{ animationDelay: '2s' }} />
 
-      <div className="mx-auto max-w-6xl text-center relative">
-        <div className="appear-up mb-6 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/8 px-4 py-2 text-xs font-semibold text-primary">
-          <Sparkles size={14} /> India's First DPDP-Native Cloud Storage
+      <div className="mx-auto max-w-6xl text-center relative z-10">
+        <div className="appear-up mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 shadow-sm transition-shadow cursor-default">
+          <Sparkles size={14} className="text-emerald-500" /> The Future of Secure Cloud Storage
         </div>
 
-        <h1 className="appear-up mb-6 font-display text-5xl font-extrabold leading-tight md:text-7xl">
-          Secure Cloud Storage.
+        <h1 className="appear-up mb-6 font-display text-5xl font-extrabold leading-tight md:text-7xl text-slate-900 tracking-tight">
+          Own Your Data.
           <br />
-          <span className="text-gradient">Never Worry About Hacks.</span>
+          <span className="text-emerald-500">Secure, Fast, Limitless.</span>
         </h1>
 
-        <p className="mx-auto mb-9 max-w-3xl text-base text-muted md:text-lg leading-relaxed">
-          NeuroStore is the ultimate secure cloud storage for everyone. Like Google Drive, but <strong className="text-white">100% private</strong>, completely un-hackable, and <strong className="text-emerald-300">40% cheaper</strong> than traditional clouds.
+        <p className="mx-auto mb-12 max-w-2xl text-base text-slate-500 md:text-lg leading-relaxed font-medium">
+          Whether you want to earn passive income by sharing your idle storage, or need military-grade encrypted cloud backup for your files — NeuroStore has you covered.
         </p>
 
-        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link to="/register" className="btn-primary px-8 py-4 inline-flex items-center gap-2 text-base font-bold shadow-[0_0_30px_rgba(29,211,176,0.2)]">
-            Start Free — 5GB Included <ArrowRight size={18} />
-          </Link>
-          <Link to="/pricing" className="btn-ghost px-7 py-3.5 font-bold hover:border-primary/45 hover:text-white transition">
-            View Pricing
-          </Link>
-        </div>
+        {/* ── 2 MASSIVE CTA OPTIONS ── */}
+        <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2 mt-8">
+          {/* Be a Node Card */}
+          <div className="bg-white rounded-3xl p-8 group relative overflow-hidden flex flex-col h-full text-left shadow-lg hover:shadow-xl border border-slate-200 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-emerald-50 blur-3xl group-hover:bg-emerald-100 transition-colors" />
 
-        {/* Stats bar */}
-        <div className="mx-auto mt-14 grid max-w-4xl grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-          <StatCard label="Cheaper vs AWS S3" value="40%" accent="text-primary" icon={TrendingUp} />
-          <StatCard label="DPDP Compliance" value="Built-in" accent="text-emerald-300" icon={ShieldCheck} />
-          <StatCard label="Encryption" value="AES-256" accent="text-amber-200" icon={Lock} />
-          <StatCard label="API Compatible" value="S3-Drop-in" accent="text-sky-200" icon={Zap} />
-        </div>
-      </div>
-    </section>
+            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <HardDrive size={32} strokeWidth={2.5} />
+            </div>
+            <h3 className="mb-3 text-2xl font-display font-extrabold text-slate-900">Be a Node</h3>
+            <p className="mb-8 text-slate-500 leading-relaxed font-medium flex-grow">
+              Turn your computer into a decentralized storage vault. Earn ₹ INR passively every month simply by keeping your device online and sharing empty hard drive space.
+            </p>
 
-    {/* ── WHY NEUROSTORE ── */}
-    <section className="px-6 py-20 border-t border-white/5">
-      <div className="mx-auto max-w-6xl">
-        <div className="text-center mb-14">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">Why NeuroStore</p>
-          <h2 className="text-3xl font-display font-bold md:text-4xl mb-3">The Only Storage Built for India's Data Laws</h2>
-          <p className="mx-auto max-w-2xl text-muted text-sm">No other provider — not AWS, Azure, or GCP — offers built-in compliance tooling for India's DPDP Act. We do.</p>
-        </div>
+            <Link to="/login?intent=node" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-500 hover:text-white transition-all shadow-sm">
+              Start Earning Now <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <FeatureCard icon={ShieldCheck} badge="Privacy First" title="100% Private Vault"
-            description="Your files are locked with a password only you know BEFORE they leave your device. We can't see your data, and neither can hackers." />
-          <FeatureCard icon={HardDrive} badge="Safety" title="Unhackable Backup"
-            description="Instead of storing your file in one centralized data center, we shatter it into 15 secure pieces across the globe. Total redundancy." color="text-amber-400" />
-          <FeatureCard icon={Zap} badge="Speed" title="Lightning Fast Downloads"
-            description="When you download a file, your device fetches the pieces from the closest and fastest servers all at once, maximizing speed." />
-        </div>
+          {/* Subscription Card */}
+          <div className="bg-white rounded-3xl p-8 group relative overflow-hidden flex flex-col h-full text-left shadow-lg hover:shadow-xl border border-slate-200 transition-all duration-300 hover:-translate-y-1">
+            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-blue-50 blur-3xl group-hover:bg-blue-100 transition-colors" />
 
+            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 border border-blue-100">
+              <Cloud size={32} strokeWidth={2.5} />
+            </div>
+            <h3 className="mb-3 text-2xl font-display font-extrabold text-slate-900">Subscription</h3>
+            <p className="mb-8 text-slate-500 leading-relaxed font-medium flex-grow">
+              Store your photos, documents, and backups in an unhackable, zero-knowledge cloud. Automatically organized, deeply encrypted, and always accessible.
+            </p>
 
-      </div>
-    </section>
-
-    {/* ── COMPARISON TABLE ── */}
-    <section className="px-6 py-16 border-t border-white/5">
-      <div className="mx-auto max-w-4xl">
-        <div className="text-center mb-10">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">Head to Head</p>
-          <h2 className="text-3xl font-display font-bold">NeuroStore vs The Giants</h2>
-        </div>
-        <div className="glass-card p-6 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/10">
-                <th className="text-left py-3 px-3 text-muted">Feature</th>
-                <th className="text-center py-3 px-3 text-primary font-bold">NeuroStore</th>
-                <th className="text-center py-3 px-3 text-gray-500">AWS S3</th>
-                <th className="text-center py-3 px-3 text-gray-500">Azure</th>
-              </tr>
-            </thead>
-            <tbody className="text-gray-300">
-              {[
-                ["Storage (per GB/month)", "₹0.80", "₹1.75", "₹1.60"],
-                ["DPDP Compliance Dashboard", "✅", "❌", "❌"],
-                ["Data Residency Proof", "✅ Signed", "❌", "❌"],
-                ["PII Auto-Detection", "✅", "❌", "❌"],
-                ["Pay-per-second Billing", "✅", "❌", "❌"],
-                ["S3 API Compatible", "✅", "✅", "❌"],
-                ["Webhook Notifications", "✅", "Lambda $$", "❌"],
-                ["Object Versioning", "✅", "✅", "✅"],
-              ].map(([feat, ns, aws, az], i) => (
-                <tr key={i} className="border-b border-white/5">
-                  <td className="py-3 px-3">{feat}</td>
-                  <td className="text-center py-3 px-3 text-emerald-300 font-semibold">{ns}</td>
-                  <td className="text-center py-3 px-3">{aws}</td>
-                  <td className="text-center py-3 px-3">{az}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <Link to="/login?intent=user" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold bg-slate-900 text-white hover:bg-emerald-500 transition-all shadow-md">
+              Get Cloud Storage <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
         </div>
       </div>
     </section>
 
-    {/* ── TESTIMONIALS ── */}
-    <section className="px-6 py-16 border-t border-white/5">
-      <div className="mx-auto max-w-5xl">
-        <div className="text-center mb-10">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">What People Say</p>
-          <h2 className="text-3xl font-display font-bold">Trusted by Forward-Thinking Teams</h2>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <TestimonialCard name="Arjun Mehta" role="CTO" company="MedVault Health"
-            text="The DPDP compliance dashboard alone saved us ₹15L/year in consultant fees. No other provider offers automated compliance proof." />
-          <TestimonialCard name="Priya Sharma" role="Head of Engineering" company="EduConnect"
-            text="Migration from S3 took 30 minutes. Same API, 40% cheaper, and we finally have Indian data residency proof for our users." />
-          <TestimonialCard name="Vikram Singh" role="Compliance Officer" company="FinSecure Capital"
-            text="The signed PDF compliance reports are game-changing. We share them directly with RBI auditors — no manual work needed." />
-        </div>
-      </div>
-    </section>
-
-    {/* ── ABOUT / COMPANY ── */}
-    <section className="px-6 py-16 border-t border-white/5">
-      <div className="mx-auto max-w-5xl">
-        <div className="grid gap-8 md:grid-cols-2 items-center">
+    {/* ── ABOUT COMPANY ── */}
+    <section className="px-6 py-24 bg-white relative border-t border-slate-100">
+      <div className="mx-auto max-w-5xl relative z-10">
+        <div className="grid gap-12 md:grid-cols-2 items-center">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">About NeuroStore</p>
-            <h2 className="text-3xl font-display font-bold mb-4">Built in India. For India.</h2>
-            <p className="text-sm text-muted leading-relaxed mb-4">
-              NeuroStore was born from a simple observation: India's DPDP Act requires every company to prove where
-              their data lives, how it's encrypted, and that it can be erased. Yet no storage provider offers
-              these capabilities natively.
-            </p>
-            <p className="text-sm text-muted leading-relaxed mb-6">
-              We're building the infrastructure layer that makes compliance automatic, not manual.
-              Our mission is to make India's data sovereignty enforceable — with cryptographic proof,
-              not trust.
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="glass-card p-3 text-center">
-                <p className="text-xl font-display font-bold text-primary"><AnimCounter end={9} /></p>
-                <p className="text-[10px] uppercase tracking-wider text-muted mt-1">Security Audits</p>
-              </div>
-              <div className="glass-card p-3 text-center">
-                <p className="text-xl font-display font-bold text-emerald-300">100%</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted mt-1">Indian Hosting</p>
-              </div>
-              <div className="glass-card p-3 text-center">
-                <p className="text-xl font-display font-bold text-amber-300"><AnimCounter end={0} /> Critical</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted mt-1">Vulnerabilities</p>
+            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 mb-6 text-xs font-bold text-slate-500 uppercase tracking-widest">
+              About NeuroStore
+            </div>
+            <h2 className="text-4xl font-display font-extrabold mb-6 text-slate-900 leading-tight">
+              Built for privacy.<br />Powered by the community.
+            </h2>
+            <div className="space-y-6 text-slate-500 font-medium leading-relaxed">
+              <p>
+                NeuroStore isn't just another tech giant hoarding your personal data in massive warehouses. We are a decentralized movement designed to give control over data back to individuals.
+              </p>
+              <p>
+                By connecting everyday computers into a massive, highly encrypted global network, we bypass the need for centralized servers completely. This means lower prices for users, and fair compensation for those who provide the storage.
+              </p>
+              <p className="font-bold text-slate-800 border-l-4 border-emerald-500 pl-4 bg-emerald-50/50 py-2 pr-2 rounded-r-lg">
+                Our mission is simple: To build the most secure, privacy-respecting cloud layer on the internet, fueled by people, for the people.
+              </p>
+            </div>
+          </div>
+
+          <div className="relative h-full w-full min-h-[400px]">
+            {/* Soft UI decorative element */}
+            <div className="absolute inset-0 bg-emerald-50 rounded-3xl shadow-sm border border-emerald-100 flex items-center justify-center overflow-hidden group">
+              <div className="absolute w-64 h-64 bg-emerald-200/50 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-1000"></div>
+
+              <div className="relative text-center z-10 p-8 bg-white/80 shadow-lg backdrop-blur-md border border-white rounded-2xl max-w-[280px]">
+                <ShieldCheck size={48} className="text-emerald-500 mx-auto mb-4" />
+                <h4 className="text-xl font-bold text-slate-900 mb-2">Military Grade AES-256</h4>
+                <p className="text-sm text-slate-500 font-medium leading-relaxed">Your data is fragmented and encrypted before it ever leaves your device.</p>
               </div>
             </div>
           </div>
-          <div className="space-y-3">
-            {[
-              { icon: Shield, title: "Security First", desc: "3 independent security audit passes. Zero critical issues. Constant-time comparisons, ReentrancyGuard, CSRF protection." },
-              { icon: IndianRupee, title: "India-Priced", desc: "40% cheaper than AWS Mumbai. Pay-per-second billing. Free tier with 5GB included. Razorpay UPI integration." },
-              { icon: Award, title: "Compliance Native", desc: "DPDP Act, RBI data localization, HIPAA-ready architecture. Not an afterthought — it's the core product." },
-              { icon: Building2, title: "Enterprise Grade", desc: "Erasure coding, webhook notifications, object versioning, immutable audit trails, white-label API." },
-            ].map((item, i) => (
-              <div key={i} className="glass-card p-4 flex items-start gap-3 hover:border-primary/30 transition-all">
-                <item.icon className="text-primary shrink-0 mt-0.5" size={18} />
-                <div>
-                  <p className="text-sm font-bold">{item.title}</p>
-                  <p className="text-xs text-muted mt-0.5">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </section>
 
-    {/* ── CTA ── */}
-    <section className="px-6 py-20 border-t border-white/5">
-      <div className="mx-auto max-w-3xl text-center">
-        <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">
-          Ready to Own Your Data?
-        </h2>
-        <p className="text-muted text-sm mb-8 max-w-xl mx-auto">
-          Start free with 5GB. No credit card required. Migrate from AWS in one command.
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link to="/register" className="btn-primary px-8 py-4 inline-flex items-center gap-2 text-base font-bold shadow-[0_0_30px_rgba(29,211,176,0.2)]">
-            Create Free Account <ArrowRight size={18} />
-          </Link>
-          <Link to="/download" className="btn-ghost px-7 py-3.5 font-bold">
-            Run a Storage Node
-          </Link>
+    {/* ── END FOOTER ── */}
+    <footer className="bg-slate-50 px-6 py-12 border-t border-slate-200">
+      <div className="mx-auto max-w-5xl text-center">
+        <div className="flex items-center justify-center gap-2 text-xl font-display font-bold mb-4 text-slate-900">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-md">
+            <HardDrive size={20} />
+          </span>
+          NeuroStore
         </div>
-      </div>
-    </section>
-
-    {/* ── FOOTER ── */}
-    <footer className="border-t border-white/8 px-6 py-12">
-      <div className="mx-auto max-w-5xl grid gap-8 md:grid-cols-4 text-sm">
-        <div>
-          <div className="flex items-center gap-2 text-lg font-display font-bold mb-3">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-300 to-primary text-[#051319]">
-              <HardDrive size={16} />
-            </span>
-            NeuroStore
-          </div>
-          <p className="text-xs text-muted">India's first DPDP-native cloud storage platform. Built for compliance, priced for startups.</p>
+        <p className="text-sm text-slate-500 font-medium mb-8">Secure. Decentralized. Rewarding.</p>
+        <div className="flex items-center justify-center gap-6 text-sm font-bold text-slate-500">
+          <Link to="/pricing" className="hover:text-emerald-600 transition-colors">Pricing</Link>
+          <Link to="/login?intent=node" className="hover:text-emerald-600 transition-colors">Be a Node</Link>
+          <Link to="/faq" className="hover:text-emerald-600 transition-colors">FAQ</Link>
         </div>
-        <div>
-          <p className="font-semibold mb-2">Product</p>
-          <div className="space-y-1.5">
-            <Link to="/pricing" className="block text-xs text-muted hover:text-primary transition">Pricing</Link>
-            <Link to="/download" className="block text-xs text-muted hover:text-primary transition">Run a Node</Link>
-            <Link to="/dashboard/node" className="block text-xs text-muted hover:text-primary transition">Node Earnings</Link>
-            <Link to="/faq" className="block text-xs text-muted hover:text-primary transition">FAQ</Link>
-          </div>
+        <div className="mt-12 pt-8 border-t border-slate-200 text-xs text-slate-400 font-medium">
+          © {new Date().getFullYear()} NeuroStore Project. All rights reserved.
         </div>
-        <div>
-          <p className="font-semibold mb-2">Compliance</p>
-          <div className="space-y-1.5">
-            <p className="text-xs text-muted">DPDP Act 2023</p>
-            <p className="text-xs text-muted">RBI Data Localization</p>
-            <p className="text-xs text-muted">ISO 27001 (Planned)</p>
-          </div>
-        </div>
-        <div>
-          <p className="font-semibold mb-2">Company</p>
-          <div className="space-y-1.5">
-            <p className="text-xs text-muted">Made in India 🇮🇳</p>
-            <a href="mailto:hello@neurostore.in" className="block text-xs text-muted hover:text-primary transition">hello@neurostore.in</a>
-            <a href="https://github.com/Janushsahni/neurostore-next" className="block text-xs text-muted hover:text-primary transition">GitHub</a>
-          </div>
-        </div>
-      </div>
-      <div className="mx-auto max-w-5xl mt-8 pt-6 border-t border-white/5 text-center text-[11px] text-muted">
-        © 2026 NeuroStore. All rights reserved. Data stored exclusively in Indian jurisdiction.
       </div>
     </footer>
   </div>
@@ -326,64 +210,57 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
 
   return (
     <header className="sticky top-0 z-50">
-      <nav className="glass-nav mx-auto flex max-w-7xl items-center justify-between px-5 py-3 md:px-7">
-        <Link to="/" onClick={closeMobile} className="inline-flex items-center gap-2 text-lg font-display font-bold">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-300 to-primary text-[#051319]">
-            <HardDrive size={18} />
+      <nav className="glass-nav mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-8 mt-4 rounded-2xl">
+        <Link to="/" onClick={closeMobile} className="inline-flex items-center gap-2.5 text-xl font-display font-extrabold text-slate-800 tracking-tight">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-primary text-white shadow-md">
+            <HardDrive size={18} strokeWidth={2.5} />
           </span>
           NeuroStore
         </Link>
 
-        <div className="hidden items-center gap-6 text-sm font-semibold text-slate-300 md:flex">
+        {/* Desktop menu: Home, Pricing, Get Started, Login */}
+        <div className="hidden items-center gap-8 text-sm font-bold text-slate-600 md:flex">
           <Link to="/" className="hover:text-primary transition-colors">Home</Link>
           <Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link>
-          <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
-          <Link to="/download" className="hover:text-primary transition-colors">Run Node</Link>
+          <Link to="/login?intent=user" className="hover:text-primary transition-colors">Get Started</Link>
         </div>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-4 md:flex">
           {isAuthenticated ? (
             <>
-              <Link to="/dashboard/drive" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-primary/40 hover:text-white transition">Dashboard</Link>
-              <Link to="/dashboard/node" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-yellow-400/40 hover:text-yellow-300 transition">Node ₹</Link>
-              <Link to="/dashboard/compliance" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-emerald-400/40 hover:text-emerald-300 transition">Compliance</Link>
-              <Link to="/s3-migration" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-orange-400/40 hover:text-orange-300 transition">AWS Sync</Link>
-              <button onClick={onLogout} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-red-300 hover:text-red-200 transition-colors">
+              <Link to="/dashboard/drive" className="btn-primary px-5 py-2.5 text-sm font-bold hover:shadow-lg transition">Dashboard</Link>
+              <button onClick={onLogout} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400 hover:text-red-500 transition-colors bg-slate-100/50 hover:bg-red-50 rounded-lg">
                 <LogOut size={16} /> Logout
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className="px-2 py-2 text-sm font-semibold text-slate-300 hover:text-white transition">Log in</Link>
-              <Link to="/register" className="btn-primary px-4 py-2 text-sm">Get Started</Link>
+              <Link to="/login" className="btn-ghost px-5 py-2.5 text-sm font-bold border border-slate-200 hover:border-slate-300">Login</Link>
             </>
           )}
         </div>
 
-        <button onClick={() => setMobileOpen(s => !s)} className="inline-flex rounded-md border border-white/12 p-2 text-slate-200 md:hidden" aria-label="Toggle menu">
-          {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+        {/* Mobile menu toggle */}
+        <button onClick={() => setMobileOpen(s => !s)} className="inline-flex rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 md:hidden transition" aria-label="Toggle menu">
+          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </nav>
 
+      {/* Mobile nav dropdown */}
       {mobileOpen && (
-        <div className="glass-nav mx-3 mt-2 rounded-xl border border-white/10 p-3 md:hidden">
-          <div className="flex flex-col gap-2 text-sm font-semibold text-slate-300">
-            <Link to="/" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Home</Link>
-            <Link to="/pricing" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Pricing</Link>
-            <Link to="/faq" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">FAQ</Link>
-            <Link to="/download" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Run Node</Link>
+        <div className="glass-nav mx-5 mt-2 rounded-xl border border-slate-200 p-4 shadow-xl md:hidden overflow-hidden">
+          <div className="flex flex-col gap-1 text-sm font-bold text-slate-600">
+            <Link to="/" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">Home</Link>
+            <Link to="/pricing" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">Pricing</Link>
+            <Link to="/login?intent=user" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">Get Started</Link>
+            <div className="h-px w-full bg-slate-100 my-2"></div>
             {isAuthenticated ? (
               <>
-                <Link to="/dashboard/drive" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Dashboard</Link>
-                <Link to="/dashboard/node" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Node Earnings</Link>
-                <Link to="/dashboard/compliance" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Compliance</Link>
-                <button onClick={() => { closeMobile(); onLogout(); }} className="rounded-md px-3 py-2 text-left text-red-300 hover:bg-red-500/10">Logout</button>
+                <Link to="/dashboard/drive" onClick={closeMobile} className="rounded-lg px-4 py-3 text-primary bg-emerald-50/50 hover:bg-emerald-100 transition">Dashboard</Link>
+                <button onClick={() => { closeMobile(); onLogout(); }} className="rounded-lg px-4 py-3 text-left text-red-500 hover:bg-red-50 transition">Logout</button>
               </>
             ) : (
-              <>
-                <Link to="/login" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Log in</Link>
-                <Link to="/register" onClick={closeMobile} className="rounded-md px-3 py-2 text-primary hover:bg-primary/10">Get Started</Link>
-              </>
+              <Link to="/login" onClick={closeMobile} className="rounded-lg px-4 py-3 text-primary bg-emerald-50/50 hover:bg-emerald-100 transition">Login</Link>
             )}
           </div>
         </div>
@@ -419,7 +296,7 @@ const AppContent = () => {
     bootstrapSession();
   }, []);
 
-  const handleLogin = () => { setIsAuthenticated(true); navigate("/dashboard/drive"); };
+  const handleLogin = (targetPath) => { setIsAuthenticated(true); navigate(typeof targetPath === "string" ? targetPath : "/dashboard/drive"); };
   const handleLogout = async () => {
     try { await apiJson("/auth/logout", { method: "POST", timeoutMs: 9000 }); } catch { }
     clearAuthSession();

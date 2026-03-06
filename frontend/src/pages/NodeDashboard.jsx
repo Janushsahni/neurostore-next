@@ -64,14 +64,14 @@ export const NodeDashboard = () => {
     };
 
     return (
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 pb-16">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 pb-16 text-slate-900 bg-slate-50 min-h-screen">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-display font-bold">Node Operator Dashboard</h1>
-                <p className="text-muted mt-1 flex items-center gap-2">
+                <h1 className="text-3xl font-display font-bold text-slate-800 tracking-tight">Node Operator Dashboard</h1>
+                <p className="text-slate-500 font-medium mt-1 flex items-center gap-2">
                     <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                     </span>
                     Live Network Telemetry • Earnings in ₹ INR
                 </p>
@@ -79,24 +79,24 @@ export const NodeDashboard = () => {
 
             {/* ═══════ NETWORK STATS ═══════ */}
             <div>
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Activity size={20} className="text-primary" /> Network Overview</h2>
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800"><Activity size={20} className="text-emerald-500" /> Network Overview</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard icon={Server} label="Total Nodes" value={stats?.total_nodes ?? '—'} accent="text-blue-400" />
-                    <StatCard icon={Wifi} label="Active Now" value={stats?.active_nodes ?? '—'} accent="text-emerald-400" />
-                    <StatCard icon={HardDrive} label="Network Storage" value={stats?.total_storage_gb ? `${stats.total_storage_gb} GB` : '—'} accent="text-purple-400" />
-                    <StatCard icon={Cpu} label="Total Shards" value={stats?.total_shards?.toLocaleString() ?? '—'} accent="text-orange-400" />
+                    <StatCard icon={Server} label="Total Nodes" value={stats?.total_nodes ?? '—'} accent="text-blue-600 bg-blue-50" />
+                    <StatCard icon={Wifi} label="Active Now" value={stats?.active_nodes ?? '—'} accent="text-emerald-600 bg-emerald-50" />
+                    <StatCard icon={HardDrive} label="Network Storage" value={stats?.total_storage_gb ? `${stats.total_storage_gb} GB` : '—'} accent="text-purple-600 bg-purple-50" />
+                    <StatCard icon={Cpu} label="Total Shards" value={stats?.total_shards?.toLocaleString() ?? '—'} accent="text-orange-600 bg-orange-50" />
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-                    <StatCard icon={HardDrive} label="Storage Used" value={stats?.used_storage_gb ? `${stats.used_storage_gb} GB` : '—'} accent="text-cyan-400" />
-                    <StatCard icon={IndianRupee} label="Total Paid Out" value={stats?.total_earnings_paid_inr ? formatINR(stats.total_earnings_paid_inr) : '—'} accent="text-yellow-400" />
-                    <StatCard icon={Coins} label="Rate" value="₹0.42/GB/month" accent="text-primary" />
+                    <StatCard icon={HardDrive} label="Storage Used" value={stats?.used_storage_gb ? `${stats.used_storage_gb} GB` : '—'} accent="text-cyan-600 bg-cyan-50" />
+                    <StatCard icon={IndianRupee} label="Total Paid Out" value={stats?.total_earnings_paid_inr ? formatINR(stats.total_earnings_paid_inr) : '—'} accent="text-yellow-600 bg-yellow-50" />
+                    <StatCard icon={Coins} label="Rate" value="₹0.42/GB/month" accent="text-emerald-700 bg-emerald-100" />
                 </div>
             </div>
 
             {/* ═══════ NODE LOOKUP ═══════ */}
-            <div className="glass-card p-6">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Search size={20} className="text-primary" /> My Node Earnings</h2>
-                <p className="text-muted text-sm mb-4">Enter your Node ID (shown during installation) to view your earnings</p>
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800"><Search size={20} className="text-emerald-500" /> My Node Earnings</h2>
+                <p className="text-slate-500 text-sm mb-4 font-medium">Enter your Node ID (shown during installation) to view your earnings</p>
                 <div className="flex gap-3">
                     <input
                         type="text"
@@ -104,69 +104,70 @@ export const NodeDashboard = () => {
                         onChange={(e) => setNodeId(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && lookupNode()}
                         placeholder="e.g. NEURO-A1B2C3D4"
-                        className="flex-1 bg-background border border-border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primary transition"
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-mono shadow-inner placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
                     />
                     <button
                         onClick={() => lookupNode()}
                         disabled={lookupLoading}
-                        className="bg-primary text-background px-6 py-3 rounded-lg font-bold hover:bg-primary/80 transition disabled:opacity-50"
+                        className="btn-primary px-8 py-3 rounded-xl font-bold flex items-center shadow-md disabled:opacity-50"
                     >
                         {lookupLoading ? 'Checking...' : 'Lookup'}
                     </button>
                 </div>
                 {lookupError && (
-                    <p className="text-red-400 text-sm mt-3">{lookupError}</p>
+                    <p className="text-red-500 text-sm mt-3 font-medium">{lookupError}</p>
                 )}
             </div>
 
             {/* ═══════ NODE DETAIL ═══════ */}
             {nodeData && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="glass-card p-6 border-primary/30">
+                    <div className="bg-white rounded-2xl p-6 shadow-lg border border-emerald-100 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -z-10 -mr-20 -mt-20"></div>
                         <div className="flex justify-between items-start mb-6">
                             <div>
-                                <h2 className="text-2xl font-bold text-primary">{nodeData.node_id}</h2>
-                                <p className="text-muted text-sm mt-1">Your personal node earnings dashboard</p>
+                                <h2 className="text-3xl font-display font-extrabold text-emerald-600 tracking-tight">{nodeData.node_id}</h2>
+                                <p className="text-slate-500 font-medium text-sm mt-1">Your personal node earnings dashboard</p>
                             </div>
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${nodeData.status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                            <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${nodeData.status === 'online' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
                                 {nodeData.status === 'online' ? '● ONLINE' : '● OFFLINE'}
                             </span>
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-background/50 rounded-xl p-4">
-                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Total Earned</p>
-                                <p className="text-2xl font-bold text-yellow-400">{formatINR(nodeData.total_earned_inr)}</p>
+                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Total Earned</p>
+                                <p className="text-2xl font-bold text-slate-800">{formatINR(nodeData.total_earned_inr)}</p>
                             </div>
-                            <div className="bg-background/50 rounded-xl p-4">
-                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Monthly Projection</p>
-                                <p className="text-2xl font-bold text-emerald-400">{formatINR(nodeData.monthly_projection_inr)}</p>
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-5 shadow-sm">
+                                <p className="text-emerald-600/80 text-xs font-bold uppercase tracking-wider mb-1">Monthly Projection</p>
+                                <p className="text-2xl font-bold text-emerald-600">{formatINR(nodeData.monthly_projection_inr)}</p>
                             </div>
-                            <div className="bg-background/50 rounded-xl p-4">
-                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Shards Hosted</p>
-                                <p className="text-2xl font-bold text-purple-400">{nodeData.shard_count}</p>
+                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Shards Hosted</p>
+                                <p className="text-2xl font-bold text-slate-800">{nodeData.shard_count}</p>
                             </div>
-                            <div className="bg-background/50 rounded-xl p-4">
-                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Storage Used</p>
-                                <p className="text-2xl font-bold text-cyan-400">{nodeData.used_gb} GB</p>
-                                <p className="text-muted text-xs mt-1">of {nodeData.max_gb} GB max</p>
+                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Storage Used</p>
+                                <p className="text-2xl font-bold text-slate-800">{nodeData.used_gb} GB</p>
+                                <p className="text-slate-400 text-xs mt-1 font-medium">of {nodeData.max_gb} GB max</p>
                             </div>
                         </div>
 
                         <div className="mt-4 grid grid-cols-2 gap-4">
-                            <div className="bg-background/50 rounded-xl p-4">
-                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Uptime</p>
-                                <p className="text-lg font-bold text-blue-400 flex items-center gap-2">
-                                    <Clock size={16} />
+                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Uptime</p>
+                                <p className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                                    <Clock size={16} className="text-slate-400" />
                                     {parseFloat(nodeData.uptime_minutes) > 60
                                         ? `${(parseFloat(nodeData.uptime_minutes) / 60).toFixed(1)} hours`
                                         : `${nodeData.uptime_minutes} min`
                                     }
                                 </p>
                             </div>
-                            <div className="bg-background/50 rounded-xl p-4">
-                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Earning Rate</p>
-                                <p className="text-lg font-bold text-primary flex items-center gap-2">
+                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Earning Rate</p>
+                                <p className="text-lg font-bold text-emerald-600 flex items-center gap-2">
                                     <TrendingUp size={16} />
                                     ₹0.42/GB/month
                                 </p>
@@ -176,28 +177,28 @@ export const NodeDashboard = () => {
 
                     {/* Earnings History */}
                     {nodeData.recent_earnings?.length > 0 && (
-                        <div className="glass-card p-6">
-                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                                <IndianRupee size={18} className="text-yellow-400" /> Recent Earnings
+                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800">
+                                <IndianRupee size={18} className="text-emerald-500" /> Recent Earnings
                             </h3>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="border-b border-border text-muted text-left">
-                                            <th className="py-2 px-3">Time</th>
-                                            <th className="py-2 px-3">Amount</th>
-                                            <th className="py-2 px-3">Reason</th>
+                                        <tr className="border-b border-slate-200 text-slate-500 text-left font-semibold">
+                                            <th className="py-3 px-3">Time</th>
+                                            <th className="py-3 px-3">Amount</th>
+                                            <th className="py-3 px-3">Reason</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {nodeData.recent_earnings.map((e, i) => (
-                                            <tr key={i} className="border-b border-border/50 hover:bg-white/5 transition">
-                                                <td className="py-2 px-3 text-muted">{new Date(e.timestamp).toLocaleString('en-IN')}</td>
-                                                <td className="py-2 px-3 text-yellow-400 font-mono">₹{e.amount_inr}</td>
-                                                <td className="py-2 px-3">
-                                                    <span className={`px-2 py-0.5 rounded-full text-xs ${e.reason === 'uptime_reward' ? 'bg-emerald-500/20 text-emerald-400' :
-                                                            e.reason === 'shard_stored' ? 'bg-purple-500/20 text-purple-400' :
-                                                                'bg-blue-500/20 text-blue-400'
+                                            <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                                                <td className="py-3 px-3 text-slate-600 font-medium">{new Date(e.timestamp).toLocaleString('en-IN')}</td>
+                                                <td className="py-3 px-3 text-slate-900 font-mono font-bold">₹{e.amount_inr}</td>
+                                                <td className="py-3 px-3">
+                                                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold tracking-wide ${e.reason === 'uptime_reward' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                                        e.reason === 'shard_stored' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
+                                                            'bg-blue-50 text-blue-600 border border-blue-100'
                                                         }`}>
                                                         {e.reason === 'uptime_reward' ? '⏱ Uptime Reward' :
                                                             e.reason === 'shard_stored' ? '💾 Shard Stored' :
@@ -216,37 +217,37 @@ export const NodeDashboard = () => {
 
             {/* ═══════ LEADERBOARD ═══════ */}
             {stats?.top_nodes?.length > 0 && (
-                <div className="glass-card p-6">
-                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                        <TrendingUp size={20} className="text-yellow-400" /> Top Earners
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800">
+                        <TrendingUp size={20} className="text-emerald-500" /> Top Earners
                     </h2>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-border text-muted text-left">
-                                    <th className="py-2 px-3">#</th>
-                                    <th className="py-2 px-3">Node ID</th>
-                                    <th className="py-2 px-3">Status</th>
-                                    <th className="py-2 px-3">Shards</th>
-                                    <th className="py-2 px-3">Storage Used</th>
-                                    <th className="py-2 px-3">Earned (₹)</th>
+                                <tr className="border-b border-slate-200 text-slate-500 text-left font-semibold">
+                                    <th className="py-3 px-3">#</th>
+                                    <th className="py-3 px-3">Node ID</th>
+                                    <th className="py-3 px-3">Status</th>
+                                    <th className="py-3 px-3">Shards</th>
+                                    <th className="py-3 px-3">Storage Used</th>
+                                    <th className="py-3 px-3">Earned (₹)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {stats.top_nodes.map((n, i) => (
-                                    <tr key={i} className="border-b border-border/50 hover:bg-white/5 transition cursor-pointer"
+                                    <tr key={i} className="border-b border-slate-100 hover:bg-emerald-50/50 transition cursor-pointer"
                                         onClick={() => { setNodeId(n.node_id); lookupNode(n.node_id); }}>
-                                        <td className="py-2 px-3 font-bold text-muted">{i + 1}</td>
-                                        <td className="py-2 px-3 font-mono text-primary">{n.node_id}</td>
-                                        <td className="py-2 px-3">
+                                        <td className="py-3 px-3 font-bold text-slate-400">{i + 1}</td>
+                                        <td className="py-3 px-3 font-mono font-bold text-slate-700">{n.node_id}</td>
+                                        <td className="py-3 px-3">
                                             {n.status === 'online'
-                                                ? <span className="text-emerald-400 flex items-center gap-1"><Wifi size={14} /> Online</span>
-                                                : <span className="text-red-400 flex items-center gap-1"><WifiOff size={14} /> Offline</span>
+                                                ? <span className="text-emerald-600 font-bold flex items-center gap-1.5"><Wifi size={14} /> Online</span>
+                                                : <span className="text-slate-400 font-medium flex items-center gap-1.5"><WifiOff size={14} /> Offline</span>
                                             }
                                         </td>
-                                        <td className="py-2 px-3">{n.shard_count}</td>
-                                        <td className="py-2 px-3">{n.used_gb} GB</td>
-                                        <td className="py-2 px-3 text-yellow-400 font-bold">{formatINR(n.earned_inr)}</td>
+                                        <td className="py-3 px-3 font-medium text-slate-600">{n.shard_count}</td>
+                                        <td className="py-3 px-3 font-medium text-slate-600">{n.used_gb} GB</td>
+                                        <td className="py-3 px-3 text-slate-900 font-bold">{formatINR(n.earned_inr)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -257,11 +258,11 @@ export const NodeDashboard = () => {
 
             {/* Empty state */}
             {!isLoading && (!stats || stats.total_nodes === 0) && !nodeData && (
-                <div className="glass-card p-12 text-center">
-                    <Server size={48} className="mx-auto text-muted mb-4" />
-                    <h3 className="text-xl font-bold mb-2">No Nodes Connected Yet</h3>
-                    <p className="text-muted max-w-md mx-auto">
-                        Download the NeuroStore Node installer from the <a href="/download" className="text-primary hover:underline">Download page</a> to start earning ₹ by contributing storage.
+                <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-slate-200">
+                    <Server size={48} className="mx-auto text-slate-300 mb-4" />
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">No Nodes Connected Yet</h3>
+                    <p className="text-slate-500 font-medium max-w-md mx-auto leading-relaxed">
+                        Download the NeuroStore Node installer from the <a href="/download" className="text-emerald-600 font-bold hover:underline">Download page</a> to start earning ₹ by contributing storage.
                     </p>
                 </div>
             )}
@@ -270,12 +271,12 @@ export const NodeDashboard = () => {
 };
 
 // ── Reusable Stat Card ──
-const StatCard = ({ icon: Icon, label, value, accent = 'text-primary' }) => (
-    <div className="glass-card p-4">
-        <div className="flex items-center gap-2 mb-2">
-            <Icon size={16} className={accent} />
-            <span className="text-muted text-xs uppercase tracking-wider">{label}</span>
+const StatCard = ({ icon: Icon, label, value, accent }) => (
+    <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200 flex flex-col items-start hover:-translate-y-1 transition-transform">
+        <div className={`p-2.5 rounded-lg mb-3 ${accent}`}>
+            <Icon size={20} />
         </div>
-        <p className={`text-xl font-bold ${accent}`}>{value}</p>
+        <p className={`text-2xl font-display font-extrabold tracking-tight text-slate-800 mb-1`}>{value}</p>
+        <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">{label}</span>
     </div>
 );

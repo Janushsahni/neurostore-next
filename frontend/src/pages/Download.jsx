@@ -240,32 +240,34 @@ exit
     };
 
     return (
-        <div className="min-h-[calc(100vh-80px)] p-8 max-w-4xl mx-auto py-12">
-            <div className="text-center mb-12">
-                <h1 className="text-4xl md:text-5xl font-display font-bold mb-4">Run a NeuroStore Node</h1>
-                <p className="text-lg text-muted max-w-2xl mx-auto">
+        <div className="min-h-screen bg-slate-50 text-slate-900 p-8 max-w-4xl mx-auto py-12 animate-in fade-in">
+            <div className="text-center mb-12 relative z-10">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-emerald-200 rounded-full blur-[100px] -z-10"></div>
+
+                <h1 className="text-4xl md:text-5xl font-display font-extrabold mb-4 text-slate-900 tracking-tight">Run a NeuroStore Node</h1>
+                <p className="text-lg text-slate-600 font-medium max-w-2xl mx-auto leading-relaxed">
                     Turn your idle hard drive into passive income. Download the lightweight node software, leave it running in the background, and earn.
                 </p>
             </div>
 
-            <div className="glass-card overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden relative z-10">
                 {/* OS Selector Tabs */}
-                <div className="flex border-b border-border bg-background/50">
+                <div className="flex border-b border-slate-200 bg-slate-50/50">
                     <button
                         onClick={() => setActiveOS('windows')}
-                        className={`flex-1 py-4 flex items-center justify-center gap-2 font-semibold transition-colors ${activeOS === 'windows' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-muted hover:text-white'}`}
+                        className={`flex-1 py-4 flex items-center justify-center gap-2 font-bold transition-all ${activeOS === 'windows' ? 'text-emerald-600 border-b-2 border-emerald-500 bg-emerald-50/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}
                     >
                         <Monitor size={18} /> Windows 10/11
                     </button>
                     <button
                         onClick={() => setActiveOS('macos')}
-                        className={`flex-1 py-4 flex items-center justify-center gap-2 font-semibold transition-colors ${activeOS === 'macos' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-muted hover:text-white'}`}
+                        className={`flex-1 py-4 flex items-center justify-center gap-2 font-bold transition-all ${activeOS === 'macos' ? 'text-emerald-600 border-b-2 border-emerald-500 bg-emerald-50/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}
                     >
                         <Apple size={18} /> macOS
                     </button>
                     <button
                         onClick={() => setActiveOS('linux')}
-                        className={`flex-1 py-4 flex items-center justify-center gap-2 font-semibold transition-colors ${activeOS === 'linux' ? 'text-primary border-b-2 border-primary bg-primary/5' : 'text-muted hover:text-white'}`}
+                        className={`flex-1 py-4 flex items-center justify-center gap-2 font-bold transition-all ${activeOS === 'linux' ? 'text-emerald-600 border-b-2 border-emerald-500 bg-emerald-50/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}
                     >
                         <Terminal size={18} /> Linux (CLI)
                     </button>
@@ -279,31 +281,31 @@ exit
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="flex flex-col md:flex-row items-center gap-8 mb-8">
                                 <div className="flex-1 space-y-4">
-                                    <h2 className="text-2xl font-bold">1-Click Professional Installer</h2>
-                                    <p className="text-muted">Download, run, pick a folder — done. The node runs invisibly in the background and auto-starts on every reboot. No terminal needed.</p>
+                                    <h2 className="text-2xl font-bold tracking-tight text-slate-800">1-Click Professional Installer</h2>
+                                    <p className="text-slate-600 font-medium">Download, run, pick a folder — done. The node runs invisibly in the background and auto-starts on every reboot. No terminal needed.</p>
 
-                                    <div className="bg-background/50 border border-primary/20 rounded-xl p-6 my-6">
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 my-6 shadow-inner">
                                         <div className="flex justify-between items-center mb-4">
-                                            <h3 className="font-bold text-lg">Storage to Contribute</h3>
-                                            <span className="text-primary font-mono bg-primary/10 px-3 py-1 rounded-full">{storageRent} GB</span>
+                                            <h3 className="font-bold text-lg text-slate-800">Storage to Contribute</h3>
+                                            <span className="text-emerald-700 font-mono font-bold bg-emerald-100 px-3 py-1 rounded-full">{storageRent} GB</span>
                                         </div>
                                         <input
                                             type="range"
                                             min="50" max="2000" step="50"
                                             value={storageRent}
                                             onChange={(e) => setStorageRent(e.target.value)}
-                                            className="w-full accent-primary h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                            className="w-full accent-emerald-500 h-2 bg-slate-300 rounded-lg appearance-none cursor-pointer"
                                         />
-                                        <div className="flex justify-between mt-2 text-xs text-muted">
+                                        <div className="flex justify-between mt-2 text-xs font-bold text-slate-400">
                                             <span>50 GB</span>
-                                            <span className="text-primary font-semibold">Est. earnings: ₹{(storageRent * 0.42).toFixed(0)}/month</span>
+                                            <span className="text-emerald-600">Est. earnings: ₹{(storageRent * 0.42).toFixed(0)}/month</span>
                                             <span>2 TB</span>
                                         </div>
                                     </div>
 
                                     <button
                                         onClick={handleWindowsDownload}
-                                        className="inline-flex w-full md:w-auto items-center justify-center gap-3 bg-gradient-to-r from-blue-500 to-primary text-background px-8 py-4 rounded-xl font-bold hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all transform hover:-translate-y-1"
+                                        className="btn-primary w-full md:w-auto flex items-center justify-center gap-3 px-8 py-4 text-basis"
                                     >
                                         <DownloadIcon size={20} />
                                         Download Installer (~12 KB)
@@ -311,9 +313,9 @@ exit
                                 </div>
                             </div>
 
-                            <div className="glass-card p-6 bg-emerald-500/5 border-emerald-500/20 mb-8">
-                                <h3 className="font-bold text-emerald-400 mb-3">What the Installer Does</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-300">
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-6 mb-8 text-emerald-900 shadow-sm">
+                                <h3 className="font-bold text-emerald-800 mb-3 flex items-center gap-2"><Monitor size={18} /> What the Installer Does</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm font-medium">
                                     <div className="flex items-center gap-2">✅ Opens a GUI setup wizard</div>
                                     <div className="flex items-center gap-2">✅ Lets you pick any drive/folder</div>
                                     <div className="flex items-center gap-2">✅ Creates AES-256 encrypted vault</div>
@@ -323,32 +325,32 @@ exit
                                 </div>
                             </div>
 
-                            <div className="glass-card p-6 bg-yellow-500/10 border-yellow-500/30 mb-8">
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 shadow-sm">
                                 <div className="flex items-start gap-4">
-                                    <AlertTriangle className="text-yellow-500 shrink-0 mt-1" size={24} />
+                                    <AlertTriangle className="text-amber-500 shrink-0 mt-1" size={24} />
                                     <div>
-                                        <h3 className="font-bold text-yellow-500 mb-1">Windows SmartScreen</h3>
-                                        <p className="text-sm text-yellow-200/80">
+                                        <h3 className="font-bold text-amber-800 mb-1">Windows SmartScreen</h3>
+                                        <p className="text-sm font-medium text-amber-700/80 leading-relaxed">
                                             Because we are a new publisher, Windows may show a warning.
-                                            Click <strong>"More info"</strong> → <strong>"Run anyway"</strong>.
+                                            Click <strong className="text-amber-900">"More info"</strong> → <strong className="text-amber-900">"Run anyway"</strong>.
                                         </p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-4">
-                                <h3 className="font-bold text-lg border-b border-border pb-2">How It Works</h3>
+                            <div className="space-y-5">
+                                <h3 className="font-bold text-lg text-slate-800 border-b border-slate-200 pb-2">How It Works</h3>
                                 <div className="flex gap-4 items-start">
-                                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">1</div>
-                                    <p className="pt-1 text-gray-300">Run the downloaded <code className="bg-background px-1.5 py-0.5 rounded text-primary">NeuroStore-Node-Setup.cmd</code> file</p>
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">1</div>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Run the downloaded <code className="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-600 font-bold border border-slate-200">NeuroStore-Node-Setup.cmd</code> file</p>
                                 </div>
                                 <div className="flex gap-4 items-start">
-                                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">2</div>
-                                    <p className="pt-1 text-gray-300">A setup wizard opens — choose which drive/folder to use for encrypted storage</p>
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">2</div>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">A setup wizard opens — choose which drive/folder to use for encrypted storage</p>
                                 </div>
                                 <div className="flex gap-4 items-start">
-                                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">3</div>
-                                    <p className="pt-1 text-gray-300">Click "Done" — the node runs silently in background. Persists after restart. You're earning!</p>
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">3</div>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Click "Done" — the node runs silently in background. Persists after restart. You're earning!</p>
                                 </div>
                             </div>
                         </div>
@@ -359,35 +361,36 @@ exit
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="flex flex-col md:flex-row items-center gap-8 mb-8">
                                 <div className="flex-1 space-y-4">
-                                    <h2 className="text-2xl font-bold">Download for macOS</h2>
-                                    <p className="text-muted">Universal binary for Apple Silicon (M1/M2/M3) and Intel Macs.</p>
+                                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Download for macOS</h2>
+                                    <p className="text-slate-600 font-medium">Universal binary for Apple Silicon (M1/M2/M3) and Intel Macs.</p>
 
-                                    <a
-                                        href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-arm64.tar.gz"
-                                        className="inline-flex items-center gap-3 bg-gradient-to-r from-blue-500 to-primary text-background px-8 py-4 rounded-xl font-bold hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all transform hover:-translate-y-1"
-                                    >
-                                        <DownloadIcon size={20} />
-                                        Download macOS Binary (ARM)
-                                        <span className="bg-background/20 px-2 py-0.5 rounded text-xs ml-2">Release</span>
-                                    </a>
-                                    <a
-                                        href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-x86_64.tar.gz"
-                                        className="inline-flex items-center gap-3 border border-border text-muted px-6 py-2 rounded-xl text-sm font-bold hover:bg-white/5 transition-all w-fit"
-                                    >
-                                        Intel Mac? Download Here
-                                    </a>
+                                    <div className="flex flex-col sm:flex-row gap-4 mt-6">
+                                        <a
+                                            href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-arm64.tar.gz"
+                                            className="btn-primary inline-flex items-center gap-3 px-6 py-3.5 text-basis shadow-md"
+                                        >
+                                            <DownloadIcon size={20} />
+                                            Download macOS Binary (ARM)
+                                        </a>
+                                        <a
+                                            href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-x86_64.tar.gz"
+                                            className="inline-flex items-center gap-3 border border-slate-300 text-slate-600 bg-white px-6 py-3.5 rounded-xl text-sm font-bold hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm"
+                                        >
+                                            Intel Mac? Download Here
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="glass-card p-6 bg-yellow-500/10 border-yellow-500/30 mb-8">
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 shadow-sm">
                                 <div className="flex items-start gap-4">
-                                    <AlertTriangle className="text-yellow-500 shrink-0 mt-1" size={24} />
+                                    <AlertTriangle className="text-amber-500 shrink-0 mt-1" size={24} />
                                     <div>
-                                        <h3 className="font-bold text-yellow-500 mb-1">Gatekeeper Block Fix</h3>
-                                        <p className="text-sm text-yellow-200/80">
+                                        <h3 className="font-bold text-amber-800 mb-1">Gatekeeper Block Fix</h3>
+                                        <p className="text-sm font-medium text-amber-700/80 leading-relaxed">
                                             macOS may prevent the terminal app from running. Open your Terminal and run this command on the downloaded file to clear the quarantine flag:
                                         </p>
-                                        <code className="block bg-background p-3 rounded-lg mt-3 text-primary text-sm font-mono border border-border">
+                                        <code className="block bg-slate-50 p-3 rounded-lg mt-3 text-emerald-600 text-sm font-mono font-bold border border-slate-200 shadow-inner">
                                             xattr -d com.apple.quarantine ~/Downloads/neuro-node-macos
                                         </code>
                                     </div>
@@ -395,14 +398,14 @@ exit
                             </div>
 
                             <div className="space-y-4">
-                                <h3 className="font-bold text-lg border-b border-border pb-2">Setup Instructions</h3>
+                                <h3 className="font-bold text-lg text-slate-800 border-b border-slate-200 pb-2">Setup Instructions</h3>
                                 <div className="flex gap-4 items-start">
-                                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">1</div>
-                                    <p className="pt-1 text-gray-300">Extract the tar archive and make the file executable: <code className="bg-background px-1.5 py-0.5 rounded text-primary text-sm">tar -xzvf neuro-node-macos-arm64.tar.gz && chmod +x neuro-node</code></p>
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">1</div>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Extract the tar archive and make the file executable: <code className="bg-slate-100 border border-slate-200 font-bold px-1.5 py-0.5 rounded text-emerald-600 text-sm">tar -xzvf neuro-node-macos-arm64.tar.gz && chmod +x neuro-node</code></p>
                                 </div>
                                 <div className="flex gap-4 items-start">
-                                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">2</div>
-                                    <p className="pt-1 text-gray-300">Run the node daemon: <code className="bg-background px-1.5 py-0.5 rounded text-primary text-sm">./neuro-node</code></p>
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">2</div>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Run the node daemon: <code className="bg-slate-100 border border-slate-200 font-bold px-1.5 py-0.5 rounded text-emerald-600 text-sm">./neuro-node</code></p>
                                 </div>
                             </div>
                         </div>
@@ -412,34 +415,34 @@ exit
                     {activeOS === 'linux' && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="space-y-4 mb-8">
-                                <h2 className="text-2xl font-bold">Quick Install via Terminal</h2>
-                                <p className="text-muted">The easiest way to install and run the node on any major Linux distribution (Ubuntu, Debian, Arch).</p>
+                                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Quick Install via Terminal</h2>
+                                <p className="text-slate-600 font-medium">The easiest way to install and run the node on any major Linux distribution (Ubuntu, Debian, Arch).</p>
 
                                 <div className="relative group mt-6">
-                                    <div className="absolute -inset-1 bg-gradient-to-r from-primary to-blue-500 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-                                    <div className="relative bg-background border border-border p-6 rounded-lg font-mono text-sm">
-                                        <div className="flex items-center gap-2 mb-4 text-muted border-b border-border pb-2">
+                                    <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-lg blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+                                    <div className="relative bg-[#0f172a] border border-slate-700 p-6 rounded-lg font-mono text-sm shadow-xl">
+                                        <div className="flex items-center gap-2 mb-4 text-slate-400 border-b border-slate-700/50 pb-2">
                                             <div className="w-3 h-3 rounded-full bg-red-500"></div>
                                             <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                                             <div className="w-3 h-3 rounded-full bg-green-500"></div>
                                             <span className="ml-2">bash</span>
                                         </div>
-                                        <span className="text-primary">curl </span>
-                                        <span className="text-white">-sSL https://raw.githubusercontent.com/Janushsahni/neurostore-next/master/deploy/linux/install.sh | </span>
-                                        <span className="text-primary">bash</span>
+                                        <span className="text-emerald-400 font-bold">curl </span>
+                                        <span className="text-slate-100 font-semibold">-sSL https://raw.githubusercontent.com/Janushsahni/neurostore-next/master/deploy/linux/install.sh | </span>
+                                        <span className="text-emerald-400 font-bold">bash</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="space-y-4 pt-6">
-                                <h3 className="font-bold text-lg border-b border-border pb-2">Setup Instructions</h3>
+                                <h3 className="font-bold text-lg text-slate-800 border-b border-slate-200 pb-2">Setup Instructions</h3>
                                 <div className="flex gap-4 items-start">
-                                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">1</div>
-                                    <p className="pt-1 text-gray-300">Copy and paste the command above into your linux terminal.</p>
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">1</div>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Copy and paste the command above into your linux terminal.</p>
                                 </div>
                                 <div className="flex gap-4 items-start">
-                                    <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold shrink-0">2</div>
-                                    <p className="pt-1 text-gray-300">The script will automatically download the binary and set up a <code>systemd</code> service so the node automatically starts on boot.</p>
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">2</div>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">The script will automatically download the binary and set up a <code className="bg-slate-100 px-1 border border-slate-200 rounded font-bold text-emerald-600">systemd</code> service so the node automatically starts on boot.</p>
                                 </div>
                             </div>
                         </div>
