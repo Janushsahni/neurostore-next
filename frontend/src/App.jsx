@@ -16,6 +16,8 @@ import { Download } from "./pages/Download";
 import { Pricing } from "./pages/Pricing";
 import { ComplianceDashboard } from "./pages/ComplianceDashboard";
 import { S3Migration } from "./pages/S3Migration";
+import { About } from "./pages/About";
+import { Contact } from "./pages/Contact";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
 
@@ -80,60 +82,64 @@ const ProtectedRoute = ({ isAuthenticated, children }) => {
 
 // ═══════ LANDING PAGE ═══════
 const LandingPage = () => (
-  <div className="selection:bg-emerald-500/20 bg-slate-50 text-slate-800 min-h-screen">
-    {/* ── HERO ── */}
-    <section className="relative overflow-hidden px-6 pb-20 pt-24 md:pt-32">
-      <div className="absolute -left-20 top-10 h-96 w-96 rounded-full bg-emerald-100/50 blur-[80px]" />
-      <div className="absolute -right-20 top-40 h-80 w-80 rounded-full bg-emerald-200/40 blur-[80px]" style={{ animationDelay: '2s' }} />
+  <div className="selection:bg-emerald-500/20 bg-slate-50 text-slate-800 min-h-screen relative overflow-hidden">
+    {/* Animated Floating Background Elements for Glassmorphism */}
+    <div className="absolute top-0 inset-x-0 h-screen bg-slate-50 overflow-hidden pointer-events-none -z-20">
+      <div className="absolute -left-20 top-10 h-[500px] w-[500px] rounded-full bg-emerald-100/60 blur-[100px] animate-[floatOrb_12s_ease-in-out_infinite]" />
+      <div className="absolute right-0 top-60 h-[600px] w-[600px] rounded-full bg-blue-100/40 blur-[120px] animate-[floatOrb_15s_ease-in-out_infinite_reverse]" />
+      <div className="absolute left-1/2 top-1/2 h-[800px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-50/50 blur-[150px] -z-10" />
+    </div>
 
+    {/* ── HERO ── */}
+    <section className="relative px-6 pb-20 pt-24 md:pt-32">
       <div className="mx-auto max-w-6xl text-center relative z-10">
-        <div className="appear-up mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 shadow-sm transition-shadow cursor-default">
+        <div className="appear-up mb-8 inline-flex items-center gap-2 rounded-full glass-card bg-white/60 backdrop-blur-md px-5 py-2.5 text-xs font-bold text-emerald-700 shadow-sm border border-emerald-200/50">
           <Sparkles size={14} className="text-emerald-500" /> The Future of Secure Cloud Storage
         </div>
 
-        <h1 className="appear-up mb-6 font-display text-5xl font-extrabold leading-tight md:text-7xl text-slate-900 tracking-tight">
+        <h1 className="appear-up mb-6 font-display text-5xl font-extrabold leading-tight md:text-7xl text-slate-900 tracking-tight drop-shadow-sm">
           Own Your Data.
           <br />
-          <span className="text-emerald-500">Secure, Fast, Limitless.</span>
+          <span className="bg-gradient-to-r from-emerald-500 to-emerald-600 bg-clip-text text-transparent">Secure, Fast, Limitless.</span>
         </h1>
 
-        <p className="mx-auto mb-12 max-w-2xl text-base text-slate-500 md:text-lg leading-relaxed font-medium">
+        <p className="mx-auto mb-14 max-w-2xl text-base text-slate-500 md:text-xl leading-relaxed font-medium">
           Whether you want to earn passive income by sharing your idle storage, or need military-grade encrypted cloud backup for your files — NeuroStore has you covered.
         </p>
 
-        {/* ── 2 MASSIVE CTA OPTIONS ── */}
-        <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2 mt-8">
+        {/* ── 2 MASSIVE CTA OPTIONS (Glassmorphic) ── */}
+        <div className="mx-auto grid max-w-4xl gap-8 md:grid-cols-2 mt-8">
           {/* Be a Node Card */}
-          <div className="bg-white rounded-3xl p-8 group relative overflow-hidden flex flex-col h-full text-left shadow-lg hover:shadow-xl border border-slate-200 transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-emerald-50 blur-3xl group-hover:bg-emerald-100 transition-colors" />
+          <div className="glass-card bg-white/70 backdrop-blur-xl rounded-[2rem] p-8 md:p-10 group relative overflow-hidden flex flex-col h-full text-left shadow-xl hover:shadow-2xl border border-white/80 transition-all duration-500 hover:-translate-y-2">
+            <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-emerald-100/50 blur-[50px] group-hover:bg-emerald-200/60 transition-colors duration-500" />
 
-            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm text-emerald-600 border border-emerald-50 relative z-10 group-hover:scale-110 transition-transform duration-500">
               <HardDrive size={32} strokeWidth={2.5} />
             </div>
-            <h3 className="mb-3 text-2xl font-display font-extrabold text-slate-900">Be a Node</h3>
-            <p className="mb-8 text-slate-500 leading-relaxed font-medium flex-grow">
+            <h3 className="mb-3 text-3xl font-display font-extrabold text-slate-900 relative z-10">Be a Node</h3>
+            <p className="mb-10 text-slate-500 leading-relaxed font-medium flex-grow relative z-10 text-lg">
               Turn your computer into a decentralized storage vault. Earn ₹ INR passively every month simply by keeping your device online and sharing empty hard drive space.
             </p>
 
-            <Link to="/login?intent=node" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-500 hover:text-white transition-all shadow-sm">
-              Start Earning Now <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            <Link to="/login?intent=node" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold bg-emerald-50 hover:bg-emerald-500 text-emerald-700 hover:text-white transition-all shadow-sm group-hover:shadow-md relative z-10 border border-emerald-100/50">
+              Start Earning Now <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
             </Link>
           </div>
 
           {/* Subscription Card */}
-          <div className="bg-white rounded-3xl p-8 group relative overflow-hidden flex flex-col h-full text-left shadow-lg hover:shadow-xl border border-slate-200 transition-all duration-300 hover:-translate-y-1">
-            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-blue-50 blur-3xl group-hover:bg-blue-100 transition-colors" />
+          <div className="glass-card bg-white/70 backdrop-blur-xl rounded-[2rem] p-8 md:p-10 group relative overflow-hidden flex flex-col h-full text-left shadow-xl hover:shadow-2xl border border-white/80 transition-all duration-500 hover:-translate-y-2">
+            <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-blue-100/50 blur-[50px] group-hover:bg-blue-200/60 transition-colors duration-500" />
 
-            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 border border-blue-100">
+            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm text-blue-600 border border-blue-50 relative z-10 group-hover:scale-110 transition-transform duration-500">
               <Cloud size={32} strokeWidth={2.5} />
             </div>
-            <h3 className="mb-3 text-2xl font-display font-extrabold text-slate-900">Subscription</h3>
-            <p className="mb-8 text-slate-500 leading-relaxed font-medium flex-grow">
+            <h3 className="mb-3 text-3xl font-display font-extrabold text-slate-900 relative z-10">Subscription</h3>
+            <p className="mb-10 text-slate-500 leading-relaxed font-medium flex-grow relative z-10 text-lg">
               Store your photos, documents, and backups in an unhackable, zero-knowledge cloud. Automatically organized, deeply encrypted, and always accessible.
             </p>
 
-            <Link to="/login?intent=user" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold bg-slate-900 text-white hover:bg-emerald-500 transition-all shadow-md">
-              Get Cloud Storage <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            <Link to="/login?intent=user" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold bg-slate-900 text-white hover:bg-emerald-500 transition-all shadow-md group-hover:shadow-lg relative z-10">
+              Get Cloud Storage <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
             </Link>
           </div>
         </div>
@@ -190,10 +196,12 @@ const LandingPage = () => (
           NeuroStore
         </div>
         <p className="text-sm text-slate-500 font-medium mb-8">Secure. Decentralized. Rewarding.</p>
-        <div className="flex items-center justify-center gap-6 text-sm font-bold text-slate-500">
+        <div className="flex items-center justify-center gap-6 text-sm font-bold text-slate-500 flex-wrap">
+          <Link to="/about" className="hover:text-emerald-600 transition-colors">About</Link>
           <Link to="/pricing" className="hover:text-emerald-600 transition-colors">Pricing</Link>
           <Link to="/login?intent=node" className="hover:text-emerald-600 transition-colors">Be a Node</Link>
           <Link to="/faq" className="hover:text-emerald-600 transition-colors">FAQ</Link>
+          <Link to="/contact" className="hover:text-emerald-600 transition-colors">Contact</Link>
         </div>
         <div className="mt-12 pt-8 border-t border-slate-200 text-xs text-slate-400 font-medium">
           © {new Date().getFullYear()} NeuroStore Project. All rights reserved.
@@ -221,8 +229,10 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
         {/* Desktop menu: Home, Pricing, Get Started, Login */}
         <div className="hidden items-center gap-8 text-sm font-bold text-slate-600 md:flex">
           <Link to="/" className="hover:text-primary transition-colors">Home</Link>
+          <Link to="/about" className="hover:text-primary transition-colors">About</Link>
           <Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link>
-          <Link to="/login?intent=user" className="hover:text-primary transition-colors">Get Started</Link>
+          <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
+          <Link to="/contact" className="hover:text-primary transition-colors">Contact</Link>
         </div>
 
         <div className="hidden items-center gap-4 md:flex">
@@ -251,8 +261,10 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
         <div className="glass-nav mx-5 mt-2 rounded-xl border border-slate-200 p-4 shadow-xl md:hidden overflow-hidden">
           <div className="flex flex-col gap-1 text-sm font-bold text-slate-600">
             <Link to="/" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">Home</Link>
+            <Link to="/about" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">About</Link>
             <Link to="/pricing" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">Pricing</Link>
-            <Link to="/login?intent=user" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">Get Started</Link>
+            <Link to="/faq" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">FAQ</Link>
+            <Link to="/contact" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">Contact</Link>
             <div className="h-px w-full bg-slate-100 my-2"></div>
             {isAuthenticated ? (
               <>
@@ -328,6 +340,8 @@ const AppContent = () => {
           <Route path="/s3-migration" element={<ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute>} />
           <Route path="/download" element={<Download />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
