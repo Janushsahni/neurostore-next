@@ -1,185 +1,281 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, HardDrive, DollarSign, Download, Server, Cpu, AlertTriangle } from 'lucide-react';
+import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins } from 'lucide-react';
 import { apiJson } from '../lib/apiClient';
 
 export const NodeDashboard = () => {
-    const [nodes, setNodes] = useState([]);
-    const [health, setHealth] = useState({ total_nodes: 0, online_nodes: 0, network_health: '0%', active_shards: 0 });
+    const [stats, setStats] = useState(null);
+    const [nodeId, setNodeId] = useState('');
+    const [nodeData, setNodeData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [lookupLoading, setLookupLoading] = useState(false);
+    const [lookupError, setLookupError] = useState('');
 
-    const fetchNodeData = async () => {
+    // Try to read Node ID from localStorage (set by the installer)
+    useEffect(() => {
+        const savedNodeId = localStorage.getItem('neuro_node_id');
+        if (savedNodeId) {
+            setNodeId(savedNodeId);
+            lookupNode(savedNodeId);
+        }
+    }, []);
+
+    const fetchStats = async () => {
         try {
-            const [nodesResult, healthResult] = await Promise.all([
-                apiJson('/api/nodes', { method: 'GET', timeoutMs: 12000 }),
-                apiJson('/api/network-health', { method: 'GET', timeoutMs: 12000 }),
-            ]);
-
-            if (nodesResult.response.ok) {
-                const nextNodes = Array.isArray(nodesResult.data?.nodes) ? nodesResult.data.nodes : [];
-                setNodes(nextNodes);
-            }
-
-            if (healthResult.response.ok) {
-                setHealth(healthResult.data || health);
-            }
+            const { response, data } = await apiJson('/api/nodes/stats', { method: 'GET', timeoutMs: 10000 });
+            if (response.ok) setStats(data);
         } catch (err) {
-            console.error("Failed to fetch node telemetry", err);
-            // Throttle toast errors so it doesn't spam on the 3s interval if backend is dead
+            console.error("Failed to fetch network stats", err);
         } finally {
             setIsLoading(false);
         }
     };
 
+    const lookupNode = async (id) => {
+        const searchId = id || nodeId;
+        if (!searchId.trim()) return;
+        setLookupLoading(true);
+        setLookupError('');
+        try {
+            const { response, data } = await apiJson(`/api/node/${encodeURIComponent(searchId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
+            if (response.ok) {
+                setNodeData(data);
+                localStorage.setItem('neuro_node_id', searchId.trim());
+            } else {
+                setLookupError(data?.error || 'Node not found');
+                setNodeData(null);
+            }
+        } catch {
+            setLookupError('Failed to connect to network');
+            setNodeData(null);
+        } finally {
+            setLookupLoading(false);
+        }
+    };
+
     useEffect(() => {
-        fetchNodeData();
-        const interval = setInterval(fetchNodeData, 3000);
+        fetchStats();
+        const interval = setInterval(fetchStats, 10000);
         return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    const formatINR = (value) => {
+        const num = parseFloat(value) || 0;
+        return `₹${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
     return (
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-display font-bold">Node Operator</h1>
-                    <p className="text-muted mt-1 flex items-center gap-2">
-                        <span className="relative flex h-3 w-3">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                        </span>
-                        Telemetry synced with AI Sentinel
+        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 pb-16">
+            {/* Header */}
+            <div>
+                <h1 className="text-3xl font-display font-bold">Node Operator Dashboard</h1>
+                <p className="text-muted mt-1 flex items-center gap-2">
+                    <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                    </span>
+                    Live Network Telemetry • Earnings in ₹ INR
+                </p>
+            </div>
+
+            {/* ═══════ NETWORK STATS ═══════ */}
+            <div>
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Activity size={20} className="text-primary" /> Network Overview</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <StatCard icon={Server} label="Total Nodes" value={stats?.total_nodes ?? '—'} accent="text-blue-400" />
+                    <StatCard icon={Wifi} label="Active Now" value={stats?.active_nodes ?? '—'} accent="text-emerald-400" />
+                    <StatCard icon={HardDrive} label="Network Storage" value={stats?.total_storage_gb ? `${stats.total_storage_gb} GB` : '—'} accent="text-purple-400" />
+                    <StatCard icon={Cpu} label="Total Shards" value={stats?.total_shards?.toLocaleString() ?? '—'} accent="text-orange-400" />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                    <StatCard icon={HardDrive} label="Storage Used" value={stats?.used_storage_gb ? `${stats.used_storage_gb} GB` : '—'} accent="text-cyan-400" />
+                    <StatCard icon={IndianRupee} label="Total Paid Out" value={stats?.total_earnings_paid_inr ? formatINR(stats.total_earnings_paid_inr) : '—'} accent="text-yellow-400" />
+                    <StatCard icon={Coins} label="Rate" value="₹0.42/GB/month" accent="text-primary" />
+                </div>
+            </div>
+
+            {/* ═══════ NODE LOOKUP ═══════ */}
+            <div className="glass-card p-6">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Search size={20} className="text-primary" /> My Node Earnings</h2>
+                <p className="text-muted text-sm mb-4">Enter your Node ID (shown during installation) to view your earnings</p>
+                <div className="flex gap-3">
+                    <input
+                        type="text"
+                        value={nodeId}
+                        onChange={(e) => setNodeId(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && lookupNode()}
+                        placeholder="e.g. NEURO-A1B2C3D4"
+                        className="flex-1 bg-background border border-border rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primary transition"
+                    />
+                    <button
+                        onClick={() => lookupNode()}
+                        disabled={lookupLoading}
+                        className="bg-primary text-background px-6 py-3 rounded-lg font-bold hover:bg-primary/80 transition disabled:opacity-50"
+                    >
+                        {lookupLoading ? 'Checking...' : 'Lookup'}
+                    </button>
+                </div>
+                {lookupError && (
+                    <p className="text-red-400 text-sm mt-3">{lookupError}</p>
+                )}
+            </div>
+
+            {/* ═══════ NODE DETAIL ═══════ */}
+            {nodeData && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="glass-card p-6 border-primary/30">
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h2 className="text-2xl font-bold text-primary">{nodeData.node_id}</h2>
+                                <p className="text-muted text-sm mt-1">Your personal node earnings dashboard</p>
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${nodeData.status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                {nodeData.status === 'online' ? '● ONLINE' : '● OFFLINE'}
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-background/50 rounded-xl p-4">
+                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Total Earned</p>
+                                <p className="text-2xl font-bold text-yellow-400">{formatINR(nodeData.total_earned_inr)}</p>
+                            </div>
+                            <div className="bg-background/50 rounded-xl p-4">
+                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Monthly Projection</p>
+                                <p className="text-2xl font-bold text-emerald-400">{formatINR(nodeData.monthly_projection_inr)}</p>
+                            </div>
+                            <div className="bg-background/50 rounded-xl p-4">
+                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Shards Hosted</p>
+                                <p className="text-2xl font-bold text-purple-400">{nodeData.shard_count}</p>
+                            </div>
+                            <div className="bg-background/50 rounded-xl p-4">
+                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Storage Used</p>
+                                <p className="text-2xl font-bold text-cyan-400">{nodeData.used_gb} GB</p>
+                                <p className="text-muted text-xs mt-1">of {nodeData.max_gb} GB max</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-4">
+                            <div className="bg-background/50 rounded-xl p-4">
+                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Uptime</p>
+                                <p className="text-lg font-bold text-blue-400 flex items-center gap-2">
+                                    <Clock size={16} />
+                                    {parseFloat(nodeData.uptime_minutes) > 60
+                                        ? `${(parseFloat(nodeData.uptime_minutes) / 60).toFixed(1)} hours`
+                                        : `${nodeData.uptime_minutes} min`
+                                    }
+                                </p>
+                            </div>
+                            <div className="bg-background/50 rounded-xl p-4">
+                                <p className="text-muted text-xs uppercase tracking-wider mb-1">Earning Rate</p>
+                                <p className="text-lg font-bold text-primary flex items-center gap-2">
+                                    <TrendingUp size={16} />
+                                    ₹0.42/GB/month
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Earnings History */}
+                    {nodeData.recent_earnings?.length > 0 && (
+                        <div className="glass-card p-6">
+                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                <IndianRupee size={18} className="text-yellow-400" /> Recent Earnings
+                            </h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border text-muted text-left">
+                                            <th className="py-2 px-3">Time</th>
+                                            <th className="py-2 px-3">Amount</th>
+                                            <th className="py-2 px-3">Reason</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {nodeData.recent_earnings.map((e, i) => (
+                                            <tr key={i} className="border-b border-border/50 hover:bg-white/5 transition">
+                                                <td className="py-2 px-3 text-muted">{new Date(e.timestamp).toLocaleString('en-IN')}</td>
+                                                <td className="py-2 px-3 text-yellow-400 font-mono">₹{e.amount_inr}</td>
+                                                <td className="py-2 px-3">
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs ${e.reason === 'uptime_reward' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                            e.reason === 'shard_stored' ? 'bg-purple-500/20 text-purple-400' :
+                                                                'bg-blue-500/20 text-blue-400'
+                                                        }`}>
+                                                        {e.reason === 'uptime_reward' ? '⏱ Uptime Reward' :
+                                                            e.reason === 'shard_stored' ? '💾 Shard Stored' :
+                                                                e.reason}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ═══════ LEADERBOARD ═══════ */}
+            {stats?.top_nodes?.length > 0 && (
+                <div className="glass-card p-6">
+                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                        <TrendingUp size={20} className="text-yellow-400" /> Top Earners
+                    </h2>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-border text-muted text-left">
+                                    <th className="py-2 px-3">#</th>
+                                    <th className="py-2 px-3">Node ID</th>
+                                    <th className="py-2 px-3">Status</th>
+                                    <th className="py-2 px-3">Shards</th>
+                                    <th className="py-2 px-3">Storage Used</th>
+                                    <th className="py-2 px-3">Earned (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {stats.top_nodes.map((n, i) => (
+                                    <tr key={i} className="border-b border-border/50 hover:bg-white/5 transition cursor-pointer"
+                                        onClick={() => { setNodeId(n.node_id); lookupNode(n.node_id); }}>
+                                        <td className="py-2 px-3 font-bold text-muted">{i + 1}</td>
+                                        <td className="py-2 px-3 font-mono text-primary">{n.node_id}</td>
+                                        <td className="py-2 px-3">
+                                            {n.status === 'online'
+                                                ? <span className="text-emerald-400 flex items-center gap-1"><Wifi size={14} /> Online</span>
+                                                : <span className="text-red-400 flex items-center gap-1"><WifiOff size={14} /> Offline</span>
+                                            }
+                                        </td>
+                                        <td className="py-2 px-3">{n.shard_count}</td>
+                                        <td className="py-2 px-3">{n.used_gb} GB</td>
+                                        <td className="py-2 px-3 text-yellow-400 font-bold">{formatINR(n.earned_inr)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Empty state */}
+            {!isLoading && (!stats || stats.total_nodes === 0) && !nodeData && (
+                <div className="glass-card p-12 text-center">
+                    <Server size={48} className="mx-auto text-muted mb-4" />
+                    <h3 className="text-xl font-bold mb-2">No Nodes Connected Yet</h3>
+                    <p className="text-muted max-w-md mx-auto">
+                        Download the NeuroStore Node installer from the <a href="/download" className="text-primary hover:underline">Download page</a> to start earning ₹ by contributing storage.
                     </p>
                 </div>
-                <button className="glass-card px-4 py-2 border-primary/30 text-primary flex items-center gap-2 text-sm font-semibold hover:bg-primary/10 transition-colors">
-                    <Download size={18} />
-                    Download Node CLI
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-card p-6 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                        <Activity size={64} />
-                    </div>
-                    <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Network Health</h3>
-                    <div className="text-4xl font-display font-bold text-white mb-1 group-hover:text-green-400 transition-colors">{health.network_health}</div>
-                    <p className="text-xs text-green-400 flex items-center gap-1">{health.online_nodes} / {health.total_nodes} Nodes Online</p>
-                </div>
-
-                <div className="glass-card p-6 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                        <HardDrive size={64} />
-                    </div>
-                    <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Global Shards</h3>
-                    <div className="text-4xl font-display font-bold text-white mb-1">{health.active_shards} <span className="text-xl text-muted group-hover:text-white/70 transition-colors">pieces</span></div>
-                    <p className="text-xs text-muted flex items-center gap-1">Distributed globally</p>
-                </div>
-
-                <div className="glass-card p-6 relative overflow-hidden border-primary/30 bg-primary/5 group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 text-primary group-hover:scale-110 transition-transform duration-500">
-                        <DollarSign size={64} />
-                    </div>
-                    <h3 className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">Your Earnings</h3>
-                    <div className="text-4xl font-display font-bold text-white mb-1 group-hover:text-primary transition-colors">$0.00</div>
-                    <p className="text-xs text-primary flex items-center gap-1">Start a node to earn</p>
-                </div>
-            </div>
-
-            {/* Neural Heatmap Visualizer */}
-            <div className="glass-card p-6">
-                <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <Cpu size={18} className="text-primary" /> Swarm Heatmap
-                </h3>
-                <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
-                    {nodes.map((node, i) => (
-                        <div
-                            key={i}
-                            title={`Node ${node.id} - ${node.status}`}
-                            className={`h-8 rounded-sm transition-colors duration-500 ${node.status === 'Online'
-                                ? (node.latency > 100 ? 'bg-yellow-500/50' : 'bg-green-500/50 border border-green-400/30')
-                                : 'bg-red-500/50'
-                                }`}
-                        ></div>
-                    ))}
-                </div>
-                <div className="flex gap-4 mt-4 text-xs text-muted">
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500/50 rounded-sm"></div> Optimal</div>
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-yellow-500/50 rounded-sm"></div> High Latency</div>
-                    <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-500/50 rounded-sm"></div> Offline</div>
-                </div>
-            </div>
-
-            <div className="glass-card overflow-hidden text-sm">
-                <div className="p-6 border-b border-border flex justify-between items-center bg-background/50">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
-                        <Server size={20} className="text-primary" /> Sentinel Registry
-                    </h2>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[800px]">
-                        <thead>
-                            <tr className="bg-background/40">
-                                <th className="p-4 font-medium text-muted">Node ID</th>
-                                <th className="p-4 font-medium text-muted">Status</th>
-                                <th className="p-4 font-medium text-muted">AI Score</th>
-                                <th className="p-4 font-medium text-muted">Uptime</th>
-                                <th className="p-4 font-medium text-muted">Latency</th>
-                                <th className="p-4 font-medium text-muted">Bandwidth</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {isLoading ? (
-                                <>
-                                    {[1, 2, 3].map((i) => (
-                                        <tr key={i} className="border-t border-border/50">
-                                            <td className="p-4"><div className="h-4 bg-muted/20 animate-pulse rounded w-24"></div></td>
-                                            <td className="p-4"><div className="h-5 bg-muted/20 animate-pulse rounded-full w-20"></div></td>
-                                            <td className="p-4"><div className="h-2 bg-muted/20 animate-pulse rounded-full w-24 mt-2"></div></td>
-                                            <td className="p-4"><div className="h-4 bg-muted/20 animate-pulse rounded w-12"></div></td>
-                                            <td className="p-4"><div className="h-4 bg-muted/20 animate-pulse rounded w-16"></div></td>
-                                            <td className="p-4"><div className="h-4 bg-muted/20 animate-pulse rounded w-12"></div></td>
-                                        </tr>
-                                    ))}
-                                </>
-                            ) : nodes.map((node) => (
-                                <tr
-                                    key={node.id}
-                                    className={`border-t border-border/50 hover:bg-background/40 transition-colors ${node.status === 'Offline' ? 'opacity-50' : ''}`}
-                                >
-                                    <td className="p-4 font-mono text-gray-300">
-                                        {node.id.substring(0, 12)}...
-                                    </td>
-                                    <td className="p-4">
-                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${node.status === 'Online'
-                                            ? 'bg-green-500/10 text-green-400 border-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.1)]'
-                                            : 'bg-red-500/10 text-red-400 border-red-500/20'
-                                            }`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${node.status === 'Online' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-                                            {node.status}
-                                        </span>
-                                    </td>
-                                    <td className="p-4">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-16 h-1.5 bg-background rounded-full overflow-hidden">
-                                                <div className="h-full bg-primary" style={{ width: `${node.ai_score}%` }}></div>
-                                            </div>
-                                            <span className="font-mono text-xs text-primary">{node.ai_score}</span>
-                                        </div>
-                                    </td>
-                                    <td className="p-4 text-gray-300">{node.uptime}%</td>
-                                    <td className="p-4 text-gray-300">
-                                        <span className={`flex items-center gap-1 ${node.latency > 120 ? 'text-yellow-400' : ''}`}>
-                                            {node.latency} ms
-                                            {node.latency > 120 && <AlertTriangle size={12} />}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 text-gray-300">{node.bandwidth} TB</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            )}
         </div>
     );
 };
+
+// ── Reusable Stat Card ──
+const StatCard = ({ icon: Icon, label, value, accent = 'text-primary' }) => (
+    <div className="glass-card p-4">
+        <div className="flex items-center gap-2 mb-2">
+            <Icon size={16} className={accent} />
+            <span className="text-muted text-xs uppercase tracking-wider">{label}</span>
+        </div>
+        <p className={`text-xl font-bold ${accent}`}>{value}</p>
+    </div>
+);
