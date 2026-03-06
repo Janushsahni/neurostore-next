@@ -48,6 +48,9 @@ struct Args {
     #[arg(long)]
     relay_url: Option<String>,
 
+    #[arg(long, default_value = "https://neurostore-backend-production.up.railway.app")]
+    gateway_url: String,
+
     #[arg(long)]
     setup_config_path: Option<String>,
 
@@ -66,6 +69,12 @@ struct SetupConfig {
     storage_path: String,
     max_gb: u64,
     relay_url: Option<String>,
+    #[serde(default = "default_gateway_url")]
+    gateway_url: Option<String>,
+}
+
+fn default_gateway_url() -> Option<String> {
+    Some("https://neurostore-backend-production.up.railway.app".to_string())
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +85,7 @@ struct RuntimeConfig {
     bootstrap: Vec<String>,
     allow_peer: Vec<String>,
     relay_url: Option<String>,
+    gateway_url: Option<String>,
 }
 
 #[tokio::main]
@@ -136,6 +146,7 @@ fn build_runtime_config(args: &Args) -> anyhow::Result<RuntimeConfig> {
         bootstrap: args.bootstrap.clone(),
         allow_peer: args.allow_peer.clone(),
         relay_url: setup.relay_url,
+        gateway_url: setup.gateway_url.or_else(|| Some(args.gateway_url.clone())),
     })
 }
 
@@ -147,6 +158,7 @@ async fn run_node_with_shutdown(
 
     let store = Arc::new(SecureBlockStore::new(&runtime.storage_path, runtime.max_gb));
     let keypair = load_or_create_identity(&runtime.storage_path)?;
+    let node_id = format!("NEURO-{}", &keypair.public().to_peer_id().to_string()[..8].to_uppercase());
     let bootstrap_addrs = runtime
         .bootstrap
         .iter()
@@ -160,14 +172,76 @@ async fn run_node_with_shutdown(
     let node = build_node(store.clone(), keypair, bootstrap_addrs, allowlist, runtime.relay_url.clone()).await?;
     let listen_addr = parse_listen_multiaddr(&runtime.listen)?;
 
-    info!(peer_id = %node.peer_id, "Node identity loaded");
+    info!(peer_id = %node.peer_id, node_id = %node_id, "Node identity loaded");
     info!(
         max_gb = runtime.max_gb,
         path = %runtime.storage_path,
         "Node storage allocation configured"
     );
 
+    // ── GATEWAY HEARTBEAT BACKGROUND TASK ──
+    let gateway_url = runtime.gateway_url.clone().unwrap_or_else(||
+        "https://neurostore-backend-production.up.railway.app".to_string()
+    );
+    let heartbeat_node_id = node_id.clone();
+    let heartbeat_store = store.clone();
+    let heartbeat_max_gb = runtime.max_gb;
+    let start_time = std::time::Instant::now();
 
+    tokio::spawn(async move {
+        let client = reqwest::Client::new();
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(45));
+        loop {
+            interval.tick().await;
+            let used_bytes = heartbeat_store.get_used_bytes();
+            let used_gb = used_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+            let uptime_min = start_time.elapsed().as_secs_f64() / 60.0;
+
+            let heartbeat = serde_json::json!({
+                "node_id": heartbeat_node_id,
+                "status": "online",
+                "shard_count": 0, // TODO: count shards from store
+                "used_gb": used_gb,
+                "max_gb": heartbeat_max_gb,
+                "free_gb": (heartbeat_max_gb as f64) - used_gb,
+                "uptime_min": uptime_min,
+                "version": env!("CARGO_PKG_VERSION"),
+                "os": std::env::consts::OS,
+                "os_version": "",
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+            });
+
+            match client
+                .post(format!("{}/api/node/heartbeat", gateway_url))
+                .json(&heartbeat)
+                .timeout(std::time::Duration::from_secs(10))
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        if let Ok(body) = resp.json::<serde_json::Value>().await {
+                            let earned = body.get("total_earned_inr")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("0.00");
+                            info!(
+                                node_id = %heartbeat_node_id,
+                                used_gb = format!("{:.3}", used_gb),
+                                uptime_min = format!("{:.1}", uptime_min),
+                                total_earned_inr = %earned,
+                                "💚 Heartbeat OK — Earning ₹"
+                            );
+                        }
+                    } else {
+                        tracing::warn!("Heartbeat HTTP {}", resp.status());
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Heartbeat failed: {} (will retry in 45s)", e);
+                }
+            }
+        }
+    });
 
     drive_node(node, listen_addr, shutdown_rx).await?;
 
@@ -199,6 +273,7 @@ fn resolve_setup_config(
         storage_path: args.storage_path.clone(),
         max_gb: args.max_gb,
         relay_url: args.relay_url.clone(),
+        gateway_url: Some(args.gateway_url.clone()),
     };
 
     if args.run_as_service {
@@ -260,6 +335,7 @@ fn run_interactive_setup(
         storage_path: baseline.storage_path,
         max_gb,
         relay_url,
+        gateway_url: baseline.gateway_url,
     };
     save_setup_config(config_path, &setup)?;
     println!("Saved setup config to {}", config_path.to_string_lossy());
