@@ -4,7 +4,7 @@ import {
   ArrowRight, Cpu, Database, Globe, HardDrive, Lock, LogOut, Menu, Server,
   ShieldCheck, Sparkles, X, Zap, BarChart3, FileSearch, Brain, Shield,
   IndianRupee, Building2, Users, ChevronRight, CheckCircle2, Clock, Eye,
-  Fingerprint, FileText, TrendingUp, Award
+  Cloud, Fingerprint, FileText, TrendingUp, Award
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 
@@ -38,7 +38,7 @@ const AnimCounter = ({ end, suffix = "", prefix = "" }) => {
 const FeatureCard = ({ icon: Icon, title, description, badge, color = "text-primary" }) => (
   <article className="glass-card interactive-card p-6 md:p-8 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all duration-300">
     <div className="mb-4 flex items-center gap-3">
-      <div className={`hero-glow inline-flex rounded-xl bg-primary/15 p-3 ${color}`}>
+      <div className={`hero - glow inline - flex rounded - xl bg - primary / 15 p - 3 ${color} `}>
         <Icon size={20} />
       </div>
       {badge && <span className="rounded-full border border-primary/35 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">{badge}</span>}
@@ -52,7 +52,7 @@ const StatCard = ({ label, value, accent, icon: Icon }) => (
   <div className="glass-card p-4 md:p-5 flex items-center gap-3">
     {Icon && <Icon className={accent + " shrink-0"} size={20} />}
     <div>
-      <p className={`text-2xl md:text-3xl font-display font-extrabold ${accent}`}>{value}</p>
+      <p className={`text - 2xl md: text - 3xl font - display font - extrabold ${accent} `}>{value}</p>
       <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted">{label}</p>
     </div>
   </div>
