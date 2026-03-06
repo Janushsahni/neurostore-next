@@ -291,6 +291,7 @@ const LandingPage = () => (
           <div className="space-y-1.5">
             <Link to="/pricing" className="block text-xs text-muted hover:text-primary transition">Pricing</Link>
             <Link to="/download" className="block text-xs text-muted hover:text-primary transition">Run a Node</Link>
+            <Link to="/dashboard/node" className="block text-xs text-muted hover:text-primary transition">Node Earnings</Link>
             <Link to="/faq" className="block text-xs text-muted hover:text-primary transition">FAQ</Link>
           </div>
         </div>
@@ -344,6 +345,7 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
           {isAuthenticated ? (
             <>
               <Link to="/dashboard/drive" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-primary/40 hover:text-white transition">Dashboard</Link>
+              <Link to="/dashboard/node" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-yellow-400/40 hover:text-yellow-300 transition">Node ₹</Link>
               <Link to="/dashboard/compliance" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-emerald-400/40 hover:text-emerald-300 transition">Compliance</Link>
               <Link to="/s3-migration" className="btn-ghost px-4 py-2 text-sm font-semibold hover:border-orange-400/40 hover:text-orange-300 transition">AWS Sync</Link>
               <button onClick={onLogout} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-red-300 hover:text-red-200 transition-colors">
@@ -373,6 +375,7 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
             {isAuthenticated ? (
               <>
                 <Link to="/dashboard/drive" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Dashboard</Link>
+                <Link to="/dashboard/node" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Node Earnings</Link>
                 <Link to="/dashboard/compliance" onClick={closeMobile} className="rounded-md px-3 py-2 hover:bg-white/5">Compliance</Link>
                 <button onClick={() => { closeMobile(); onLogout(); }} className="rounded-md px-3 py-2 text-left text-red-300 hover:bg-red-500/10">Logout</button>
               </>

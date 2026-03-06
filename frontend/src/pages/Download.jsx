@@ -296,7 +296,7 @@ exit
                                         />
                                         <div className="flex justify-between mt-2 text-xs text-muted">
                                             <span>50 GB</span>
-                                            <span className="text-primary font-semibold">Est. earnings: ${(storageRent * 0.005).toFixed(2)}/month</span>
+                                            <span className="text-primary font-semibold">Est. earnings: ₹{(storageRent * 0.42).toFixed(0)}/month</span>
                                             <span>2 TB</span>
                                         </div>
                                     </div>
@@ -306,7 +306,7 @@ exit
                                         className="inline-flex w-full md:w-auto items-center justify-center gap-3 bg-gradient-to-r from-blue-500 to-primary text-background px-8 py-4 rounded-xl font-bold hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all transform hover:-translate-y-1"
                                     >
                                         <DownloadIcon size={20} />
-                                        Download Installer ({(0.012).toFixed(1)} MB)
+                                        Download Installer (~12 KB)
                                     </button>
                                 </div>
                             </div>
