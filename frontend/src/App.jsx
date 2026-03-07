@@ -18,6 +18,7 @@ import { ComplianceDashboard } from "./pages/ComplianceDashboard";
 import { S3Migration } from "./pages/S3Migration";
 import { About } from "./pages/About";
 import { Contact } from "./pages/Contact";
+import { ProtocolSimulation } from "./components/ProtocolSimulation";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
 
@@ -145,6 +146,9 @@ const LandingPage = () => (
         </div>
       </div>
     </section>
+
+    {/* ── PROTOCOL SIMULATION ── */}
+    <ProtocolSimulation />
 
     {/* ── ABOUT COMPANY ── */}
     <section className="px-6 py-24 bg-white relative border-t border-slate-100">
