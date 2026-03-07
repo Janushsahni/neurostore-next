@@ -1,9 +1,10 @@
 ﻿import React, { useState, useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { HardDrive, Mail, Lock, User, ArrowRight, AlertCircle, RefreshCw } from "lucide-react";
 
 import { setAuthSession } from "../lib/authStorage";
 import { apiJson } from "../lib/apiClient";
+import { API_BASE } from "../lib/config";
 
 const GoogleIcon = () => (
     <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
@@ -43,12 +44,16 @@ export const Login = ({ onAuth }) => {
     const [isLoading, setIsLoading] = useState(false);
 
     const getTargetPath = () => {
-        if (intent === "node") return "/onboard/node";
-        return "/pricing";
+        if (intent === "node") return "/dashboard/node";
+        return "/dashboard/drive";
     };
 
     const handleOAuth = (provider) => {
-        window.alert(`OAuth for ${provider} is pending backend configuration. Please use email log in for now.`);
+        if (provider.toLowerCase() === "google") {
+            window.location.href = `${API_BASE}/api/auth/google/login?intent=${intent}`;
+        } else {
+            window.alert(`OAuth for ${provider} is pending backend configuration. Please use Google or Email.`);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -178,8 +183,8 @@ export const Register = ({ onAuth }) => {
     const [isLoading, setIsLoading] = useState(false);
 
     const getTargetPath = () => {
-        if (intent === "node") return "/onboard/node";
-        return "/pricing";
+        if (intent === "node") return "/dashboard/node";
+        return "/dashboard/drive";
     };
 
     const handleOAuth = (provider) => {
@@ -335,3 +340,35 @@ export const Register = ({ onAuth }) => {
     );
 };
 
+export const AuthCallback = ({ onAuth }) => {
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const hash = window.location.hash.startsWith("#")
+            ? window.location.hash.slice(1)
+            : window.location.hash;
+        const params = new URLSearchParams(hash);
+        const token = params.get("token") || "";
+        const csrf = params.get("csrf") || "";
+        const email = params.get("email") || "";
+        const name = params.get("name") || email;
+        const target = params.get("target") || "/dashboard/drive";
+
+        if (!token || !email) {
+            navigate("/login?error=OAuth%20callback%20failed", { replace: true });
+            return;
+        }
+
+        setAuthSession({ email, name }, csrf, token);
+        onAuth(target);
+    }, [navigate, onAuth]);
+
+    return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-900">
+            <div className="glass-card w-full max-w-md p-8 text-center bg-white/90 shadow-xl border-slate-200 rounded-2xl">
+                <h2 className="text-2xl font-display font-extrabold mb-2">Finishing sign in</h2>
+                <p className="text-slate-500 font-medium text-sm">Establishing your secure session.</p>
+            </div>
+        </div>
+    );
+};

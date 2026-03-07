@@ -18,6 +18,9 @@ use store::SecureBlockStore;
 use tokio::sync::oneshot;
 use tracing::info;
 
+const DEFAULT_GATEWAY_URL: &str = "https://neurostore-backend-production.up.railway.app";
+const DEFAULT_RELAY_URL: &str = "wss://demo.neurostore.network/v1/nodes/ws";
+
 // --- CREATOR SIGNATURE ---
 // Base64 encoded payload proving original authorship by Janyshh
 #[allow(dead_code)]
@@ -27,7 +30,7 @@ const _CREATOR_SIG: &[u8] = b"SmFueXNoaCAtIE9yaWdpbmFsIENyZWF0b3Igb2YgTmV1cm9TdG
 
 #[command(name = "neuro-node", version, about = "Decentralized storage node")]
 struct Args {
-    #[arg(long, default_value = "./node-data")]
+    #[arg(long, default_value_t = default_storage_path_string())]
     storage_path: String,
 
     #[arg(long, default_value_t = 50)]
@@ -48,7 +51,7 @@ struct Args {
     #[arg(long)]
     relay_url: Option<String>,
 
-    #[arg(long, default_value = "https://neurostore-backend-production.up.railway.app")]
+    #[arg(long, default_value = DEFAULT_GATEWAY_URL)]
     gateway_url: String,
 
     #[arg(long)]
@@ -71,10 +74,37 @@ struct SetupConfig {
     relay_url: Option<String>,
     #[serde(default = "default_gateway_url")]
     gateway_url: Option<String>,
+    #[serde(default)]
+    node_secret: Option<String>,
+    #[serde(default = "default_wallet_address")]
+    wallet_address: String,
+    #[serde(default = "default_declared_location")]
+    declared_location: String,
+    #[serde(default = "default_auto_register")]
+    auto_register: bool,
 }
 
 fn default_gateway_url() -> Option<String> {
-    Some("https://neurostore-backend-production.up.railway.app".to_string())
+    Some(DEFAULT_GATEWAY_URL.to_string())
+}
+
+fn default_wallet_address() -> String {
+    "0x0000000000000000000000000000000000000000".to_string()
+}
+
+fn default_declared_location() -> String {
+    "IN".to_string()
+}
+
+fn default_auto_register() -> bool {
+    true
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct RegistrationState {
+    peer_id: String,
+    gateway_url: String,
+    registered_at: String,
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +116,10 @@ struct RuntimeConfig {
     allow_peer: Vec<String>,
     relay_url: Option<String>,
     gateway_url: Option<String>,
+    node_secret: Option<String>,
+    wallet_address: String,
+    declared_location: String,
+    auto_register: bool,
 }
 
 #[tokio::main]
@@ -147,6 +181,10 @@ fn build_runtime_config(args: &Args) -> anyhow::Result<RuntimeConfig> {
         allow_peer: args.allow_peer.clone(),
         relay_url: setup.relay_url,
         gateway_url: setup.gateway_url.or_else(|| Some(args.gateway_url.clone())),
+        node_secret: normalize_optional_secret(setup.node_secret),
+        wallet_address: normalize_wallet_address(&setup.wallet_address),
+        declared_location: normalize_declared_location(&setup.declared_location),
+        auto_register: setup.auto_register,
     })
 }
 
@@ -158,7 +196,8 @@ async fn run_node_with_shutdown(
 
     let store = Arc::new(SecureBlockStore::new(&runtime.storage_path, runtime.max_gb));
     let keypair = load_or_create_identity(&runtime.storage_path)?;
-    let node_id = format!("NEURO-{}", &keypair.public().to_peer_id().to_string()[..8].to_uppercase());
+    let peer_id = keypair.public().to_peer_id().to_string();
+    let node_id = format!("NEURO-{}", &peer_id[..8].to_uppercase());
     let bootstrap_addrs = runtime
         .bootstrap
         .iter()
@@ -169,6 +208,10 @@ async fn run_node_with_shutdown(
         .iter()
         .map(|s| libp2p::PeerId::from_str(s))
         .collect::<Result<HashSet<_>, _>>()?;
+    if runtime.auto_register {
+        ensure_gateway_registration(runtime, &peer_id).await;
+    }
+
     let node = build_node(store.clone(), keypair, bootstrap_addrs, allowlist, runtime.relay_url.clone()).await?;
     let listen_addr = parse_listen_multiaddr(&runtime.listen)?;
 
@@ -209,6 +252,8 @@ async fn run_node_with_shutdown(
                 "os": std::env::consts::OS,
                 "os_version": "",
                 "timestamp": chrono::Utc::now().to_rfc3339(),
+                "build_digest": build_digest(),
+                "build_signature": build_signature(),
             });
 
             match client
@@ -274,9 +319,19 @@ fn resolve_setup_config(
         max_gb: args.max_gb,
         relay_url: args.relay_url.clone(),
         gateway_url: Some(args.gateway_url.clone()),
+        node_secret: std::env::var("NEUROSTORE_NODE_SHARED_SECRET")
+            .ok()
+            .or_else(|| std::env::var("NODE_SHARED_SECRET").ok()),
+        wallet_address: default_wallet_address(),
+        declared_location: default_declared_location(),
+        auto_register: true,
     };
 
     if args.run_as_service {
+        if let Some(saved) = load_setup_config(config_path)? {
+            info!(path = %config_path.display(), "Loaded saved node setup for service mode");
+            return Ok(saved);
+        }
         return Ok(defaults);
     }
 
@@ -313,7 +368,21 @@ fn run_interactive_setup(
         println!("No saved setup found. Let's get you set up to earn by renting storage.");
     }
 
-    let default_relay = baseline.relay_url.clone().unwrap_or_else(|| "wss://demo.neurostore.network/v1/nodes/ws".to_string());
+    let default_relay = baseline
+        .relay_url
+        .clone()
+        .unwrap_or_else(|| DEFAULT_RELAY_URL.to_string());
+    let default_gateway = baseline
+        .gateway_url
+        .clone()
+        .unwrap_or_else(|| DEFAULT_GATEWAY_URL.to_string());
+    let default_node_secret = baseline.node_secret.clone().unwrap_or_default();
+
+    let storage_path_input = prompt_path_gui_fallback(
+        "NeuroStore Storage Location",
+        "Choose where NeuroStore should keep encrypted shard data.",
+        &baseline.storage_path,
+    )?;
 
     // Native Cross-Platform GUI Prompts!
     let max_gb_input = prompt_gui_fallback(
@@ -328,18 +397,86 @@ fn run_interactive_setup(
         &default_relay,
     )?;
 
+    let gateway_url_input = prompt_gui_fallback(
+        "NeuroStore Gateway",
+        "Enter the HTTPS gateway URL used for heartbeats and control plane requests.",
+        &default_gateway,
+    )?;
+
+    let node_secret_input = prompt_gui_fallback(
+        "NeuroStore Onboarding Secret",
+        "Enter the node onboarding secret used to register this node with the gateway. Leave blank to skip automatic registration.",
+        &default_node_secret,
+    )?;
+
+    let wallet_address_input = prompt_gui_fallback(
+        "NeuroStore Payout Wallet",
+        "Enter the payout wallet address for this node.",
+        &baseline.wallet_address,
+    )?;
+
+    let declared_location_input = prompt_gui_fallback(
+        "NeuroStore Node Region",
+        "Enter the declared node location (examples: IN, IN-KA, US-CA).",
+        &baseline.declared_location,
+    )?;
+
     let max_gb = max_gb_input.parse::<u64>().unwrap_or(baseline.max_gb);
     let relay_url = if relay_url_input.is_empty() { None } else { Some(relay_url_input) };
+    let gateway_url = if gateway_url_input.is_empty() {
+        baseline.gateway_url.clone()
+    } else {
+        Some(gateway_url_input)
+    };
 
     let setup = SetupConfig {
-        storage_path: baseline.storage_path,
+        storage_path: normalize_storage_path(&storage_path_input),
         max_gb,
         relay_url,
-        gateway_url: baseline.gateway_url,
+        gateway_url,
+        node_secret: normalize_optional_secret(if node_secret_input.is_empty() {
+            baseline.node_secret.clone()
+        } else {
+            Some(node_secret_input)
+        }),
+        wallet_address: normalize_wallet_address(&wallet_address_input),
+        declared_location: normalize_declared_location(&declared_location_input),
+        auto_register: true,
     };
     save_setup_config(config_path, &setup)?;
     println!("Saved setup config to {}", config_path.to_string_lossy());
     Ok(setup)
+}
+
+fn prompt_path_gui_fallback(title: &str, prompt: &str, default_value: &str) -> anyhow::Result<String> {
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        let script = format!(
+            "Add-Type -AssemblyName System.Windows.Forms; \
+             Add-Type -AssemblyName System.Drawing; \
+             $dialog = New-Object System.Windows.Forms.FolderBrowserDialog; \
+             $dialog.Description = '{prompt}'; \
+             $dialog.ShowNewFolderButton = $true; \
+             if ('{default_value}' -ne '') {{ $dialog.SelectedPath = '{default_value}' }}; \
+             if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{ Write-Output $dialog.SelectedPath }}",
+            prompt = prompt.replace("'", "''"),
+            default_value = default_value.replace("'", "''")
+        );
+        if let Ok(output) = Command::new("powershell")
+            .arg("-NoProfile")
+            .arg("-Command")
+            .arg(script)
+            .output()
+        {
+            let res = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !res.is_empty() {
+                return Ok(res);
+            }
+        }
+    }
+
+    prompt_gui_fallback(title, prompt, default_value)
 }
 
 fn prompt_gui_fallback(title: &str, prompt: &str, default_value: &str) -> anyhow::Result<String> {
@@ -477,6 +614,185 @@ fn default_setup_config_path() -> PathBuf {
             .join("node-config.json");
     }
     PathBuf::from("node-config.json")
+}
+
+fn default_storage_path() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        return PathBuf::from(local_app_data)
+            .join("Neurostore")
+            .join("node-data");
+    }
+
+    #[cfg(target_os = "macos")]
+    if let Some(home) = std::env::var_os("HOME") {
+        return PathBuf::from(home)
+            .join("Library")
+            .join("Application Support")
+            .join("NeuroStore")
+            .join("node-data");
+    }
+
+    if let Some(xdg) = std::env::var_os("XDG_DATA_HOME") {
+        return PathBuf::from(xdg)
+            .join("neurostore")
+            .join("node-data");
+    }
+    if let Some(home) = std::env::var_os("HOME") {
+        return PathBuf::from(home)
+            .join(".local")
+            .join("share")
+            .join("neurostore")
+            .join("node-data");
+    }
+    PathBuf::from("./node-data")
+}
+
+fn default_storage_path_string() -> String {
+    default_storage_path().to_string_lossy().to_string()
+}
+
+fn normalize_storage_path(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        default_storage_path_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn normalize_optional_secret(value: Option<String>) -> Option<String> {
+    value.and_then(|raw| {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
+}
+
+fn normalize_wallet_address(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        default_wallet_address()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn normalize_declared_location(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        default_declared_location()
+    } else {
+        trimmed.to_uppercase()
+    }
+}
+
+fn build_digest() -> Option<&'static str> {
+    option_env!("NEURO_NODE_BUILD_DIGEST")
+}
+
+fn build_signature() -> Option<&'static str> {
+    option_env!("NEURO_NODE_BUILD_SIGNATURE")
+}
+
+fn registration_state_path(storage_path: &str) -> PathBuf {
+    PathBuf::from(storage_path).join(".gateway-registration.json")
+}
+
+fn load_registration_state(storage_path: &str) -> anyhow::Result<Option<RegistrationState>> {
+    let path = registration_state_path(storage_path);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let raw = fs::read_to_string(&path)
+        .with_context(|| format!("failed to read registration state {}", path.display()))?;
+    let state: RegistrationState = serde_json::from_str(&raw)
+        .with_context(|| format!("failed to parse registration state {}", path.display()))?;
+    Ok(Some(state))
+}
+
+fn save_registration_state(storage_path: &str, state: &RegistrationState) -> anyhow::Result<()> {
+    let path = registration_state_path(storage_path);
+    let raw = serde_json::to_string_pretty(state)?;
+    fs::write(&path, raw)
+        .with_context(|| format!("failed to write registration state {}", path.display()))?;
+    Ok(())
+}
+
+async fn ensure_gateway_registration(runtime: &RuntimeConfig, peer_id: &str) {
+    let gateway_url = runtime
+        .gateway_url
+        .clone()
+        .unwrap_or_else(|| DEFAULT_GATEWAY_URL.to_string());
+
+    match load_registration_state(&runtime.storage_path) {
+        Ok(Some(existing))
+            if existing.peer_id == peer_id && existing.gateway_url == gateway_url =>
+        {
+            info!(peer_id = %peer_id, "Node already registered with gateway");
+            return;
+        }
+        Ok(_) => {}
+        Err(err) => tracing::warn!("Failed to read registration state: {err:#}"),
+    }
+
+    let Some(node_secret) = runtime.node_secret.clone() else {
+        tracing::warn!("Skipping gateway auto-registration: node onboarding secret is missing");
+        return;
+    };
+
+    let payload = serde_json::json!({
+        "peer_id": peer_id,
+        "wallet_address": runtime.wallet_address,
+        "capacity_gb": runtime.max_gb,
+        "declared_location": runtime.declared_location,
+        "latency_ms": serde_json::Value::Null,
+        "build_digest": build_digest(),
+        "build_signature": build_signature(),
+    });
+
+    let client = reqwest::Client::new();
+    match client
+        .post(format!("{gateway_url}/api/node/register"))
+        .header("x-node-secret", node_secret)
+        .json(&payload)
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            let state = RegistrationState {
+                peer_id: peer_id.to_string(),
+                gateway_url: gateway_url.clone(),
+                registered_at: chrono::Utc::now().to_rfc3339(),
+            };
+            if let Err(err) = save_registration_state(&runtime.storage_path, &state) {
+                tracing::warn!("Registered node but failed to save registration state: {err:#}");
+            }
+            info!(peer_id = %peer_id, gateway = %gateway_url, "Gateway node registration succeeded");
+        }
+        Ok(resp) => {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            tracing::warn!(
+                peer_id = %peer_id,
+                gateway = %gateway_url,
+                status = %status,
+                body = %body,
+                "Gateway node registration failed"
+            );
+        }
+        Err(err) => {
+            tracing::warn!(
+                peer_id = %peer_id,
+                gateway = %gateway_url,
+                "Gateway node registration request failed: {err}"
+            );
+        }
+    }
 }
 
 #[cfg(windows)]

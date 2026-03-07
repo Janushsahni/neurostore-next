@@ -19,14 +19,20 @@ jobs:
       matrix:
         include:
           - os: windows-latest
+            target: x86_64-pc-windows-msvc
             artifact_name: neuro-node.exe
             asset_name: neuro-node.exe
+            bundle_name: neuro-node-windows-x86_64
           - os: macos-latest
+            target: aarch64-apple-darwin
             artifact_name: neuro-node
-            asset_name: neuro-node-macos
+            asset_name: neuro-node-macos-arm64.tar.gz
+            bundle_name: neuro-node-macos-arm64
           - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
             artifact_name: neuro-node
-            asset_name: neuro-node-linux
+            asset_name: neuro-node-linux-x86_64.tar.gz
+            bundle_name: neuro-node-linux-x86_64
 
     steps:
       - name: Checkout repository
@@ -34,15 +40,63 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Prepare signed node build identity
+        shell: pwsh
+        env:
+          NODE_BINARY_SIGNING_SECRET: ${{ secrets.NODE_BINARY_SIGNING_SECRET }}
+        run: |
+          .\scripts\prepare-node-build-signature.ps1 `
+            -Target "${{ matrix.target }}" `
+            -Package "neuro-node" `
+            -Version "${{ github.ref_name }}" `
+            -GitSha "${{ github.sha }}" `
+            -ArtifactName "${{ matrix.bundle_name }}" `
+            -JsonOut "dist/${{ matrix.bundle_name }}.build.json"
 
       - name: Build neuro-node binary
-        run: cargo build --release -p neuro-node
+        run: cargo build --release -p neuro-node --target ${{ matrix.target }}
 
       - name: Rename binary for macOS/Linux
         if: matrix.os != 'windows-latest'
-        run: mv target/release/${{ matrix.artifact_name }} target/release/${{ matrix.asset_name }}
+        run: mv target/${{ matrix.target }}/release/${{ matrix.artifact_name }} target/${{ matrix.target }}/release/neuro-node
+
+      - name: Bundle Mac/Linux release assets
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          mkdir -p dist/release_bundle
+          cp target/${{ matrix.target }}/release/neuro-node dist/release_bundle/neuro-node
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            cp deploy/systemd/install-node-service.sh dist/release_bundle/install-node-service.sh
+            cp deploy/systemd/uninstall-node-service.sh dist/release_bundle/uninstall-node-service.sh
+            cp deploy/systemd/neuro-node.service dist/release_bundle/neuro-node.service
+          else
+            cp deploy/launchd/install-node-service.sh dist/release_bundle/install-node-service.sh
+            cp deploy/launchd/uninstall-node-service.sh dist/release_bundle/uninstall-node-service.sh
+            cp deploy/launchd/com.neurostore.node.plist dist/release_bundle/com.neurostore.node.plist
+          fi
+          chmod +x dist/release_bundle/neuro-node dist/release_bundle/install-node-service.sh dist/release_bundle/uninstall-node-service.sh
+          tar -czvf dist/${{ matrix.asset_name }} -C dist/release_bundle .
+
+      - name: Bundle release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          if ("${{ matrix.os }}" -eq "windows-latest") {
+            Copy-Item "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "dist/${{ matrix.asset_name }}"
+          }
+          $binaryHash = (Get-FileHash -Path "dist/${{ matrix.asset_name }}" -Algorithm SHA256).Hash.ToLowerInvariant()
+          @"
+          $binaryHash  ${{ matrix.asset_name }}
+          "@ | Set-Content -Path "dist/${{ matrix.bundle_name }}.sha256"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release/${{ matrix.asset_name }}
+          files: |
+            dist/${{ matrix.asset_name }}
+            dist/${{ matrix.bundle_name }}.build.json
+            dist/${{ matrix.bundle_name }}.sha256

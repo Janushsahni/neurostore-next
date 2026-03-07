@@ -6,14 +6,11 @@ use axum::{
 };
 use std::collections::HashMap;
 use std::sync::Arc;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sha2::{Digest, Sha256};
 use md5::Md5;
-use aes_gcm::{
-    aead::{Aead, KeyInit},
-    Aes256Gcm, Key, Nonce,
-};
+use hmac::Mac;
 use neuro_protocol::{ChunkCommand, StoreChunkRequest};
 use futures::stream::{FuturesUnordered, StreamExt};
 use std::time::Instant;
@@ -34,14 +31,8 @@ pub struct ListQuery {
 
 // ── BUCKET AUTHORIZATION ──────────────────────────────────────────
 pub(crate) async fn authorize_bucket(state: &AppState, bucket: &str, email: &str) -> Result<(), (StatusCode, String)> {
-    // ZERO-KNOWLEDGE BUCKETS: Hash the bucket name to prevent enumeration leaks
-    let hashed_bucket = match state.metadata_protector.encrypt(&format!("bucket_salt_{}", bucket)) {
-        Ok(h) => h,
-        Err(_) => return Err((StatusCode::INTERNAL_SERVER_ERROR, "Bucket masking failed".to_string())),
-    };
-
     let row = sqlx::query("SELECT owner_email FROM buckets WHERE name = $1")
-        .bind(&hashed_bucket)
+        .bind(bucket)
         .fetch_optional(&state.db)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("DB Error: {}", e)))?;
@@ -59,7 +50,7 @@ pub(crate) async fn authorize_bucket(state: &AppState, bucket: &str, email: &str
         },
         None => {
             sqlx::query("INSERT INTO buckets (name, owner_email) VALUES ($1, $2)")
-                .bind(&hashed_bucket)
+                .bind(bucket)
                 .bind(email)
                 .execute(&state.db)
                 .await
@@ -67,6 +58,71 @@ pub(crate) async fn authorize_bucket(state: &AppState, bucket: &str, email: &str
             Ok(())
         }
     }
+}
+
+pub(crate) fn object_key_locator(state: &AppState, bucket: &str, key: &str) -> String {
+    state
+        .metadata_protector
+        .blind_index("object-key", &format!("{bucket}:{key}"))
+}
+
+pub(crate) fn encrypt_object_key(state: &AppState, key: &str) -> Result<String, (StatusCode, String)> {
+    state
+        .metadata_protector
+        .encrypt(key)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Key encryption failed".to_string()))
+}
+
+fn display_key_from_row(state: &AppState, obj: &crate::models::Object) -> String {
+    if let Some(encrypted_key) = obj.encrypted_key.as_deref() {
+        return state
+            .metadata_protector
+            .decrypt(encrypted_key)
+            .unwrap_or_else(|_| encrypted_key.to_string());
+    }
+
+    state
+        .metadata_protector
+        .decrypt(&obj.key)
+        .unwrap_or_else(|_| obj.key.clone())
+}
+
+fn parse_client_manifest(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-neuro-client-manifest")
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn merge_client_manifest(metadata_json: Option<serde_json::Value>, client_manifest: Option<String>) -> serde_json::Value {
+    let mut metadata = metadata_json.unwrap_or_else(|| serde_json::json!({}));
+    if !metadata.is_object() {
+        metadata = serde_json::json!({});
+    }
+
+    if let Some(map) = metadata.as_object_mut() {
+        map.insert("zero_knowledge".to_string(), serde_json::Value::Bool(true));
+        if let Some(manifest) = client_manifest {
+            map.insert("client_manifest".to_string(), serde_json::Value::String(manifest));
+        }
+    }
+
+    metadata
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ClientManifestRequest {
+    pub client_manifest: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ClientManifestResponse {
+    pub bucket: String,
+    pub key: String,
+    pub zero_knowledge: bool,
+    pub client_manifest: Option<String>,
 }
 
 // S3 Auth Stub - Extract AWS Signature V4 or fallback to JWT
@@ -190,7 +246,7 @@ pub async fn list_objects(
             xml.push_str("  <IsTruncated>false</IsTruncated>\n");
 
             for o in objects {
-                let decrypted_key = state.metadata_protector.decrypt(&o.key).unwrap_or_else(|_| o.key.clone());
+                let decrypted_key = display_key_from_row(&state, &o);
                 
                 xml.push_str("  <Contents>\n");
                 xml.push_str(&format!("    <Key>{}</Key>\n", xml_escape(&decrypted_key)));
@@ -255,38 +311,15 @@ pub async fn put_object(
     let body_bytes = Bytes::from(full_body);
     let etag = format!("\"{:x}\"", Md5::digest(&body_bytes));
     
-    // ── DOUBLE-BLIND ENCRYPTION & SALTED VAULT ──
-    // By default, we use deterministic encryption for Global Deduplication.
-    // However, if the user requests "Private Vault" mode by providing a salt,
-    // we mix it into the hash. This creates a completely unique CID and Key
-    // even for identical files, preventing ISPs or adversaries from 
-    // fingerprinting the existence of specific data in the mesh.
+    // Treat the uploaded body as opaque client ciphertext.
+    // The gateway never derives or stores a decryptable file key.
     let mut hasher = Sha256::new();
-    if let Some(salt) = headers.get("x-neuro-private-salt").and_then(|h| h.to_str().ok()) {
-        hasher.update(salt.as_bytes());
-    }
     hasher.update(&body_bytes);
-    let plaintext_hash = hasher.finalize();
-    let enc_key_hex = hex::encode(plaintext_hash);
-
-    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&plaintext_hash));
-    let mut nonce_bytes = [0u8; 12];
-    rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
-
-    let encrypted_body = match cipher.encrypt(nonce, body_bytes.as_ref()) {
-        Ok(enc) => {
-            let mut combined = nonce_bytes.to_vec();
-            combined.extend(enc);
-            combined
-        },
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Encryption failed").into_response(),
-    };
-
-    let size = encrypted_body.len() as i64;
+    let ciphertext_hash = hasher.finalize();
+    let size = body_bytes.len() as i64;
     
     let mut cid_hasher = Sha256::new();
-    cid_hasher.update(&encrypted_body);
+    cid_hasher.update(&body_bytes);
     let cid = format!("Qm{}", bs58::encode(cid_hasher.finalize()).into_string());
 
     // RS(10, 10) - 20 total shards
@@ -299,7 +332,7 @@ pub async fn put_object(
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "RS Init Error").into_response(),
     };
         
-    let physical_shards = match encoder.encode(&encrypted_body) {
+    let physical_shards = match encoder.encode(&body_bytes) {
         Ok(s) => s,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "RS Encode Error").into_response(),
     };
@@ -438,35 +471,29 @@ pub async fn put_object(
         return (StatusCode::SERVICE_UNAVAILABLE, format!("Insufficient shard durability: {}/{}", successful_store_acks, required_optimistic_shards)).into_response();
     }
 
-    // ── ENTERPRISE: Malware Scanning Hook (ClamAV Simulation) ──
-    tracing::info!("Scanning {} for malware signatures...", key);
-    // Simulate API call to ClamAV daemon
-    tokio::time::sleep(tokio::time::Duration::from_millis(800)).await;
-    tracing::info!("Malware scan clean for {}", key);
+    tracing::info!("Zero-knowledge upload accepted for {}", key);
+    let client_manifest = parse_client_manifest(&headers);
 
     let metadata_json = serde_json::json!({ 
-        "encryption_key": enc_key_hex,
-        "sla_tier": "enterprise-sovereign",
-        "legal_fiduciary": "NeuroStore SLA Protocol",
-        "malware_scan": "clean"
+        "zero_knowledge": true,
+        "ciphertext_hash": hex::encode(ciphertext_hash),
+        "client_manifest": client_manifest,
+        "inspection": "server-blind",
+        "malware_scan": "not_performed_server_side"
     });
-    let metadata_str = serde_json::to_string(&metadata_json).unwrap_or_else(|_| "{}".to_string());
     
-    let encrypted_key = match state.metadata_protector.encrypt(&key) {
+    let object_key = object_key_locator(&state, &bucket, &key);
+    let encrypted_key = match encrypt_object_key(&state, &key) {
         Ok(k) => k,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Key encryption failed").into_response(),
-    };
-    
-    let encrypted_metadata = match state.metadata_protector.encrypt(&metadata_str) {
-        Ok(m) => m,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Metadata encryption failed").into_response(),
+        Err(err) => return err.into_response(),
     };
 
     let res = sqlx::query(
         r#"
-        INSERT INTO objects (bucket, key, etag, cid, shards, recovery_threshold, size, metadata_json)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO objects (bucket, key, encrypted_key, etag, cid, shards, recovery_threshold, size, metadata_json)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (bucket, key) DO UPDATE SET
+            encrypted_key = excluded.encrypted_key,
             etag = excluded.etag,
             cid = excluded.cid,
             size = excluded.size,
@@ -474,13 +501,14 @@ pub async fn put_object(
         "#
     )
     .bind(&bucket)
+    .bind(&object_key)
     .bind(&encrypted_key)
     .bind(&etag)
     .bind(&cid)
     .bind(total_shards as i32)
     .bind(recovery_threshold as i32)
     .bind(size)
-    .bind(serde_json::json!({ "encrypted": encrypted_metadata }))
+    .bind(&metadata_json)
     .execute(&state.db)
     .await;
 
@@ -498,7 +526,7 @@ pub async fn put_object(
                 "shards": total_shards,
                 "recovery_threshold": recovery_threshold,
                 "etag": etag,
-                "metadata": encrypted_metadata
+                "metadata": metadata_json
             });
             
             let manifest_bytes = serde_json::to_vec(&manifest).unwrap_or_default();
@@ -614,28 +642,30 @@ pub async fn reconstruct_metadata(
             let shards = manifest["shards"].as_i64().unwrap_or(20);
             let threshold = manifest["recovery_threshold"].as_i64().unwrap_or(10);
             let size = manifest["size"].as_i64().unwrap_or(0);
-            let encrypted_meta = manifest["metadata"].as_str().unwrap_or("");
+            let metadata = manifest["metadata"].clone();
 
-            let encrypted_key = match state.metadata_protector.encrypt(&key) {
+            let object_key = object_key_locator(&state, &bucket, &key);
+            let encrypted_key = match encrypt_object_key(&state, &key) {
                 Ok(k) => k,
-                Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Key encryption failed").into_response(),
+                Err(err) => return err.into_response(),
             };
 
             let res = sqlx::query(
                 r#"
-                INSERT INTO objects (bucket, key, etag, cid, shards, recovery_threshold, size, metadata_json)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                INSERT INTO objects (bucket, key, encrypted_key, etag, cid, shards, recovery_threshold, size, metadata_json)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 ON CONFLICT (bucket, key) DO NOTHING
                 "#
             )
             .bind(&bucket)
+            .bind(&object_key)
             .bind(&encrypted_key)
             .bind(etag)
             .bind(cid)
             .bind(shards as i32)
             .bind(threshold as i32)
             .bind(size)
-            .bind(serde_json::json!({ "encrypted": encrypted_meta }))
+            .bind(metadata)
             .execute(&state.db)
             .await;
 
@@ -645,6 +675,74 @@ pub async fn reconstruct_metadata(
             }
         }
         _ => (StatusCode::NOT_FOUND, "No Shadow Manifest found in Swarm").into_response(),
+    }
+}
+
+pub async fn put_client_manifest(
+    State(state): State<Arc<AppState>>,
+    Path((bucket, key)): Path<(String, String)>,
+    headers: HeaderMap,
+    axum::Json(payload): axum::Json<ClientManifestRequest>,
+) -> impl IntoResponse {
+    if let Err(err) = validate_csrf(&headers) {
+        return err.into_response();
+    }
+    let user_email = match validate_s3_auth(&headers, &state) {
+        Ok(email) => email,
+        Err(err) => return err.into_response(),
+    };
+    if let Err(err) = authorize_bucket(&state, &bucket, &user_email).await {
+        return err.into_response();
+    }
+
+    let key = key.trim_start_matches('/').to_string();
+    if payload.client_manifest.trim().is_empty() {
+        return (StatusCode::BAD_REQUEST, "client_manifest is required").into_response();
+    }
+    if payload.client_manifest.len() > 64 * 1024 {
+        return (StatusCode::PAYLOAD_TOO_LARGE, "client_manifest exceeds 64KB").into_response();
+    }
+
+    let object_key = object_key_locator(&state, &bucket, &key);
+    let row = sqlx::query_as::<_, crate::models::Object>(
+        "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
+    )
+    .bind(&bucket)
+    .bind(&object_key)
+    .fetch_optional(&state.db)
+    .await;
+
+    match row {
+        Ok(Some(obj)) => {
+            let metadata_json = merge_client_manifest(obj.metadata_json.clone(), Some(payload.client_manifest.clone()));
+            let res = sqlx::query(
+                "UPDATE objects SET metadata_json = $1 WHERE bucket = $2 AND key = $3"
+            )
+            .bind(&metadata_json)
+            .bind(&bucket)
+            .bind(&object_key)
+            .execute(&state.db)
+            .await;
+
+            match res {
+                Ok(_) => (
+                    StatusCode::OK,
+                    axum::Json(ClientManifestResponse {
+                        bucket,
+                        key,
+                        zero_knowledge: true,
+                        client_manifest: metadata_json
+                            .get("client_manifest")
+                            .and_then(|v| v.as_str())
+                            .map(|v| v.to_string()),
+                    }),
+                )
+                    .into_response(),
+                Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update client manifest").into_response(),
+            }
+        }
+        Ok(None) => (StatusCode::NOT_FOUND, "NoSuchKey").into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response(),
     }
 }
 
@@ -664,16 +762,13 @@ pub async fn get_object(
     
     let key = key.trim_start_matches('/').to_string();
     
-    let encrypted_key = match state.metadata_protector.encrypt(&key) {
-        Ok(k) => k,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Search Encryption Failure").into_response(),
-    };
+    let object_key = object_key_locator(&state, &bucket, &key);
 
     let row = sqlx::query_as::<_, crate::models::Object>(
         "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
     )
     .bind(&bucket)
-    .bind(&encrypted_key)
+    .bind(&object_key)
     .fetch_optional(&state.db)
     .await;
 
@@ -798,27 +893,7 @@ pub async fn get_object(
                 }
             };
             
-            let metadata_str = match obj.metadata_json.as_ref().and_then(|v| v.get("encrypted")).and_then(|v| v.as_str()) {
-                Some(enc_str) => state.metadata_protector.decrypt(enc_str).unwrap_or_else(|_| "{}".to_string()),
-                None => "{}".to_string(),
-            };
-            let metadata: serde_json::Value = serde_json::from_str(&metadata_str).unwrap_or(serde_json::json!({}));
-            
-            let mut final_data = reconstructed_data;
-            if let Some(key_hex) = metadata.get("encryption_key").and_then(|v| v.as_str()) {
-                if let Ok(key_bytes) = hex::decode(key_hex) {
-                    if key_bytes.len() == 32 {
-                        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key_bytes));
-                        if final_data.len() > 12 {
-                            let (nonce_bytes, ciphertext) = final_data.split_at(12);
-                            let nonce = Nonce::from_slice(nonce_bytes);
-                            if let Ok(dec) = cipher.decrypt(nonce, ciphertext) {
-                                final_data = dec;
-                            }
-                        }
-                    }
-                }
-            }
+            let final_data = reconstructed_data;
 
             let duration = start_time.elapsed();
             tracing::info!("GET SUCCESS: {}/{} | Racing Shards: {}/{} | Latency: {}ms", bucket, key, success_count, obj.shards, duration.as_millis());
@@ -830,6 +905,27 @@ pub async fn get_object(
                 "BLOCKCHAIN AUDIT (Tx Queued): user {} accessed {}/{} at timestamp {}", 
                 user_email, bucket, key, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
             );
+
+            let encrypted_display_key = obj
+                .encrypted_key
+                .clone()
+                .unwrap_or_else(|| key.clone());
+            let _ = sqlx::query(
+                r#"
+                INSERT INTO object_heat (object_cid, bucket, object_key, access_count, rolling_heat, last_accessed_at, updated_at)
+                VALUES ($1, $2, $3, 1, 1.0, NOW(), NOW())
+                ON CONFLICT (object_cid) DO UPDATE SET
+                    access_count = object_heat.access_count + 1,
+                    rolling_heat = LEAST((object_heat.rolling_heat * 0.85) + 1.5, 100.0),
+                    last_accessed_at = NOW(),
+                    updated_at = NOW()
+                "#
+            )
+            .bind(&obj.cid)
+            .bind(&bucket)
+            .bind(&encrypted_display_key)
+            .execute(&state.db)
+            .await;
             
             let cache = state.edge_cache.clone();
             let cid = obj.cid.clone();
@@ -889,16 +985,18 @@ pub async fn deduplicate_object(
 
     match existing_obj {
         Ok(Some(obj)) => {
-            let encrypted_key = match state.metadata_protector.encrypt(&key) {
+            let object_key = object_key_locator(&state, &bucket, &key);
+            let encrypted_key = match encrypt_object_key(&state, &key) {
                 Ok(k) => k,
-                Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Key encryption failed").into_response(),
+                Err(err) => return err.into_response(),
             };
 
             let copy_res = sqlx::query(
                 r#"
-                INSERT INTO objects (bucket, key, etag, cid, shards, recovery_threshold, size, metadata_json)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                INSERT INTO objects (bucket, key, encrypted_key, etag, cid, shards, recovery_threshold, size, metadata_json)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 ON CONFLICT (bucket, key) DO UPDATE SET
+                    encrypted_key = excluded.encrypted_key,
                     etag = excluded.etag,
                     cid = excluded.cid,
                     size = excluded.size,
@@ -906,6 +1004,7 @@ pub async fn deduplicate_object(
                 "#
             )
             .bind(&bucket)
+            .bind(&object_key)
             .bind(&encrypted_key)
             .bind(&obj.etag)
             .bind(&obj.cid)
@@ -950,16 +1049,13 @@ pub async fn delete_object(
     
     let key = key.trim_start_matches('/').to_string();
 
-    let encrypted_key = match state.metadata_protector.encrypt(&key) {
-        Ok(k) => k,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Delete Encryption Failure").into_response(),
-    };
+    let object_key = object_key_locator(&state, &bucket, &key);
 
     let row = sqlx::query_as::<_, crate::models::Object>(
         "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
     )
     .bind(&bucket)
-    .bind(&encrypted_key)
+    .bind(&object_key)
     .fetch_optional(&state.db)
     .await;
 
@@ -996,14 +1092,14 @@ pub async fn delete_object(
                 sqlx::query("UPDATE objects SET metadata_json = $1 WHERE bucket = $2 AND key = $3")
                     .bind(&shredded_metadata)
                     .bind(&bucket)
-                    .bind(&encrypted_key)
+                    .bind(&object_key)
                     .execute(&mut *tx)
                     .await
                     .map_err(|e| e.to_string())?;
 
                 sqlx::query("DELETE FROM objects WHERE bucket = $1 AND key = $2")
                     .bind(&bucket)
-                    .bind(&encrypted_key)
+                    .bind(&object_key)
                     .execute(&mut *tx)
                     .await
                     .map_err(|e| e.to_string())?;
@@ -1043,16 +1139,13 @@ pub async fn get_presigned_manifest(
     }
     
     let key = key.trim_start_matches('/').to_string();
-    let encrypted_key = match state.metadata_protector.encrypt(&key) {
-        Ok(k) => k,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Encryption Error").into_response(),
-    };
+    let object_key = object_key_locator(&state, &bucket, &key);
 
     let obj_row = sqlx::query_as::<_, crate::models::Object>(
         "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
     )
     .bind(&bucket)
-    .bind(&encrypted_key)
+    .bind(&object_key)
     .fetch_optional(&state.db)
     .await;
 
@@ -1075,33 +1168,7 @@ pub async fn get_presigned_manifest(
                 }));
             }
 
-            let metadata_str = match obj.metadata_json.as_ref().and_then(|v| v.get("encrypted")).and_then(|v| v.as_str()) {
-                Some(enc_str) => state.metadata_protector.decrypt(enc_str).unwrap_or_else(|_| "{}".to_string()),
-                None => "{}".to_string(),
-            };
-            let metadata: serde_json::Value = serde_json::from_str(&metadata_str).unwrap_or(serde_json::json!({}));
-            
-            // SECURITY: Wrap the encryption key with the client's public key.
-            // The raw key is NEVER sent in plaintext — it's encrypted with HMAC-based
-            // key wrapping using the client's public key as additional entropy.
-            let client_pub_key_hex = headers.get("x-client-public-key").and_then(|h| h.to_str().ok());
-            let raw_encryption_key = metadata.get("encryption_key").and_then(|v| v.as_str()).unwrap_or("");
-            
-            let final_encryption_key = if let Some(pub_hex) = client_pub_key_hex {
-                if raw_encryption_key.is_empty() {
-                    serde_json::Value::Null
-                } else {
-                    // Wrap: HMAC-SHA256(client_pubkey, raw_key) as the transport envelope
-                    // Client must unwrap using their private key to derive the same HMAC.
-                    let mut wrap_hmac = hmac::Hmac::<sha2::Sha256>::new_from_slice(pub_hex.as_bytes())
-                        .unwrap_or_else(|_| hmac::Hmac::<sha2::Sha256>::new_from_slice(b"fallback").unwrap());
-                    hmac::Mac::update(&mut wrap_hmac, raw_encryption_key.as_bytes());
-                    let wrapped = hex::encode(hmac::Mac::finalize(wrap_hmac).into_bytes());
-                    serde_json::Value::String(format!("WRAPPED:v1:{}", wrapped))
-                }
-            } else {
-                return (StatusCode::BAD_REQUEST, "x-client-public-key header required for secure manifest delivery.").into_response();
-            };
+            let metadata = obj.metadata_json.clone().unwrap_or_else(|| serde_json::json!({}));
 
             // ── CRYPTOGRAPHIC BANDWIDTH VOUCHERS (ANTI FREE-RIDER) ──
             // Uses a SEPARATE secret from JWT to prevent key leakage cross-contamination.
@@ -1120,7 +1187,8 @@ pub async fn get_presigned_manifest(
                 "size": obj.size,
                 "recovery_threshold": obj.recovery_threshold,
                 "total_shards": obj.shards,
-                "encryption_key": final_encryption_key,
+                "zero_knowledge": metadata.get("zero_knowledge").cloned().unwrap_or(serde_json::Value::Bool(true)),
+                "client_manifest": metadata.get("client_manifest").cloned().unwrap_or(serde_json::Value::Null),
                 "bandwidth_voucher": bandwidth_voucher,
                 "shards": shards
             });

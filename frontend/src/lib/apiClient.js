@@ -46,6 +46,7 @@ export async function apiRequest(path, options = {}) {
             body,
             signal: timeout.signal,
             mode: "cors",
+            credentials: "include",
             cache: "no-store",
         });
 

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use crate::AppState;
 use hmac::Mac;
+use std::net::IpAddr;
 
 // ── WEBHOOK NOTIFICATION SYSTEM ──
 // Allows customers to register webhook URLs that get called when
@@ -31,6 +32,43 @@ pub struct WebhookEvent {
     pub signature: String,
 }
 
+fn is_public_webhook_url(url: &str) -> bool {
+    let Ok(parsed) = reqwest::Url::parse(url) else {
+        return false;
+    };
+
+    if parsed.scheme() != "https" {
+        return false;
+    }
+
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+
+    if host.eq_ignore_ascii_case("localhost") {
+        return false;
+    }
+
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return match ip {
+            IpAddr::V4(ipv4) => {
+                !(ipv4.is_private()
+                    || ipv4.is_loopback()
+                    || ipv4.is_link_local()
+                    || ipv4.is_multicast()
+                    || ipv4.is_unspecified())
+            }
+            IpAddr::V6(ipv6) => {
+                !(ipv6.is_loopback()
+                    || ipv6.is_multicast()
+                    || ipv6.is_unspecified())
+            }
+        };
+    }
+
+    true
+}
+
 /// Register a webhook endpoint for a bucket.
 pub async fn register_webhook(
     State(state): State<Arc<AppState>>,
@@ -46,8 +84,8 @@ pub async fn register_webhook(
     }
 
     // Validate webhook URL
-    if !payload.url.starts_with("https://") {
-        return (StatusCode::BAD_REQUEST, "Webhook URL must use HTTPS").into_response();
+    if !is_public_webhook_url(&payload.url) {
+        return (StatusCode::BAD_REQUEST, "Webhook URL must be a public HTTPS endpoint").into_response();
     }
 
     let valid_events = ["object.created", "object.deleted", "object.accessed"];

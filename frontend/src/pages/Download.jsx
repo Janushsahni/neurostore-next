@@ -370,7 +370,7 @@ exit
                                             className="btn-primary inline-flex items-center gap-3 px-6 py-3.5 text-basis shadow-md"
                                         >
                                             <DownloadIcon size={20} />
-                                            Download macOS Binary (ARM)
+                                            Download macOS Bundle (ARM)
                                         </a>
                                         <a
                                             href="https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-x86_64.tar.gz"
@@ -388,10 +388,10 @@ exit
                                     <div>
                                         <h3 className="font-bold text-amber-800 mb-1">Gatekeeper Block Fix</h3>
                                         <p className="text-sm font-medium text-amber-700/80 leading-relaxed">
-                                            macOS may prevent the terminal app from running. Open your Terminal and run this command on the downloaded file to clear the quarantine flag:
+                                            macOS may block the downloaded bundle. After extracting it, clear the quarantine flag before installation:
                                         </p>
                                         <code className="block bg-slate-50 p-3 rounded-lg mt-3 text-emerald-600 text-sm font-mono font-bold border border-slate-200 shadow-inner">
-                                            xattr -d com.apple.quarantine ~/Downloads/neuro-node-macos
+                                            xattr -dr com.apple.quarantine ~/Downloads/neuro-node-*
                                         </code>
                                     </div>
                                 </div>
@@ -401,11 +401,15 @@ exit
                                 <h3 className="font-bold text-lg text-slate-800 border-b border-slate-200 pb-2">Setup Instructions</h3>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">1</div>
-                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Extract the tar archive and make the file executable: <code className="bg-slate-100 border border-slate-200 font-bold px-1.5 py-0.5 rounded text-emerald-600 text-sm">tar -xzvf neuro-node-macos-arm64.tar.gz && chmod +x neuro-node</code></p>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Extract the tar archive: <code className="bg-slate-100 border border-slate-200 font-bold px-1.5 py-0.5 rounded text-emerald-600 text-sm">tar -xzvf neuro-node-macos-arm64.tar.gz</code></p>
                                 </div>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">2</div>
-                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Run the node daemon: <code className="bg-slate-100 border border-slate-200 font-bold px-1.5 py-0.5 rounded text-emerald-600 text-sm">./neuro-node</code></p>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Install the background service: <code className="bg-slate-100 border border-slate-200 font-bold px-1.5 py-0.5 rounded text-emerald-600 text-sm">sudo bash install-node-service.sh</code></p>
+                                </div>
+                                <div className="flex gap-4 items-start">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">3</div>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">The bundle already includes `neuro-node`, `install-node-service.sh`, `uninstall-node-service.sh`, and `com.neurostore.node.plist`.</p>
                                 </div>
                             </div>
                         </div>
@@ -427,9 +431,8 @@ exit
                                             <div className="w-3 h-3 rounded-full bg-green-500"></div>
                                             <span className="ml-2">bash</span>
                                         </div>
-                                        <span className="text-emerald-400 font-bold">curl </span>
-                                        <span className="text-slate-100 font-semibold">-sSL https://raw.githubusercontent.com/Janushsahni/neurostore-next/master/deploy/linux/install.sh | </span>
-                                        <span className="text-emerald-400 font-bold">bash</span>
+                                        <span className="text-emerald-400 font-bold">curl -L -o neuro-node-linux-x86_64.tar.gz </span>
+                                        <span className="text-slate-100 font-semibold">https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-linux-x86_64.tar.gz</span>
                                     </div>
                                 </div>
                             </div>
@@ -438,11 +441,15 @@ exit
                                 <h3 className="font-bold text-lg text-slate-800 border-b border-slate-200 pb-2">Setup Instructions</h3>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">1</div>
-                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Copy and paste the command above into your linux terminal.</p>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Download and extract the release bundle: <code className="bg-slate-100 px-1 border border-slate-200 rounded font-bold text-emerald-600">tar -xzvf neuro-node-linux-x86_64.tar.gz</code></p>
                                 </div>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">2</div>
-                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">The script will automatically download the binary and set up a <code className="bg-slate-100 px-1 border border-slate-200 rounded font-bold text-emerald-600">systemd</code> service so the node automatically starts on boot.</p>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">Install the background service: <code className="bg-slate-100 px-1 border border-slate-200 rounded font-bold text-emerald-600">sudo bash install-node-service.sh</code></p>
+                                </div>
+                                <div className="flex gap-4 items-start">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">3</div>
+                                    <p className="pt-1 text-slate-600 font-medium leading-relaxed">The bundle includes `neuro-node`, `install-node-service.sh`, `uninstall-node-service.sh`, and `neuro-node.service` for `systemd` installs.</p>
                                 </div>
                             </div>
                         </div>

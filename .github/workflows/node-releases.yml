@@ -39,6 +39,19 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Prepare signed node build identity
+        shell: pwsh
+        env:
+          NODE_BINARY_SIGNING_SECRET: ${{ secrets.NODE_BINARY_SIGNING_SECRET }}
+        run: |
+          .\scripts\prepare-node-build-signature.ps1 `
+            -Target "${{ matrix.target }}" `
+            -Package "neuro-node" `
+            -Version "${{ github.ref_name }}" `
+            -GitSha "${{ github.sha }}" `
+            -ArtifactName "${{ matrix.artifact_name }}" `
+            -JsonOut "release_bundle/${{ matrix.artifact_name }}.build.json"
+
       - name: Build Physical Node Daemon
         run: cargo build -p neuro-node --release --target ${{ matrix.target }}
 
@@ -46,14 +59,30 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: |
           mkdir -p release_bundle
-          cp target/${{ matrix.target }}/release/${{ matrix.executable }} release_bundle/
+          cp target/${{ matrix.target }}/release/${{ matrix.executable }} release_bundle/neuro-node
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            cp deploy/systemd/install-node-service.sh release_bundle/install-node-service.sh
+            cp deploy/systemd/uninstall-node-service.sh release_bundle/uninstall-node-service.sh
+            cp deploy/systemd/neuro-node.service release_bundle/neuro-node.service
+          else
+            cp deploy/launchd/install-node-service.sh release_bundle/install-node-service.sh
+            cp deploy/launchd/uninstall-node-service.sh release_bundle/uninstall-node-service.sh
+            cp deploy/launchd/com.neurostore.node.plist release_bundle/com.neurostore.node.plist
+          fi
+          chmod +x release_bundle/neuro-node release_bundle/install-node-service.sh release_bundle/uninstall-node-service.sh
+          sha256sum release_bundle/neuro-node > release_bundle/${{ matrix.artifact_name }}.sha256
           tar -czvf ${{ matrix.artifact_name }}.tar.gz -C release_bundle .
 
       - name: Package Bundle (Windows)
         if: matrix.os == 'windows-latest'
+        shell: pwsh
         run: |
-          mkdir release_bundle
-          cp target/${{ matrix.target }}/release/${{ matrix.executable }} release_bundle/
+          New-Item -ItemType Directory -Path release_bundle -Force | Out-Null
+          Copy-Item target/${{ matrix.target }}/release/${{ matrix.executable }} release_bundle/
+          $hash = (Get-FileHash -Path "target/${{ matrix.target }}/release/${{ matrix.executable }}" -Algorithm SHA256).Hash.ToLowerInvariant()
+          @"
+          $hash  ${{ matrix.executable }}
+          "@ | Set-Content -Path "release_bundle/${{ matrix.artifact_name }}.sha256"
           Compress-Archive -Path release_bundle/* -DestinationPath ${{ matrix.artifact_name }}.zip
 
       - name: Upload Binaries to Release

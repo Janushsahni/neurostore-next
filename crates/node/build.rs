@@ -1,4 +1,7 @@
 fn main() {
+    println!("cargo:rerun-if-env-changed=NEURO_NODE_BUILD_DIGEST");
+    println!("cargo:rerun-if-env-changed=NEURO_NODE_BUILD_SIGNATURE");
+
     #[cfg(windows)]
     {
         let mut res = winres::WindowsResource::new();

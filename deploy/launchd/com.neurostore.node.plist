@@ -7,13 +7,11 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/local/bin/neuro-node</string>
-        <string>--storage-path</string>
-        <string>/Library/Application Support/NeuroStore/data</string>
-        <string>--max-gb</string>
-        <string>50</string>
-        <string>--relay-url</string>
-        <string>wss://demo.neurostore.network/v1/nodes/ws</string>
+        <string>--setup-config-path</string>
+        <string>/Library/Application Support/NeuroStore/node-config.json</string>
     </array>
+    <key>WorkingDirectory</key>
+    <string>/Library/Application Support/NeuroStore</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>

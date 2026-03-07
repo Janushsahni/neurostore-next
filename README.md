@@ -56,6 +56,15 @@ Node registration requires shared-secret authentication:
 - Header: `x-node-secret: <NODE_SHARED_SECRET>`
 - Endpoint: `POST /api/nodes/register`
 
+## Zero-Knowledge API Uploads
+
+For true zero-knowledge object storage:
+- encrypt file bytes on the client before `PUT /:bucket/:key`
+- optionally attach sealed metadata in header `x-neuro-client-manifest`
+- or upload sealed metadata after the object write with `POST /api/client-manifest/:bucket/:key`
+
+The gateway stores client ciphertext as opaque bytes and does not retain a decryptable server-side file key for this flow.
+
 ## Key Paths
 
 - `deploy/docker-compose.yml` - main deploy stack

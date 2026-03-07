@@ -17,8 +17,8 @@ use rand::RngCore;
 use crate::AppState;
 use crate::models::{Claims, LoginRequest, RegisterRequest, UserProfile};
 
-const AUTH_COOKIE: &str = "neuro_auth";
-const CSRF_COOKIE: &str = "neuro_csrf";
+pub(crate) const AUTH_COOKIE: &str = "neuro_auth";
+pub(crate) const CSRF_COOKIE: &str = "neuro_csrf";
 
 pub(crate) fn get_cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
     let cookie_header = headers.get("cookie")?.to_str().ok()?;
@@ -33,7 +33,7 @@ pub(crate) fn get_cookie_value(headers: &HeaderMap, name: &str) -> Option<String
     None
 }
 
-fn build_cookie(name: &str, value: &str, max_age_secs: i64, secure: bool, http_only: bool) -> String {
+pub(crate) fn build_cookie(name: &str, value: &str, max_age_secs: i64, secure: bool, http_only: bool) -> String {
     let mut cookie = format!(
         "{}={}; Path=/; Max-Age={}; SameSite=Strict",
         name, value, max_age_secs
@@ -58,13 +58,13 @@ fn clear_cookie(name: &str, secure: bool, http_only: bool) -> String {
     cookie
 }
 
-fn generate_csrf_token() -> String {
+pub(crate) fn generate_csrf_token() -> String {
     let mut bytes = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut bytes);
     hex::encode(bytes)
 }
 
-fn create_jwt(email: &str, secret: &str) -> String {
+pub(crate) fn create_jwt(email: &str, secret: &str) -> String {
     let expiration = Utc::now()
         .checked_add_signed(Duration::days(1))
         .expect("valid timestamp")
@@ -259,7 +259,11 @@ pub async fn login(
     };
 
     let password = payload.password.clone();
-    let hash = user_row.password_hash.clone();
+    let Some(hash) = user_row.password_hash.clone() else {
+        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({
+            "error": "This account uses single sign-on. Continue with Google."
+        }))).into_response();
+    };
 
     let is_valid = match task::spawn_blocking(move || {
         match PasswordHash::new(&hash) {

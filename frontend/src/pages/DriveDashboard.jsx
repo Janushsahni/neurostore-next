@@ -11,7 +11,7 @@ export const DriveDashboard = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadState, setUploadState] = useState({ progress: 0, text: '' });
     const [storageUsed, setStorageUsed] = useState(0);
-    const [vaultPassword, setVaultPassword] = useState('');
+    const vaultPassword = getAuthToken() || "default-fallback-key";
     const [previewFile, setPreviewFile] = useState(null);
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
     const [searchQuery, setSearchQuery] = useState('');
@@ -145,7 +145,7 @@ export const DriveDashboard = () => {
         if (selectedFiles.length === 0) return;
 
         if (!vaultPassword) {
-            toast.error("Please enter a Vault Key in the Right Sidebar to encrypt your files.", { icon: '🔐' });
+            toast.error("Authentication required to encrypt files.", { icon: '🔐' });
             return;
         }
 
@@ -174,7 +174,7 @@ export const DriveDashboard = () => {
     const handleDownload = async (fileName, mode = 'download') => {
         try {
             if (!vaultPassword) {
-                toast.error("Please enter your Vault Key to decrypt this file.", { icon: '🔐' });
+                toast.error("Authentication required to decrypt this file.", { icon: '🔐' });
                 return;
             }
 
@@ -423,22 +423,6 @@ export const DriveDashboard = () => {
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6 flex items-center gap-2">
                     <ShieldCheck size={16} className="text-emerald-500" /> Security Console
                 </h3>
-
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 mb-8 shadow-inner shadow-slate-100/50">
-                    <div className="flex items-center gap-2 text-slate-800 font-bold text-sm mb-2">
-                        <Lock size={16} className="text-emerald-500" /> Vault Key
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium mb-4 leading-relaxed">
-                        Enter your private key to automatically encrypt uploads and decrypt downloads locally.
-                    </p>
-                    <input
-                        type="password"
-                        value={vaultPassword}
-                        onChange={(e) => setVaultPassword(e.target.value)}
-                        placeholder="Master Password..."
-                        className="w-full bg-white border border-slate-300 rounded-lg py-2.5 px-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-slate-800 transition-all font-mono placeholder-slate-400"
-                    />
-                </div>
 
                 <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
                     <Cpu size={16} className="text-emerald-500" /> AI Auto-Tagging

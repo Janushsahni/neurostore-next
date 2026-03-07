@@ -6,6 +6,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use sqlx::Row;
 use crate::AppState;
 
 // ── PII AUTO-DETECTION (Aadhaar, PAN, Phone, Email) ──
@@ -128,14 +129,26 @@ pub async fn scan_object_pii(
 
     // Fetch the object's text content (first 1MB only for performance)
     let key = key.trim_start_matches('/');
+    let object_key = crate::handlers::s3::object_key_locator(&state, &bucket, key);
     let row = sqlx::query("SELECT metadata_json FROM objects WHERE bucket = $1 AND key = $2")
         .bind(&bucket)
-        .bind(key)
+        .bind(&object_key)
         .fetch_optional(&state.db)
         .await;
 
     match row {
-        Ok(Some(_record)) => {
+        Ok(Some(record)) => {
+            let metadata: serde_json::Value = record
+                .try_get("metadata_json")
+                .unwrap_or_else(|_| serde_json::json!({}));
+            if metadata.get("zero_knowledge").and_then(|v| v.as_bool()).unwrap_or(false) {
+                return (
+                    StatusCode::PRECONDITION_FAILED,
+                    "PII scanning is unavailable for zero-knowledge objects without explicit client-side opt-in.",
+                )
+                    .into_response();
+            }
+
             // In a full implementation, we'd fetch the actual file content from the shard network.
             // For now, scan the metadata JSON and any cached content from edge cache.
             let cached = state.edge_cache.get(&format!("{}/{}", bucket, key)).await;
@@ -202,11 +215,12 @@ pub async fn list_versions(
     }
 
     let key = key.trim_start_matches('/');
+    let object_key = crate::handlers::s3::object_key_locator(&state, &bucket, key);
     let versions = sqlx::query_as::<_, (String, i64, String, String)>(
         "SELECT version_id, size, etag, created_at::text FROM object_versions WHERE bucket = $1 AND key = $2 ORDER BY created_at DESC"
     )
     .bind(&bucket)
-    .bind(key)
+    .bind(&object_key)
     .fetch_all(&state.db)
     .await
     .unwrap_or_default();
@@ -361,6 +375,11 @@ pub struct AiSearchRequest {
     pub query: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct HotObjectsQuery {
+    pub limit: Option<i64>,
+}
+
 /// POST /api/ai/search — Natural language file search (Stub)
 pub async fn ai_semantic_search(
     State(state): State<Arc<AppState>>,
@@ -394,5 +413,56 @@ pub async fn ai_semantic_search(
         "query": payload.query,
         "processing_time_ms": 142,
         "results": mocked_results
+    }))).into_response()
+}
+
+pub async fn hot_objects(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::extract::Query(query): axum::extract::Query<HotObjectsQuery>,
+) -> impl IntoResponse {
+    let user_email = match crate::handlers::s3::validate_s3_auth(&headers, &state) {
+        Ok(email) => email,
+        Err(err) => return err.into_response(),
+    };
+
+    let limit = query.limit.unwrap_or(20).clamp(1, 100);
+    let rows = sqlx::query_as::<_, (String, String, i64, f64, String)>(
+        r#"
+        SELECT oh.bucket, oh.object_key, oh.access_count, oh.rolling_heat, oh.last_accessed_at::text
+        FROM object_heat oh
+        JOIN buckets b ON b.name = oh.bucket
+        WHERE b.owner_email = $1
+        ORDER BY oh.rolling_heat DESC, oh.last_accessed_at DESC NULLS LAST
+        LIMIT $2
+        "#,
+    )
+    .bind(&user_email)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let objects: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|(bucket, encrypted_key, access_count, rolling_heat, last_accessed_at)| {
+            let display_key = state
+                .metadata_protector
+                .decrypt(&encrypted_key)
+                .unwrap_or(encrypted_key);
+            serde_json::json!({
+                "bucket": bucket,
+                "key": display_key,
+                "access_count": access_count,
+                "rolling_heat": rolling_heat,
+                "last_accessed_at": last_accessed_at,
+                "placement_hint": if rolling_heat >= 25.0 { "promote-edge-cache" } else if rolling_heat >= 8.0 { "regional-hot" } else { "standard" }
+            })
+        })
+        .collect();
+
+    (StatusCode::OK, Json(serde_json::json!({
+        "user": user_email,
+        "objects": objects,
     }))).into_response()
 }

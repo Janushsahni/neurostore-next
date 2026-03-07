@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct User {
     pub email: String,
-    pub password_hash: String,
+    pub password_hash: Option<String>,
     pub name: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
 }
@@ -20,6 +20,7 @@ pub struct Bucket {
 pub struct Object {
     pub bucket: String,
     pub key: String,
+    pub encrypted_key: Option<String>,
     pub etag: String,
     pub cid: String,
     pub shards: i32,

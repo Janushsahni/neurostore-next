@@ -122,16 +122,18 @@ pub async fn zk_store(
         ));
     }
 
-    let encrypted_key = match state.metadata_protector.encrypt(&key) {
+    let object_key = crate::handlers::s3::object_key_locator(&state, &bucket, &key);
+    let encrypted_key = match crate::handlers::s3::encrypt_object_key(&state, &key) {
         Ok(k) => k,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Key encryption failed").into_response(),
+        Err(err) => return err.into_response(),
     };
 
     let res = sqlx::query(
         r#"
-        INSERT INTO objects (bucket, key, etag, cid, shards, recovery_threshold, size, metadata_json)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO objects (bucket, key, encrypted_key, etag, cid, shards, recovery_threshold, size, metadata_json)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (bucket, key) DO UPDATE SET
+            encrypted_key = excluded.encrypted_key,
             etag = excluded.etag,
             cid = excluded.cid,
             size = excluded.size,
@@ -140,6 +142,7 @@ pub async fn zk_store(
         "#
     )
     .bind(&bucket)
+    .bind(&object_key)
     .bind(&encrypted_key)
     .bind(&etag)
     .bind(&cid)

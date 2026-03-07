@@ -1,6 +1,6 @@
 use axum::{
     extract::{Request, State},
-    http::{HeaderValue, Method},
+    http::{HeaderValue, Method, StatusCode},
     middleware::{from_fn, Next},
     response::{Response, IntoResponse},
     routing::{get, post},
@@ -174,6 +174,7 @@ async fn main() -> anyhow::Result<()> {
             axum::http::header::AUTHORIZATION,
             "x-csrf-token".parse().unwrap(),
             "x-neuro-proof-token".parse().unwrap(),
+            "x-neuro-client-manifest".parse().unwrap(),
         ])
         .expose_headers([
             axum::http::header::CONTENT_TYPE,
@@ -199,6 +200,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/auth/escrow", post(handlers::auth::setup_escrow))
         .route("/api/auth/sso/saml", post(handlers::auth::sso_saml_login))
         .route("/api/auth/sso/oauth", post(handlers::auth::sso_oauth_login))
+        .route("/api/auth/google/login", get(handlers::oauth::google_login))
+        .route("/api/auth/google/callback", get(handlers::oauth::google_callback))
+        .route("/api/admin/controls", get(handlers::admin::get_controls).post(handlers::admin::patch_controls))
         
         // S3-Compatible API (Path Style)
         .route("/:bucket", get(handlers::s3::list_objects))
@@ -210,6 +214,7 @@ async fn main() -> anyhow::Result<()> {
         
         // Internal Extensions
         .route("/api/manifest/:bucket/*key", get(handlers::s3::get_presigned_manifest))
+        .route("/api/client-manifest/:bucket/*key", post(handlers::s3::put_client_manifest))
         .route("/api/deduplicate/:bucket/*key", post(handlers::s3::deduplicate_object))
         .route("/api/reconstruct/:bucket/*key", post(handlers::s3::reconstruct_metadata))
         .route("/api/compliance/sovereignty/:bucket", get(handlers::compliance::sovereignty_audit))
@@ -230,10 +235,12 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/worm/configure", post(handlers::features::configure_worm))
         .route("/api/ai/auto-tag/:bucket/*key", post(handlers::features::auto_tag_object))
         .route("/api/ai/search", post(handlers::features::ai_semantic_search))
+        .route("/api/ai/hot-objects", get(handlers::features::hot_objects))
         .route("/api/billing/usage", get(handlers::features::get_usage_summary))
         .fallback_service(ServeDir::new("public"))
         .layer(cors)
         .layer(from_fn(security_headers))
+        .layer(from_fn(emergency_controls))
         .layer(from_fn(rate_limit))
         .with_state(shared_state);
 
@@ -247,7 +254,7 @@ async fn main() -> anyhow::Result<()> {
     info!("NeuroStore V3 Enterprise Gateway listening on {}", addr);
     
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
 
     Ok(())
 }
@@ -356,20 +363,31 @@ async fn rate_limit(
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Response {
-    let client_ip = request
-        .headers()
-        .get("x-forwarded-for")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.split(',').next())
-        .map(|s| s.trim().to_string())
-        .or_else(|| {
-            request
-                .headers()
-                .get("x-real-ip")
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string())
-        })
-        .unwrap_or_else(|| "127.0.0.1".to_string());
+    let trust_proxy_headers = std::env::var("TRUST_PROXY_HEADERS")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    let client_ip = if trust_proxy_headers {
+        request
+            .headers()
+            .get("x-forwarded-for")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.split(',').next())
+            .map(|s| s.trim().to_string())
+            .or_else(|| {
+                request
+                    .headers()
+                    .get("x-real-ip")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string())
+            })
+    } else {
+        request
+            .extensions()
+            .get::<axum::extract::ConnectInfo<SocketAddr>>()
+            .map(|connect| connect.0.ip().to_string())
+    }
+    .unwrap_or_else(|| "unknown-client".to_string());
 
     let count = RATE_LIMIT_CACHE.get(&client_ip).await.unwrap_or(0);
 
@@ -382,6 +400,75 @@ async fn rate_limit(
     }
 
     RATE_LIMIT_CACHE.insert(client_ip, count + 1).await;
+    next.run(request).await
+}
+
+async fn emergency_controls(
+    request: Request,
+    next: Next,
+) -> Response {
+    let method = request.method().clone();
+    let path = request.uri().path().to_string();
+
+    if path.starts_with("/readyz") || path.starts_with("/api/health") || path.starts_with("/api/admin/controls") {
+        return next.run(request).await;
+    }
+
+    let state = match request.extensions().get::<Arc<AppState>>() {
+        Some(state) => Arc::clone(state),
+        None => return next.run(request).await,
+    };
+
+    let controls = match crate::handlers::admin::load_controls(&state).await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("Failed to load emergency controls: {}", e);
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "control plane unavailable",
+            )
+                .into_response();
+        }
+    };
+
+    let is_write = matches!(method, Method::POST | Method::PUT | Method::DELETE | Method::PATCH);
+
+    let exempt_write_paths = [
+        "/auth/login",
+        "/api/login",
+        "/auth/register",
+        "/api/register",
+        "/auth/logout",
+        "/api/logout",
+        "/api/node/heartbeat",
+        "/zk/submit-proof",
+    ];
+    let exempt_write = exempt_write_paths.iter().any(|p| path == *p);
+
+    if controls.writes_locked && is_write && !exempt_write {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "writes temporarily disabled by emergency control",
+        )
+            .into_response();
+    }
+
+    if controls.node_admission_locked && path == "/api/nodes/register" {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "node admission temporarily disabled by emergency control",
+        )
+            .into_response();
+    }
+
+    if controls.payouts_locked && path.contains("/earnings") {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "payout APIs temporarily disabled by emergency control",
+        )
+            .into_response();
+    }
+
     next.run(request).await
 }
 

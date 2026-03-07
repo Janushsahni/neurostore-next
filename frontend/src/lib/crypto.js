@@ -6,15 +6,16 @@
 const PBKDF2_ITERATIONS = 100000;
 const SALT_SIZE = 16;
 const IV_SIZE = 12;
+const TEXT_ENCODER = new TextEncoder();
+const TEXT_DECODER = new TextDecoder();
 
 /**
  * Derives an AES-GCM key from a user password.
  */
 async function deriveKey(password, salt) {
-    const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
         "raw",
-        encoder.encode(password),
+        TEXT_ENCODER.encode(password),
         { name: "PBKDF2" },
         false,
         ["deriveBits", "deriveKey"]
@@ -32,6 +33,25 @@ async function deriveKey(password, salt) {
         true,
         ["encrypt", "decrypt"]
     );
+}
+
+function bytesToBase64Url(bytes) {
+    let binary = "";
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+    }
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlToBytes(value) {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+    const binary = atob(normalized + padding);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
 }
 
 /**
@@ -128,4 +148,28 @@ export async function decryptFile(encryptedBlob, password, originalMimeType = 'a
     }
 
     return new Blob(decryptedChunks, { type: originalMimeType });
+}
+
+export async function encryptClientManifest(manifest, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(SALT_SIZE));
+    const iv = crypto.getRandomValues(new Uint8Array(IV_SIZE));
+    const key = await deriveKey(password, salt);
+    const plaintext = TEXT_ENCODER.encode(JSON.stringify(manifest));
+    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
+
+    const packed = new Uint8Array(SALT_SIZE + IV_SIZE + ciphertext.byteLength);
+    packed.set(salt, 0);
+    packed.set(iv, SALT_SIZE);
+    packed.set(new Uint8Array(ciphertext), SALT_SIZE + IV_SIZE);
+    return bytesToBase64Url(packed);
+}
+
+export async function decryptClientManifest(encoded, password) {
+    const packed = base64UrlToBytes(encoded);
+    const salt = packed.slice(0, SALT_SIZE);
+    const iv = packed.slice(SALT_SIZE, SALT_SIZE + IV_SIZE);
+    const ciphertext = packed.slice(SALT_SIZE + IV_SIZE);
+    const key = await deriveKey(password, salt);
+    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+    return JSON.parse(TEXT_DECODER.decode(plaintext));
 }

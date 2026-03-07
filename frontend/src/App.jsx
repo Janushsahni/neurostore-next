@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 
-import { Login, Register } from "./pages/Auth";
+import { AuthCallback, Login, Register } from "./pages/Auth";
 import { DriveDashboard } from "./pages/DriveDashboard";
 import { NodeDashboard } from "./pages/NodeDashboard";
 import { FAQ } from "./pages/FAQ";
@@ -338,6 +338,7 @@ const AppContent = () => {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard/drive" replace /> : <Login onAuth={handleLogin} />} />
           <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard/drive" replace /> : <Register onAuth={handleLogin} />} />
+          <Route path="/auth/callback" element={<AuthCallback onAuth={handleLogin} />} />
           <Route path="/dashboard/drive" element={<ProtectedRoute isAuthenticated={isAuthenticated}><DriveDashboard /></ProtectedRoute>} />
           <Route path="/dashboard/compliance" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ComplianceDashboard /></ProtectedRoute>} />
           <Route path="/dashboard/node" element={<ProtectedRoute isAuthenticated={isAuthenticated}><NodeDashboard /></ProtectedRoute>} />

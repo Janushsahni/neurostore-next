@@ -2,9 +2,12 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
+use hmac::{Hmac, Mac};
 use sha2::{Sha256, Digest};
 use base64::{engine::general_purpose, Engine as _};
 use zeroize::Zeroize;
+
+type HmacSha256 = Hmac<Sha256>;
 
 /// AES-256-GCM metadata encryption layer.
 ///
@@ -16,6 +19,7 @@ use zeroize::Zeroize;
 /// to the ciphertext, ensuring no two encryptions produce the same output.
 pub struct MetadataProtector {
     cipher: Aes256Gcm,
+    index_key: [u8; 32],
 }
 
 impl MetadataProtector {
@@ -29,7 +33,10 @@ impl MetadataProtector {
         // SECURITY: Wipe the intermediate key from RAM immediately after use
         key.zeroize(); 
         
-        Self { cipher }
+        let mut index_key = [0u8; 32];
+        index_key.copy_from_slice(&key);
+
+        Self { cipher, index_key }
     }
 
     pub fn encrypt(&self, plain_text: &str) -> Result<String, String> {
@@ -73,5 +80,14 @@ impl MetadataProtector {
         combined.zeroize();
         
         result
+    }
+
+    pub fn blind_index(&self, namespace: &str, plain_text: &str) -> String {
+        let mut mac = <HmacSha256 as Mac>::new_from_slice(&self.index_key)
+            .expect("HMAC key length is valid");
+        mac.update(namespace.as_bytes());
+        mac.update(b":");
+        mac.update(plain_text.as_bytes());
+        hex::encode(mac.finalize().into_bytes())
     }
 }

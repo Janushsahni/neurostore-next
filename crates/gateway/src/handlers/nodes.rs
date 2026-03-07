@@ -8,7 +8,11 @@ use axum::{
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 use crate::AppState;
+
+type HmacSha256 = Hmac<Sha256>;
 
 #[derive(Deserialize)]
 pub struct NodeRegisterRequest {
@@ -17,6 +21,8 @@ pub struct NodeRegisterRequest {
     pub capacity_gb: i64,
     pub declared_location: String, // e.g. "IN-KA" (Karnataka, India)
     pub latency_ms: Option<f64>, // Provided by P2P ping metric or client header
+    pub build_digest: Option<String>,
+    pub build_signature: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -31,6 +37,10 @@ pub async fn register_provider_node(
     headers: HeaderMap,
     Json(payload): Json<NodeRegisterRequest>,
 ) -> impl IntoResponse {
+    if let Err(err) = verify_node_build(&payload.peer_id, payload.build_digest.as_deref(), payload.build_signature.as_deref()) {
+        return err.into_response();
+    }
+
     let provided_secret = headers
         .get("x-node-secret")
         .and_then(|v| v.to_str().ok())
@@ -55,6 +65,13 @@ pub async fn register_provider_node(
         return (StatusCode::BAD_REQUEST, "declared_location must use ISO-style format (e.g. IN-KA)").into_response();
     }
 
+    let controls = match crate::handlers::admin::load_controls(&state).await {
+        Ok(c) => c,
+        Err(_) => {
+            return (StatusCode::SERVICE_UNAVAILABLE, "control plane unavailable").into_response();
+        }
+    };
+
     // ── GEOFENCE & LATENCY TETHER VALIDATION ──
     let country_code = payload.declared_location.split('-').next().unwrap_or("XX");
     if let Some(rtt) = payload.latency_ms {
@@ -73,6 +90,7 @@ pub async fn register_provider_node(
         VALUES ($1, $2, $3, $4, FALSE)
         ON CONFLICT (peer_id) DO UPDATE SET
             storage_capacity_gb = excluded.storage_capacity_gb,
+            is_active = CASE WHEN $5 THEN FALSE ELSE nodes.is_active END,
             last_seen = CURRENT_TIMESTAMP
         "#
     )
@@ -80,6 +98,7 @@ pub async fn register_provider_node(
     .bind(&payload.wallet_address)
     .bind(payload.capacity_gb)
     .bind(&payload.declared_location)
+    .bind(controls.quarantine_new_nodes)
     .execute(&state.db)
     .await;
 
@@ -155,6 +174,8 @@ pub struct HeartbeatRequest {
     pub os: Option<String>,
     pub os_version: Option<String>,
     pub timestamp: Option<String>,
+    pub build_digest: Option<String>,
+    pub build_signature: Option<String>,
 }
 
 /// POST /api/node/heartbeat — Nodes send this every 45 seconds
@@ -162,6 +183,10 @@ pub async fn node_heartbeat(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<HeartbeatRequest>,
 ) -> impl IntoResponse {
+    if let Err(err) = verify_node_build(&payload.node_id, payload.build_digest.as_deref(), payload.build_signature.as_deref()) {
+        return err.into_response();
+    }
+
     if payload.node_id.is_empty() || payload.node_id.len() > 64 {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "invalid node_id" }))).into_response();
     }
@@ -211,11 +236,16 @@ pub async fn node_heartbeat(
         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "db error" }))).into_response();
     }
 
+    let payouts_locked = crate::handlers::admin::load_controls(&state)
+        .await
+        .map(|c| c.payouts_locked)
+        .unwrap_or(false);
+
     // Calculate earnings for this heartbeat interval (45 seconds)
     let heartbeat_interval_secs: f64 = 45.0;
     let earnings_inr = used_gb * INR_PER_GB_PER_SECOND * heartbeat_interval_secs;
 
-    if earnings_inr > 0.0 {
+    if earnings_inr > 0.0 && !payouts_locked {
         let _ = sqlx::query(
             "INSERT INTO node_earnings (node_id, amount_inr, reason) VALUES ($1, $2, 'uptime_reward')"
         )
@@ -244,10 +274,53 @@ pub async fn node_heartbeat(
 
     (StatusCode::OK, Json(serde_json::json!({
         "status": "ack",
-        "earned_this_heartbeat_inr": format!("{:.4}", earnings_inr),
+        "earned_this_heartbeat_inr": format!("{:.4}", if payouts_locked { 0.0 } else { earnings_inr }),
         "total_earned_inr": format!("{:.2}", total_earned),
         "pending_shards": serde_json::Value::Null,
+        "payouts_locked": payouts_locked,
     }))).into_response()
+}
+
+fn verify_node_build(
+    node_id: &str,
+    build_digest: Option<&str>,
+    build_signature: Option<&str>,
+) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+    let signing_secret = std::env::var("NODE_BINARY_SIGNING_SECRET").unwrap_or_default();
+    if signing_secret.is_empty() {
+        return Ok(());
+    }
+
+    let digest = build_digest.unwrap_or_default();
+    let signature = build_signature.unwrap_or_default();
+    if digest.is_empty() || signature.is_empty() {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({ "error": "signed node build required" })),
+        ));
+    }
+    if digest.len() != 64 || !digest.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "invalid build_digest" })),
+        ));
+    }
+
+    let mut mac = <HmacSha256 as Mac>::new_from_slice(signing_secret.as_bytes())
+        .expect("valid hmac key");
+    mac.update(node_id.as_bytes());
+    mac.update(b":");
+    mac.update(digest.as_bytes());
+    let expected = hex::encode(mac.finalize().into_bytes());
+
+    if bool::from(expected.as_bytes().ct_eq(signature.as_bytes())) {
+        Ok(())
+    } else {
+        Err((
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({ "error": "node build signature verification failed" })),
+        ))
+    }
 }
 
 /// GET /api/nodes/stats — Network-wide statistics (public)
