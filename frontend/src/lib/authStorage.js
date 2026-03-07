@@ -43,5 +43,6 @@ export function clearAuthSession() {
     sessionStorage.removeItem('neuro_user');
     sessionStorage.removeItem('neuro_csrf');
     sessionStorage.removeItem('neuro_token');
+    sessionStorage.removeItem('neuro_vault_key');
     localStorage.removeItem('neuro_token');
 }

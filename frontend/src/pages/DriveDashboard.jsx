@@ -11,7 +11,7 @@ export const DriveDashboard = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadState, setUploadState] = useState({ progress: 0, text: '' });
     const [storageUsed, setStorageUsed] = useState(0);
-    const vaultPassword = getAuthToken() || "default-fallback-key";
+    const vaultPassword = sessionStorage.getItem('neuro_vault_key') || getAuthToken() || "default-fallback-key";
     const [previewFile, setPreviewFile] = useState(null);
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
     const [searchQuery, setSearchQuery] = useState('');
