@@ -11,10 +11,12 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::ServeDir;
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 use tokio::sync::mpsc;
+use tokio::sync::RwLock;
 use crate::p2p::SwarmRequest;
 
 use moka::future::Cache;
@@ -29,6 +31,23 @@ pub mod repair;
 pub mod geofence;
 pub mod crypto;
 
+#[derive(Debug, Clone)]
+pub struct HeartbeatCacheEntry {
+    pub node_id: String,
+    pub status: String,
+    pub os: String,
+    pub version: String,
+    pub shard_count: i32,
+    pub used_gb: f64,
+    pub max_gb: f64,
+    pub free_gb: f64,
+    pub uptime_minutes: f64,
+    pub persisted_total_earned_inr: f64,
+    pub pending_earnings_inr: f64,
+    pub last_heartbeat_at: chrono::DateTime<chrono::Utc>,
+    pub dirty: bool,
+}
+
 pub struct AppState {
     pub db: sqlx::PgPool,
     pub p2p_tx: mpsc::Sender<SwarmRequest>,
@@ -42,6 +61,7 @@ pub struct AppState {
     pub node_shared_secret: String,
     pub cookie_secure: bool,
     pub environment: String,
+    pub heartbeat_buffer: RwLock<HashMap<String, HeartbeatCacheEntry>>,
 }
 
 #[tokio::main]
@@ -144,6 +164,7 @@ async fn main() -> anyhow::Result<()> {
         node_shared_secret,
         cookie_secure,
         environment,
+        heartbeat_buffer: RwLock::new(HashMap::new()),
     });
 
 
@@ -157,6 +178,11 @@ async fn main() -> anyhow::Result<()> {
     let repair_daemon = repair::RepairDaemon::new(Arc::clone(&shared_state));
     tokio::spawn(async move {
         repair_daemon.start().await;
+    });
+
+    let heartbeat_state = Arc::clone(&shared_state);
+    tokio::spawn(async move {
+        handlers::nodes::heartbeat_flush_daemon(heartbeat_state).await;
     });
 
     let allowed_origins = parse_allowed_origins();
@@ -198,6 +224,7 @@ async fn main() -> anyhow::Result<()> {
         
         // Enterprise Auth Routes
         .route("/api/auth/escrow", post(handlers::auth::setup_escrow))
+        .route("/api/auth/recovery-kit", get(handlers::auth::get_recovery_kit).post(handlers::auth::setup_escrow))
         .route("/api/auth/sso/saml", post(handlers::auth::sso_saml_login))
         .route("/api/auth/sso/oauth", post(handlers::auth::sso_oauth_login))
         .route("/api/auth/google/login", get(handlers::oauth::google_login))
@@ -214,9 +241,13 @@ async fn main() -> anyhow::Result<()> {
         
         // Internal Extensions
         .route("/api/manifest/:bucket/*key", get(handlers::s3::get_presigned_manifest))
+        .route("/api/downloads/plan/:bucket/*key", get(handlers::s3::plan_download))
+        .route("/api/uploads/plan/:bucket/*key", post(handlers::s3::plan_upload))
+        .route("/api/uploads/direct/commit/:bucket/*key", post(handlers::s3::commit_direct_upload))
         .route("/api/client-manifest/:bucket/*key", post(handlers::s3::put_client_manifest))
         .route("/api/deduplicate/:bucket/*key", post(handlers::s3::deduplicate_object))
         .route("/api/reconstruct/:bucket/*key", post(handlers::s3::reconstruct_metadata))
+        .route("/api/object/shards/:bucket/*key", get(handlers::s3::get_object_shards))
         .route("/api/compliance/sovereignty/:bucket", get(handlers::compliance::sovereignty_audit))
         .route("/api/nodes/register", post(handlers::nodes::register_provider_node))
         .route("/api/node/heartbeat", post(handlers::nodes::node_heartbeat))
@@ -474,7 +505,7 @@ async fn emergency_controls(
 
 fn parse_allowed_origins() -> Vec<HeaderValue> {
     let raw = std::env::var("ALLOWED_ORIGINS").unwrap_or_else(|_| {
-        "https://neurostore-next.vercel.app,https://neurostore-next-production.up.railway.app,http://localhost:5173".to_string()
+        "https://neurostore.vercel.app,https://neurostore-next.vercel.app,https://neurostore-backend-production.up.railway.app,http://localhost:5173".to_string()
     });
 
     let mut parsed = Vec::new();

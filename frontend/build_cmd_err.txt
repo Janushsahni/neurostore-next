@@ -1,0 +1,21 @@
+
+> frontend@0.0.0 build
+> vite build
+
+[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m✓[39m 4 modules transformed.
+[31m✗[39m Build failed in 94ms
+[31merror during build:
+[31m[@tailwindcss/vite:generate:build] `@utility btn-3d:hover` defines an invalid utility name. Utilities should be alphanumeric and start with a lowercase letter.[31m
+file: [36mS:/neurostore-next/neurostore-next/frontend/src/index.css[31m
+    at file:///S:/neurostore-next/neurostore-next/frontend/node_modules/tailwindcss/dist/chunk-O3SHLFNR.mjs:32:3856
+    at Ar (file:///S:/neurostore-next/neurostore-next/frontend/node_modules/tailwindcss/dist/chunk-O3SHLFNR.mjs:3:1733)
+    at I (file:///S:/neurostore-next/neurostore-next/frontend/node_modules/tailwindcss/dist/chunk-O3SHLFNR.mjs:3:1377)
+    at Gi (file:///S:/neurostore-next/neurostore-next/frontend/node_modules/tailwindcss/dist/chunk-O3SHLFNR.mjs:32:2712)
+    at async ao (file:///S:/neurostore-next/neurostore-next/frontend/node_modules/tailwindcss/dist/chunk-O3SHLFNR.mjs:38:631)
+    at async vf (file:///S:/neurostore-next/neurostore-next/frontend/node_modules/tailwindcss/dist/chunk-O3SHLFNR.mjs:38:1406)
+    at async uu (file:///S:/neurostore-next/neurostore-next/frontend/node_modules/@tailwindcss/node/dist/index.mjs:10:3458)
+    at async B.generate (file:///S:/neurostore-next/neurostore-next/frontend/node_modules/@tailwindcss/vite/dist/index.mjs:1:5049)
+    at async Object.handler (file:///S:/neurostore-next/neurostore-next/frontend/node_modules/@tailwindcss/vite/dist/index.mjs:1:3768)
+    at async transform (file:///S:/neurostore-next/neurostore-next/frontend/node_modules/rollup/dist/es/shared/node-entry.js:21269:16)[39m

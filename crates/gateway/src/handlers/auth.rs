@@ -13,6 +13,7 @@ use argon2::{
 use jsonwebtoken::{encode, Header, EncodingKey};
 use chrono::{Utc, Duration};
 use rand::RngCore;
+use sqlx::Row;
 
 use crate::AppState;
 use crate::models::{Claims, LoginRequest, RegisterRequest, UserProfile};
@@ -347,10 +348,12 @@ pub async fn logout(
 
 #[derive(serde::Deserialize)]
 pub struct EscrowRequest {
-    pub encrypted_shards: Vec<String>,
+    pub wrapped_vault_key: String,
+    pub wrapped_manifest_seed: Option<String>,
+    pub recovery_contacts: Option<Vec<String>>,
+    pub recovery_policy: Option<serde_json::Value>,
 }
 
-/// E1: Enterprise Key Escrow (Shamir's Secret Sharing stub)
 pub async fn setup_escrow(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -361,12 +364,108 @@ pub async fn setup_escrow(
         Err(e) => return e.into_response(),
     };
 
-    tracing::info!("Key Escrow enabled for {}. Shard count: {}", email, payload.encrypted_shards.len());
+    if payload.wrapped_vault_key.trim().is_empty() {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "wrapped_vault_key is required" }))).into_response();
+    }
+
+    let contacts = payload.recovery_contacts.unwrap_or_default();
+    let policy = payload.recovery_policy.unwrap_or_else(|| serde_json::json!({ "type": "recovery-kit" }));
+    let kit_id = format!("rk_{}", hex::encode(rand::random::<[u8; 8]>()));
+
+    let result = sqlx::query(
+        r#"
+        INSERT INTO recovery_kits (email, kit_id, wrapped_vault_key, wrapped_manifest_seed, recovery_contacts, recovery_policy, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        ON CONFLICT (email) DO UPDATE SET
+            kit_id = excluded.kit_id,
+            wrapped_vault_key = excluded.wrapped_vault_key,
+            wrapped_manifest_seed = excluded.wrapped_manifest_seed,
+            recovery_contacts = excluded.recovery_contacts,
+            recovery_policy = excluded.recovery_policy,
+            updated_at = NOW()
+        "#
+    )
+    .bind(&email)
+    .bind(&kit_id)
+    .bind(&payload.wrapped_vault_key)
+    .bind(&payload.wrapped_manifest_seed)
+    .bind(serde_json::json!(contacts))
+    .bind(policy)
+    .execute(&state.db)
+    .await;
+
+    if let Err(err) = result {
+        tracing::error!("Failed to persist recovery kit for {}: {}", email, err);
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "failed to store recovery kit" }))).into_response();
+    }
+
+    tracing::info!("Recovery kit enabled for {}", email);
     
     (StatusCode::OK, Json(serde_json::json!({
-        "status": "escrow_active",
-        "message": "Master key split and securely escrowed using Shamir's Secret Sharing."
+        "status": "recovery_kit_active",
+        "kit_id": kit_id,
+        "message": "Recovery kit stored. The server holds only client-wrapped recovery material, not the raw vault key."
     }))).into_response()
+}
+
+pub async fn get_recovery_kit(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let email = match crate::handlers::s3::validate_s3_auth(&headers, &state) {
+        Ok(e) => e,
+        Err(e) => return e.into_response(),
+    };
+
+    let row = sqlx::query(
+        r#"SELECT kit_id, wrapped_vault_key, wrapped_manifest_seed, recovery_contacts, recovery_policy, updated_at::text
+           FROM recovery_kits WHERE email = $1"#
+    )
+    .bind(&email)
+    .fetch_optional(&state.db)
+    .await;
+
+    match row {
+        Ok(Some(record)) => (StatusCode::OK, Json(serde_json::json!({
+            "kit_id": record.try_get::<String, _>("kit_id").unwrap_or_default(),
+            "wrapped_vault_key": record.try_get::<String, _>("wrapped_vault_key").unwrap_or_default(),
+            "wrapped_manifest_seed": record.try_get::<Option<String>, _>("wrapped_manifest_seed").unwrap_or(None),
+            "recovery_contacts": record.try_get::<serde_json::Value, _>("recovery_contacts").unwrap_or_else(|_| serde_json::json!([])),
+            "recovery_policy": record.try_get::<serde_json::Value, _>("recovery_policy").unwrap_or_else(|_| serde_json::json!({})),
+            "updated_at": record.try_get::<String, _>("updated_at").unwrap_or_default(),
+        }))).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "recovery kit not configured" }))).into_response(),
+        Err(err) => {
+            tracing::error!("Failed to load recovery kit for {}: {}", email, err);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "failed to load recovery kit" }))).into_response()
+        }
+    }
+}
+
+pub async fn get_recovery_kit_public(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(email): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    let normalized_email = normalize_email(&email);
+
+    let row = sqlx::query(
+        r#"SELECT wrapped_vault_key, wrapped_manifest_seed FROM recovery_kits WHERE email = $1"#
+    )
+    .bind(&normalized_email)
+    .fetch_optional(&state.db)
+    .await;
+
+    match row {
+        Ok(Some(record)) => (StatusCode::OK, Json(serde_json::json!({
+            "wrapped_vault_key": record.try_get::<String, _>("wrapped_vault_key").unwrap_or_default(),
+            "wrapped_manifest_seed": record.try_get::<Option<String>, _>("wrapped_manifest_seed").unwrap_or(None),
+        }))).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Recovery kit not configured for this email." }))).into_response(),
+        Err(err) => {
+            tracing::error!("Failed to load recovery kit for {}: {}", normalized_email, err);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Database error loading kit." }))).into_response()
+        }
+    }
 }
 
 /// E3: Enterprise SSO - SAML 2.0 (Okta / Entra ID) stub

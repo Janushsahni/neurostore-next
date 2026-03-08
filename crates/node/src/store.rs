@@ -1,24 +1,35 @@
-use sled::Db;
-use std::path::Path;
+use std::fs;
+use std::io::{Read, Write as IoWrite};
+use std::path::{Path, PathBuf};
 use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
     AeadCore, Aes256Gcm, Key, Nonce,
 };
 use sha2::Digest;
+use sled::Db;
 
 const USED_BYTES_KEY: &[u8] = b"__meta:used_bytes";
 const ENCRYPTION_KEY: &[u8] = b"__meta:node_encryption_key";
-const CHUNK_PREFIX: &str = "c:";
 
 pub struct SecureBlockStore {
-    db: Db,
+    db: Db, // Still used for metadata and tracking
+    storage_path: PathBuf,
+    shards_path: PathBuf,
     max_bytes: u64,
     cipher: Aes256Gcm,
 }
 
 impl SecureBlockStore {
-    pub fn new(storage_path: &str, max_gb: u64) -> Self {
-        let db = sled::open(Path::new(storage_path)).expect("Failed to open local block store");
+    pub fn new(storage_path_str: &str, max_gb: u64) -> Self {
+        let storage_path = PathBuf::from(storage_path_str);
+        let db_path = storage_path.join("db");
+        let shards_path = storage_path.join("shards");
+
+        // Ensure directories exist
+        fs::create_dir_all(&db_path).expect("Failed to create db directory");
+        fs::create_dir_all(&shards_path).expect("Failed to create shards directory");
+
+        let db = sled::open(&db_path).expect("Failed to open local metadata store");
         let max_bytes = max_gb
             .saturating_mul(1024)
             .saturating_mul(1024)
@@ -42,30 +53,39 @@ impl SecureBlockStore {
         };
 
         println!(
-            "Secure node initialized at {}. Allocated capacity: {} GB. Used: {} bytes. E2E Encryption Enabled.",
-            storage_path, max_gb, used_bytes
+            "Secure node initialized at {:?}. Shards: {:?}. Capacity: {} GB. Used: {} bytes. E2E Encryption Enabled.",
+            storage_path, shards_path, max_gb, used_bytes
         );
         Self {
             db,
+            storage_path,
+            shards_path,
             max_bytes,
             cipher,
         }
     }
 
-    pub fn save_chunk(&self, cid: &str, raw_data: &[u8]) -> Result<bool, sled::Error> {
-        let key = chunk_key(cid);
-        let existing_len = self.db.get(&key)?.map(|v| v.len() as u64).unwrap_or(0);
+    fn shard_path(&self, cid: &str) -> PathBuf {
+        // We use a safe filename for the CID to prevent directory traversal
+        let safe_cid = cid.replace(|c: char| !c.is_alphanumeric(), "_");
+        self.shards_path.join(format!("{}.neuro", safe_cid))
+    }
+
+    pub fn save_chunk(&self, cid: &str, raw_data: &[u8]) -> anyhow::Result<bool> {
+        let path = self.shard_path(cid);
+        
+        // Check if exists and get old size
+        let old_size = if path.exists() {
+            fs::metadata(&path)?.len()
+        } else {
+            0
+        };
 
         let used_bytes = read_used_bytes(&self.db).unwrap_or(0);
 
         // Node-level End-to-End Encryption
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits
         
-        // ── SELF-VERIFYING SHARD MERKLEIZATION (BIT-ROT PROTECTION) ──
-        // Over a 10-year lifespan, HDD platters and SSD gates experience bit-flips.
-        // We calculate a strict SHA-256 checksum of the RAW data before encryption.
-        // This ensures we can mathematically detect physical hardware corruption 
-        // later during retrieval.
         let mut hasher = sha2::Sha256::new();
         sha2::Digest::update(&mut hasher, raw_data);
         let checksum = hasher.finalize();
@@ -73,7 +93,7 @@ impl SecureBlockStore {
         let encrypted_data = match self.cipher.encrypt(&nonce, raw_data) {
             Ok(enc) => {
                 let mut payload = nonce.to_vec();
-                payload.extend_from_slice(&checksum); // Append the 32-byte checksum
+                payload.extend_from_slice(&checksum);
                 payload.extend_from_slice(&enc);
                 payload
             }
@@ -81,65 +101,67 @@ impl SecureBlockStore {
         };
 
         let projected = used_bytes
-            .saturating_sub(existing_len)
+            .saturating_sub(old_size)
             .saturating_add(encrypted_data.len() as u64);
 
         if projected > self.max_bytes {
             return Ok(false);
         }
 
-        self.db.insert(key, encrypted_data)?;
+        // PHYSICAL FILE CREATION: This is what the user wants to see
+        fs::write(&path, encrypted_data)?;
+        
         write_used_bytes(&self.db, projected)?;
+        self.db.flush()?;
 
         Ok(true)
     }
 
-    pub fn retrieve_chunk(&self, cid: &str) -> Result<Option<Vec<u8>>, sled::Error> {
-        let raw_lookup = if let Some(v) = self.db.get(chunk_key(cid))? {
-            Some(v)
-        } else {
-            self.db.get(cid)?
-        };
+    pub fn retrieve_chunk(&self, cid: &str) -> anyhow::Result<Option<Vec<u8>>> {
+        let path = self.shard_path(cid);
+        if !path.exists() {
+            return Ok(None);
+        }
 
-        if let Some(payload) = raw_lookup {
-            if payload.len() < 12 + 32 { // 12 bytes nonce + 32 bytes checksum
-                // Legacy unencrypted fallback (or corrupt data)
-                return Ok(Some(payload.to_vec())); 
-            }
-            let nonce = Nonce::from_slice(&payload[0..12]);
-            let stored_checksum = &payload[12..44];
-            let ciphertext = &payload[44..];
-            
-            match self.cipher.decrypt(nonce, ciphertext) {
-                Ok(decrypted) => {
-                    // Verify the checksum to detect Bit-Rot
-                    let mut hasher = sha2::Sha256::new();
-                    sha2::Digest::update(&mut hasher, &decrypted);
-                    let computed_checksum = hasher.finalize();
-                    
-                    if computed_checksum.as_slice() != stored_checksum {
-                        // Data is decrypted but physically corrupted on disk.
-                        // In a full implementation, we trigger the Repair Daemon here.
-                        eprintln!("CRITICAL ALERT: Silent Bit-Rot detected for shard CID {}", cid);
-                        return Ok(None); // Treat as missing so the gateway asks another node
-                    }
-                    
-                    Ok(Some(decrypted))
-                },
-                Err(_) => Ok(Some(payload.to_vec())), // Legacy fallback
-            }
-        } else {
-            Ok(None)
+        let mut file = fs::File::open(path)?;
+        let mut payload = Vec::new();
+        file.read_to_end(&mut payload)?;
+
+        if payload.len() < 12 + 32 { 
+            return Ok(Some(payload)); 
+        }
+
+        let nonce = Nonce::from_slice(&payload[0..12]);
+        let stored_checksum = &payload[12..44];
+        let ciphertext = &payload[44..];
+        
+        match self.cipher.decrypt(nonce, ciphertext) {
+            Ok(decrypted) => {
+                let mut hasher = sha2::Sha256::new();
+                sha2::Digest::update(&mut hasher, &decrypted);
+                let computed_checksum = hasher.finalize();
+                
+                if computed_checksum.as_slice() != stored_checksum {
+                    eprintln!("CRITICAL ALERT: Silent Bit-Rot detected for shard CID {}", cid);
+                    return Ok(None);
+                }
+                
+                Ok(Some(decrypted))
+            },
+            Err(_) => Ok(Some(payload)), 
         }
     }
 
-    pub fn delete_chunk(&self, cid: &str) -> Result<bool, sled::Error> {
-        let key = chunk_key(cid);
-        if let Some(v) = self.db.remove(&key)? {
+    pub fn delete_chunk(&self, cid: &str) -> anyhow::Result<bool> {
+        let path = self.shard_path(cid);
+        if path.exists() {
+            let size = fs::metadata(&path)?.len();
+            fs::remove_file(path)?;
+            
             let used_bytes = read_used_bytes(&self.db).unwrap_or(0);
-            let updated = used_bytes.saturating_sub(v.len() as u64);
+            let updated = used_bytes.saturating_sub(size);
             write_used_bytes(&self.db, updated)?;
-            // REMOVED: self.db.flush()? to resolve I/O bottleneck
+            self.db.flush()?;
             Ok(true)
         } else {
             Ok(false)
@@ -150,10 +172,6 @@ impl SecureBlockStore {
     pub fn get_used_bytes(&self) -> u64 {
         read_used_bytes(&self.db).unwrap_or(0)
     }
-}
-
-fn chunk_key(cid: &str) -> String {
-    format!("{CHUNK_PREFIX}{cid}")
 }
 
 fn read_used_bytes(db: &Db) -> Result<u64, sled::Error> {

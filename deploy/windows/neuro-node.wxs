@@ -18,6 +18,7 @@
         </Component>
 
         <Component Id="ServiceScripts" Guid="B2C3D4E5-F6A7-8901-BCDE-F12345678901">
+          <File Source="$(var.SourceDir)\install-node-gui.ps1" />
           <File Source="$(var.SourceDir)\install-service.ps1" />
           <File Source="$(var.SourceDir)\install-service.bat" />
           <File Source="$(var.SourceDir)\uninstall-service.ps1" />
@@ -41,9 +42,9 @@
         <Component Id="StartMenuShortcut" Guid="D4E5F6A7-B8C9-0123-DEF0-234567890123">
           <Shortcut Id="NodeShortcut"
                     Name="NeuroStore Node"
-                    Description="Start NeuroStore decentralized storage node"
-                    Target="[INSTALLFOLDER]neuro-node.exe"
-                    Arguments="--interactive-setup"
+                    Description="Launch NeuroStore node GUI setup"
+                    Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
+                    Arguments="-ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]install-node-gui.ps1&quot;"
                     WorkingDirectory="INSTALLFOLDER" />
           <Shortcut Id="NodeAddressShortcut"
                     Name="Show Node Address"

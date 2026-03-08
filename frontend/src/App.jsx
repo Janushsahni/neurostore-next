@@ -18,9 +18,12 @@ import { ComplianceDashboard } from "./pages/ComplianceDashboard";
 import { S3Migration } from "./pages/S3Migration";
 import { About } from "./pages/About";
 import { Contact } from "./pages/Contact";
+import { ObjectExplorer } from "./pages/ObjectExplorer";
 import { ProtocolSimulation } from "./components/ProtocolSimulation";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
+
+const WINDOWS_NODE_INSTALLER_URL = "/neuro-node-windows.exe";
 
 // ── Animated Counter ──
 const AnimCounter = ({ end, suffix = "", prefix = "" }) => {
@@ -81,6 +84,15 @@ const ProtectedRoute = ({ isAuthenticated, children }) => {
   return children;
 };
 
+const AuthRedirectRoute = ({ isAuthenticated, component: Component, onAuth }) => {
+  if (isAuthenticated) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('intent') === 'node') return <Navigate to="/dashboard/node" replace />;
+    return <Navigate to="/dashboard/drive" replace />;
+  }
+  return <Component onAuth={onAuth} />;
+};
+
 // ═══════ LANDING PAGE ═══════
 const LandingPage = () => (
   <div className="selection:bg-emerald-500/20 bg-slate-50 text-slate-800 min-h-screen relative overflow-hidden">
@@ -122,9 +134,14 @@ const LandingPage = () => (
               Turn your computer into a decentralized storage vault. Earn ₹ INR passively every month simply by keeping your device online and sharing empty hard drive space.
             </p>
 
-            <Link to="/login?intent=node" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold bg-emerald-50 hover:bg-emerald-500 text-emerald-700 hover:text-white transition-all shadow-sm group-hover:shadow-md relative z-10 border border-emerald-100/50">
-              Start Earning Now <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
-            </Link>
+            <div className="flex flex-col gap-3 mt-auto relative z-10 font-bold">
+              <Link to="/login?intent=node" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-md hover:shadow-lg">
+                Start Earning Now <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
+              </Link>
+              <a href={WINDOWS_NODE_INSTALLER_URL} className="w-full py-3.5 rounded-xl flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all">
+                Download Software
+              </a>
+            </div>
           </div>
 
           {/* Subscription Card */}
@@ -336,12 +353,13 @@ const AppContent = () => {
       <main>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard/drive" replace /> : <Login onAuth={handleLogin} />} />
-          <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard/drive" replace /> : <Register onAuth={handleLogin} />} />
+          <Route path="/login" element={<AuthRedirectRoute isAuthenticated={isAuthenticated} component={Login} onAuth={handleLogin} />} />
+          <Route path="/register" element={<AuthRedirectRoute isAuthenticated={isAuthenticated} component={Register} onAuth={handleLogin} />} />
           <Route path="/auth/callback" element={<AuthCallback onAuth={handleLogin} />} />
           <Route path="/dashboard/drive" element={<ProtectedRoute isAuthenticated={isAuthenticated}><DriveDashboard /></ProtectedRoute>} />
           <Route path="/dashboard/compliance" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ComplianceDashboard /></ProtectedRoute>} />
           <Route path="/dashboard/node" element={<ProtectedRoute isAuthenticated={isAuthenticated}><NodeDashboard /></ProtectedRoute>} />
+          <Route path="/explorer/:bucket/*" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute>} />
           <Route path="/s3-migration" element={<ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute>} />
           <Route path="/download" element={<Download />} />
           <Route path="/pricing" element={<Pricing />} />

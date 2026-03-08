@@ -1,0 +1,132 @@
+﻿
+> frontend@0.0.0 build
+> vite build
+
+[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mΓ£ô[39m 1760 modules transformed.
+node.exe : 
+[31mΓ£ù[39m Build 
+failed in 1.91s
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: ([31mΓ£ù[39m   
+  Build failed in 1    
+.91s:String) [], R    
+emoteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+[31merror during 
+build:
+[31msrc/pages/DriveDas
+hboard.jsx (10:9): 
+"signPayoutReceipt" is 
+not exported by 
+"src/lib/crypto.js", 
+imported by "src/pages/
+DriveDashboard.jsx".[3
+1m
+file: [36mS:/neurostor
+e-next/neurostore-next/
+frontend/src/pages/Driv
+eDashboard.jsx:10:9[31
+m
+[33m
+ 8: import { decryptDow
+nloadInWorker, 
+encryptUploadInWorker, 
+hashFileInWorker } 
+from '../lib/cryptoWork
+erClient';
+ 9: import { 
+RecoverySetupModal } 
+from '../components/Rec
+overySetupModal';
+10: import { 
+signPayoutReceipt } 
+from '../lib/crypto';
+             ^
+11: 
+12: export const 
+DriveDashboard = () => 
+{
+[31m
+    at getRollupError (
+file:///S:/neurostore-n
+ext/neurostore-next/fro
+ntend/node_modules/roll
+up/dist/es/shared/parse
+Ast.js:402:41)
+    at error (file:///S
+:/neurostore-next/neuro
+store-next/frontend/nod
+e_modules/rollup/dist/e
+s/shared/parseAst.js:39
+8:42)
+    at Module.error (fi
+le:///S:/neurostore-nex
+t/neurostore-next/front
+end/node_modules/rollup
+/dist/es/shared/node-en
+try.js:17040:16)
+    at 
+Module.traceVariable (f
+ile:///S:/neurostore-ne
+xt/neurostore-next/fron
+tend/node_modules/rollu
+p/dist/es/shared/node-e
+ntry.js:17452:29)
+    at ModuleScope.find
+Variable (file:///S:/ne
+urostore-next/neurostor
+e-next/frontend/node_mo
+dules/rollup/dist/es/sh
+ared/node-entry.js:1507
+0:39)
+    at ReturnValueScope
+.findVariable (file:///
+S:/neurostore-next/neur
+ostore-next/frontend/no
+de_modules/rollup/dist/
+es/shared/node-entry.js
+:5673:38)
+    at FunctionBodyScop
+e.findVariable (file://
+/S:/neurostore-next/neu
+rostore-next/frontend/n
+ode_modules/rollup/dist
+/es/shared/node-entry.j
+s:5673:38)
+    at ReturnValueScope
+.findVariable (file:///
+S:/neurostore-next/neur
+ostore-next/frontend/no
+de_modules/rollup/dist/
+es/shared/node-entry.js
+:5673:38)
+    at FunctionBodyScop
+e.findVariable (file://
+/S:/neurostore-next/neu
+rostore-next/frontend/n
+ode_modules/rollup/dist
+/es/shared/node-entry.j
+s:5673:38)
+    at BlockScope.findV
+ariable (file:///S:/neu
+rostore-next/neurostore
+-next/frontend/node_mod
+ules/rollup/dist/es/sha
+red/node-entry.js:5673:
+38)[39m

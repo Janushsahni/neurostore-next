@@ -63,9 +63,11 @@ jobs:
           Copy-Item "target\release\neuro-node.exe" "$bundleRoot\neuro-node.exe"
           Copy-Item "target\release\neuro-uploader.exe" "$bundleRoot\neuro-uploader.exe"
           Copy-Item "dist\node-build-info.json" "$bundleRoot\build-info.json"
+          Copy-Item "deploy\windows\install-node-gui.ps1" "$bundleRoot\install-node-gui.ps1"
           Copy-Item "deploy\windows\install-service.ps1" "$bundleRoot\install-service.ps1"
           Copy-Item "deploy\windows\uninstall-service.ps1" "$bundleRoot\uninstall-service.ps1"
           Copy-Item "deploy\windows\install-service.bat" "$bundleRoot\install-service.bat"
+          Copy-Item "deploy\windows\uninstall-service.bat" "$bundleRoot\uninstall-service.bat"
           Copy-Item "deploy\windows\show-node-address.ps1" "$bundleRoot\show-node-address.ps1"
           Copy-Item "deploy\windows\show-node-address.bat" "$bundleRoot\show-node-address.bat"
           Copy-Item "deploy\windows\upload-image.ps1" "$bundleRoot\upload-image.ps1"
@@ -101,12 +103,13 @@ jobs:
           Neuro Node Windows Bundle
           ========================
 
-          1) Run start-node.bat
-          2) Enter how much disk space in GB to allocate
-          3) Keep this window open to keep the node online
-          4) Run show-node-address.bat and share your multiaddr
+          Preferred setup (no terminal):
+          1) Run install-node-gui.ps1
+          2) Choose storage folder and GB allocation in GUI
+          3) Service installs and starts automatically
+          4) Node ID is shown and copied to clipboard
 
-          Install as Windows background service:
+          Legacy manual service setup:
           1) Right-click install-service.bat and Run as administrator
           2) Enter storage path and disk allocation in GB
           3) Service name: NeurostoreNode (auto-start enabled)

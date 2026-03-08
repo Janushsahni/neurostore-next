@@ -32,3 +32,5 @@ services/control-plane/.env
 *.zip
 peer_id.txt
 **/node_identity.key
+
+.vercel

@@ -1,6 +1,7 @@
 // #![windows_subsystem = "windows"]
 mod p2p;
 mod store;
+mod ingress;
 
 use anyhow::Context;
 use clap::Parser;
@@ -76,6 +77,10 @@ struct SetupConfig {
     gateway_url: Option<String>,
     #[serde(default)]
     node_secret: Option<String>,
+    #[serde(default = "default_ingress_port")]
+    ingress_port: u16,
+    #[serde(default)]
+    public_ingress_url: Option<String>,
     #[serde(default = "default_wallet_address")]
     wallet_address: String,
     #[serde(default = "default_declared_location")]
@@ -86,6 +91,10 @@ struct SetupConfig {
 
 fn default_gateway_url() -> Option<String> {
     Some(DEFAULT_GATEWAY_URL.to_string())
+}
+
+fn default_ingress_port() -> u16 {
+    9184
 }
 
 fn default_wallet_address() -> String {
@@ -117,6 +126,8 @@ struct RuntimeConfig {
     relay_url: Option<String>,
     gateway_url: Option<String>,
     node_secret: Option<String>,
+    ingress_port: u16,
+    public_ingress_url: Option<String>,
     wallet_address: String,
     declared_location: String,
     auto_register: bool,
@@ -182,6 +193,8 @@ fn build_runtime_config(args: &Args) -> anyhow::Result<RuntimeConfig> {
         relay_url: setup.relay_url,
         gateway_url: setup.gateway_url.or_else(|| Some(args.gateway_url.clone())),
         node_secret: normalize_optional_secret(setup.node_secret),
+        ingress_port: setup.ingress_port,
+        public_ingress_url: setup.public_ingress_url,
         wallet_address: normalize_wallet_address(&setup.wallet_address),
         declared_location: normalize_declared_location(&setup.declared_location),
         auto_register: setup.auto_register,
@@ -198,6 +211,14 @@ async fn run_node_with_shutdown(
     let keypair = load_or_create_identity(&runtime.storage_path)?;
     let peer_id = keypair.public().to_peer_id().to_string();
     let node_id = format!("NEURO-{}", &peer_id[..8].to_uppercase());
+
+    // Lock the storage folder to the Node ID
+    let mut final_storage_path = PathBuf::from(&runtime.storage_path);
+    if !final_storage_path.ends_with(&node_id) {
+        final_storage_path.push(&node_id);
+    }
+    fs::create_dir_all(&final_storage_path)?;
+
     let bootstrap_addrs = runtime
         .bootstrap
         .iter()
@@ -230,15 +251,39 @@ async fn run_node_with_shutdown(
     let heartbeat_store = store.clone();
     let heartbeat_max_gb = runtime.max_gb;
     let start_time = std::time::Instant::now();
+    let advertised_ingress_url = resolve_public_ingress_url(runtime);
+
+    let ingress_secret = std::env::var("NODE_INGRESS_SHARED_SECRET")
+        .or_else(|_| std::env::var("NODE_SHARED_SECRET"))
+        .unwrap_or_default();
+    let ingress_store = store.clone();
+    let ingress_peer_id = peer_id.clone();
+    let ingress_url_for_server = advertised_ingress_url.clone();
+    let ingress_port = runtime.ingress_port;
+    tokio::spawn(async move {
+        if ingress_secret.is_empty() {
+            tracing::warn!("NODE_INGRESS_SHARED_SECRET not set; direct node ingress disabled");
+            return;
+        }
+        if let Err(err) = ingress::serve_ingress(ingress_store, ingress_peer_id, ingress_secret, ingress_port).await {
+            tracing::error!("Node ingress server failed: {}", err);
+        }
+    });
 
     tokio::spawn(async move {
         let client = reqwest::Client::new();
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(45));
+        let mut sys = sysinfo::System::new_all();
         loop {
             interval.tick().await;
+            sys.refresh_all();
+            
             let used_bytes = heartbeat_store.get_used_bytes();
             let used_gb = used_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
             let uptime_min = start_time.elapsed().as_secs_f64() / 60.0;
+            
+            let cpu_usage = sys.global_cpu_info().cpu_usage();
+            let memory_used_percent = (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0;
 
             let heartbeat = serde_json::json!({
                 "node_id": heartbeat_node_id,
@@ -248,9 +293,14 @@ async fn run_node_with_shutdown(
                 "max_gb": heartbeat_max_gb,
                 "free_gb": (heartbeat_max_gb as f64) - used_gb,
                 "uptime_min": uptime_min,
+                "cpu_usage_percent": cpu_usage,
+                "memory_usage_percent": memory_used_percent,
                 "version": env!("CARGO_PKG_VERSION"),
                 "os": std::env::consts::OS,
                 "os_version": "",
+                "username": whoami::username(),
+                "hostname": whoami::hostname(),
+                "ingress_url": ingress_url_for_server,
                 "timestamp": chrono::Utc::now().to_rfc3339(),
                 "build_digest": build_digest(),
                 "build_signature": build_signature(),
@@ -322,10 +372,14 @@ fn resolve_setup_config(
         node_secret: std::env::var("NEUROSTORE_NODE_SHARED_SECRET")
             .ok()
             .or_else(|| std::env::var("NODE_SHARED_SECRET").ok()),
+        ingress_port: std::env::var("NEUROSTORE_INGRESS_PORT").ok().and_then(|v| v.parse().ok()).unwrap_or(default_ingress_port()),
+        public_ingress_url: std::env::var("NEUROSTORE_PUBLIC_INGRESS_URL").ok(),
         wallet_address: default_wallet_address(),
         declared_location: default_declared_location(),
         auto_register: true,
     };
+
+    let explicit_config = args.setup_config_path.is_some();
 
     if args.run_as_service {
         if let Some(saved) = load_setup_config(config_path)? {
@@ -339,10 +393,15 @@ fn resolve_setup_config(
         return run_interactive_setup(&defaults, config_path);
     }
 
-    if launched_without_flags {
+    if launched_without_flags || explicit_config {
         if let Some(saved) = load_setup_config(config_path)? {
+            let mut setup = saved;
+            // Always ensure the storage path is normalized
+            setup.storage_path = normalize_storage_path(&setup.storage_path);
             info!(path = %config_path.display(), "Loaded saved node setup");
-            return Ok(saved);
+            return Ok(setup);
+        } else if explicit_config {
+            anyhow::bail!("Explicitly requested setup config not found at {}", config_path.display());
         }
     }
 
@@ -377,6 +436,8 @@ fn run_interactive_setup(
         .clone()
         .unwrap_or_else(|| DEFAULT_GATEWAY_URL.to_string());
     let default_node_secret = baseline.node_secret.clone().unwrap_or_default();
+    let default_ingress_port = baseline.ingress_port.to_string();
+    let default_public_ingress_url = baseline.public_ingress_url.clone().unwrap_or_default();
 
     let storage_path_input = prompt_path_gui_fallback(
         "NeuroStore Storage Location",
@@ -409,6 +470,18 @@ fn run_interactive_setup(
         &default_node_secret,
     )?;
 
+    let ingress_port_input = prompt_gui_fallback(
+        "NeuroStore Direct Ingress Port",
+        "Enter the local port to expose direct shard upload/download on.",
+        &default_ingress_port,
+    )?;
+
+    let public_ingress_url_input = prompt_gui_fallback(
+        "NeuroStore Public Ingress URL",
+        "Enter the public base URL browsers should use to reach this node (leave blank for local testing only).",
+        &default_public_ingress_url,
+    )?;
+
     let wallet_address_input = prompt_gui_fallback(
         "NeuroStore Payout Wallet",
         "Enter the payout wallet address for this node.",
@@ -438,6 +511,12 @@ fn run_interactive_setup(
             baseline.node_secret.clone()
         } else {
             Some(node_secret_input)
+        }),
+        ingress_port: ingress_port_input.parse::<u16>().unwrap_or(baseline.ingress_port),
+        public_ingress_url: normalize_optional_secret(if public_ingress_url_input.is_empty() {
+            baseline.public_ingress_url.clone()
+        } else {
+            Some(public_ingress_url_input)
         }),
         wallet_address: normalize_wallet_address(&wallet_address_input),
         declared_location: normalize_declared_location(&declared_location_input),
@@ -672,6 +751,13 @@ fn normalize_optional_secret(value: Option<String>) -> Option<String> {
     })
 }
 
+fn resolve_public_ingress_url(runtime: &RuntimeConfig) -> Option<String> {
+    runtime
+        .public_ingress_url
+        .clone()
+        .or_else(|| Some(format!("http://127.0.0.1:{}", runtime.ingress_port)))
+}
+
 fn normalize_wallet_address(value: &str) -> String {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -750,6 +836,7 @@ async fn ensure_gateway_registration(runtime: &RuntimeConfig, peer_id: &str) {
         "capacity_gb": runtime.max_gb,
         "declared_location": runtime.declared_location,
         "latency_ms": serde_json::Value::Null,
+        "ingress_url": resolve_public_ingress_url(runtime),
         "build_digest": build_digest(),
         "build_signature": build_signature(),
     });

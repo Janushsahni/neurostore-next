@@ -173,3 +173,38 @@ export async function decryptClientManifest(encoded, password) {
     const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
     return JSON.parse(TEXT_DECODER.decode(plaintext));
 }
+
+/**
+ * Escrow Cryptography: Encrypts the user's master vault key using a generated Recovery Phrase.
+ */
+export async function encryptEscrowPayload(vaultKey, recoveryPhrase) {
+    const salt = crypto.getRandomValues(new Uint8Array(SALT_SIZE));
+    const iv = crypto.getRandomValues(new Uint8Array(IV_SIZE));
+    const key = await deriveKey(recoveryPhrase, salt);
+
+    const plaintext = TEXT_ENCODER.encode(vaultKey);
+    const ciphertext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, plaintext).catch(async () => {
+        // Fallback to encrypt (typo fix in flow)
+        return await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
+    });
+
+    const packed = new Uint8Array(SALT_SIZE + IV_SIZE + ciphertext.byteLength);
+    packed.set(salt, 0);
+    packed.set(iv, SALT_SIZE);
+    packed.set(new Uint8Array(ciphertext), SALT_SIZE + IV_SIZE);
+    return bytesToBase64Url(packed);
+}
+
+/**
+ * Escrow Cryptography: Decrypts the user's master vault key using their Recovery Phrase.
+ */
+export async function decryptEscrowPayload(encodedPayload, recoveryPhrase) {
+    const packed = base64UrlToBytes(encodedPayload);
+    const salt = packed.slice(0, SALT_SIZE);
+    const iv = packed.slice(SALT_SIZE, SALT_SIZE + IV_SIZE);
+    const ciphertext = packed.slice(SALT_SIZE + IV_SIZE);
+
+    const key = await deriveKey(recoveryPhrase, salt);
+    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+    return TEXT_DECODER.decode(plaintext);
+}

@@ -1,0 +1,49 @@
+﻿error[E0277]: the trait bound `DirectChunkCommit: serde::Serialize` is not satisfied
+    --> crates\gateway\src\handlers\s3.rs:1093:33
+     |
+1093 |               let manifest_blob = serd...
+     |  _________________________________^
+1094 | |                 "bucket": bkt,
+1095 | |                 "key": k,
+1096 | |                 "object_cid": backup...
+...    |
+1101 | |                 "chunk_mapping": bac...
+1102 | |             });
+     | |              ^
+     | |              |
+     | |______________unsatisfied trait bound
+     |                required by a bound introduced by this call
+     |
+help: the trait `Serialize` is not implemented for `DirectChunkCommit`
+    --> crates\gateway\src\handlers\s3.rs:188:1
+     |
+ 188 | pub struct DirectChunkCommit {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: for local types consider adding `#[derive(serde::Serialize)]` to your `DirectChunkCommit` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `Serialize`:
+               &'a T
+               &'a mut T
+               ()
+               (T,)
+               (T0, T1)
+               (T0, T1, T2)
+               (..., ..., ..., ...)
+               (..., ..., ..., ..., ...)
+             and 220 others
+     = note: required for `Vec<...>` to implement `Serialize`
+     = note: 1 redundant requirement hidden
+     = note: required for `&Vec<...>` to implement `Serialize`
+note: required by a bound in `to_value`
+    --> C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde_json-1.0.149\src\value\mod.rs:997:8
+     |
+ 995 | ...fn to_value<T>(...
+     |       -------- required by a bound in this function
+ 996 | ...e
+ 997 | ...T: Serialize,
+     |       ^^^^^^^^^ required by this bound in `to_value`
+     = note: the full name for the type has been written to 'S:\neurostore-next\neurostore-next\target\debug\deps\neurostore_gateway-24fb2a81dbbfae9f.long-type-18403098522779810258.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+     = note: this error originates in the macro `$crate::json_internal` which comes from the expansion of the macro `serde_json::json` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+

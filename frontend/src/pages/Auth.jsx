@@ -1,10 +1,12 @@
 ﻿import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { HardDrive, Mail, Lock, User, ArrowRight, AlertCircle, RefreshCw } from "lucide-react";
-
+import { HardDrive, Mail, Lock, User, ArrowRight, AlertCircle, RefreshCw, ShieldCheck } from "lucide-react";
 import { setAuthSession } from "../lib/authStorage";
 import { apiJson } from "../lib/apiClient";
 import { API_BASE } from "../lib/config";
+import { decryptEscrowPayload } from "../lib/crypto";
+
+const WINDOWS_NODE_INSTALLER_URL = "/neuro-node-windows.exe";
 
 const GoogleIcon = () => (
     <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
@@ -42,6 +44,10 @@ export const Login = ({ onAuth }) => {
     const [password, setPassword] = useState("");
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Recovery State
+    const [showRecovery, setShowRecovery] = useState(false);
+    const [recoveryPhrase, setRecoveryPhrase] = useState("");
 
     const getTargetPath = () => {
         if (intent === "node") return "/dashboard/node";
@@ -85,6 +91,58 @@ export const Login = ({ onAuth }) => {
                 ? "Request timed out. Try again."
                 : (err?.message || "Login failed");
             setError(safeMessage);
+            setPassword(""); // Clear invalid password to be safe
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleRecoverySubmit = async (e) => {
+        e.preventDefault();
+        setError(null);
+        setIsLoading(true);
+
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!normalizedEmail || !recoveryPhrase) {
+            setError("Email and Recovery Kit Phrase are required.");
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            // 1. Fetch encrypted payload from public endpoint
+            const res = await fetch(`${API_BASE}/api/auth/recovery-kit/${encodeURIComponent(normalizedEmail)}`);
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || "Recovery kit not found for this email. Contact support.");
+            }
+            const { wrapped_vault_key } = await res.json();
+
+            // 2. Mathematically decrypt the payload with the entered phrase client-side
+            let vaultKey;
+            try {
+                vaultKey = await decryptEscrowPayload(wrapped_vault_key, recoveryPhrase);
+            } catch (decErr) {
+                throw new Error("Invalid Recovery Phrase. Decryption failed.");
+            }
+
+            if (!vaultKey) throw new Error("Vault Key reconstruction failed.");
+
+            // 3. We successfully reconstructed their password. Issue a login natively!
+            const { response, data } = await apiJson("/auth/login", {
+                method: "POST",
+                body: { email: normalizedEmail, password: vaultKey },
+                timeoutMs: 12000,
+            });
+
+            if (!response.ok) throw new Error(data.error || "Auto-Login with recovered key failed.");
+
+            setAuthSession(data.user, data.csrf_token || "", data.token || "");
+            sessionStorage.setItem('neuro_vault_key', vaultKey);
+            onAuth(getTargetPath());
+
+        } catch (err) {
+            setError(err.message || "Recovery Failed.");
         } finally {
             setIsLoading(false);
         }
@@ -102,10 +160,19 @@ export const Login = ({ onAuth }) => {
             </Link>
 
             <div className="glass-card w-full max-w-[420px] p-8 md:p-10 relative overflow-hidden bg-white/90 shadow-xl border-slate-200 z-10 rounded-2xl">
-                <h2 className="text-2xl font-display font-extrabold text-center mb-2">Welcome Back</h2>
-                <p className="text-slate-500 font-medium text-center text-sm mb-8">
+                <p className="text-slate-500 font-medium text-center text-sm mb-4">
                     {intent === "node" ? "Sign in to manage your Storage Node." : "Sign in to your secure workspace."}
                 </p>
+
+                {intent === "node" && (
+                    <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-center">
+                        <p className="text-xs font-bold text-emerald-800 mb-2 uppercase tracking-tight">Need the node software?</p>
+                        <a href={WINDOWS_NODE_INSTALLER_URL} className="inline-flex items-center gap-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                            <span className="bg-emerald-500 text-white p-1 rounded-lg"><HardDrive size={14} /></span>
+                            Download Node Installer
+                        </a>
+                    </div>
+                )}
 
                 {error && (
                     <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl flex items-start gap-3">
@@ -157,6 +224,12 @@ export const Login = ({ onAuth }) => {
                         </div>
                     </div>
 
+                    <div className="flex justify-end mt-2">
+                        <button type="button" onClick={() => setShowRecovery(true)} className="text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                            Forgot password? Use Recovery Kit
+                        </button>
+                    </div>
+
                     <button
                         type="submit"
                         disabled={isLoading}
@@ -165,6 +238,57 @@ export const Login = ({ onAuth }) => {
                         {isLoading ? <RefreshCw className="animate-spin" size={18} /> : (<><span>Sign In</span><ArrowRight size={18} /></>)}
                     </button>
                 </form>
+
+                {/* Account Recovery Modal Overlay */}
+                {showRecovery && (
+                    <div className="absolute inset-0 z-20 bg-white/95 backdrop-blur-md p-8 md:p-10 flex flex-col justify-center animate-in fade-in zoom-in-95 duration-200">
+                        <button onClick={() => { setShowRecovery(false); setError(null); }} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700">
+                            ✕
+                        </button>
+                        <h3 className="text-xl font-display font-extrabold text-slate-800 mb-2">Account Recovery</h3>
+                        <p className="text-sm text-slate-500 font-medium mb-6">
+                            Enter the 48-character phrase generated when you setup your account to reconstruct your Vault Key.
+                        </p>
+
+                        {error && (
+                            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl flex items-start gap-3">
+                                <AlertCircle size={18} className="shrink-0 mt-0.5" /> <p leading-relaxed>{error}</p>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleRecoverySubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">Email Address</label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 transition-all shadow-inner"
+                                    placeholder="you@example.com"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">Recovery Phrase</label>
+                                <textarea
+                                    value={recoveryPhrase}
+                                    onChange={(e) => setRecoveryPhrase(e.target.value)}
+                                    rows={3}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-emerald-800 font-mono text-sm tracking-wide focus:outline-none focus:border-emerald-500 transition-all shadow-inner resize-none"
+                                    placeholder="48-character hex code..."
+                                    required
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full bg-slate-900 text-white hover:bg-slate-800 py-3.5 mt-2 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 font-bold text-base shadow-md transition-all"
+                            >
+                                {isLoading ? <RefreshCw className="animate-spin" size={18} /> : (<><span>Decrypt Vault</span><ShieldCheck size={18} /></>)}
+                            </button>
+                        </form>
+                    </div>
+                )}
 
                 <p className="text-center text-sm font-medium text-slate-500 mt-8">
                     Don&apos;t have an account? <Link to={`/register?intent=${intent}`} className="text-primary hover:text-emerald-600 font-bold hover:underline transition-colors">Sign up</Link>
@@ -255,10 +379,19 @@ export const Register = ({ onAuth }) => {
             </Link>
 
             <div className="glass-card w-full max-w-[420px] p-8 md:p-10 relative overflow-hidden bg-white/90 shadow-xl border-slate-200 z-10 rounded-2xl">
-                <h2 className="text-2xl font-display font-extrabold text-center mb-2 mt-2">Create Account</h2>
-                <p className="text-slate-500 font-medium text-center text-sm mb-8">
+                <p className="text-slate-500 font-medium text-center text-sm mb-4">
                     {intent === "node" ? "Start earning passive income." : "Get 5GB secure storage instantly."}
                 </p>
+
+                {intent === "node" && (
+                    <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-center">
+                        <p className="text-xs font-bold text-emerald-800 mb-2 uppercase tracking-tight">Need the node software?</p>
+                        <a href={WINDOWS_NODE_INSTALLER_URL} className="inline-flex items-center gap-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                            <span className="bg-emerald-500 text-white p-1 rounded-lg"><HardDrive size={14} /></span>
+                            Download Node Installer
+                        </a>
+                    </div>
+                )}
 
                 {error && (
                     <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl flex items-start gap-3">

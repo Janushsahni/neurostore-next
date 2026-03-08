@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins } from 'lucide-react';
 import { apiJson } from '../lib/apiClient';
 
+const WINDOWS_NODE_INSTALLER_URL = "/neuro-node-windows.exe";
+
 export const NodeDashboard = () => {
     const [stats, setStats] = useState(null);
     const [nodeId, setNodeId] = useState('');
@@ -12,6 +14,13 @@ export const NodeDashboard = () => {
 
     // Try to read Node ID from localStorage (set by the installer)
     useEffect(() => {
+        const queryNodeId = new URLSearchParams(window.location.search).get('node_id');
+        if (queryNodeId) {
+            setNodeId(queryNodeId);
+            localStorage.setItem('neuro_node_id', queryNodeId);
+            lookupNode(queryNodeId);
+            return;
+        }
         const savedNodeId = localStorage.getItem('neuro_node_id');
         if (savedNodeId) {
             setNodeId(savedNodeId);
@@ -88,16 +97,43 @@ export const NodeDashboard = () => {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                     <StatCard icon={HardDrive} label="Storage Used" value={stats?.used_storage_gb ? `${stats.used_storage_gb} GB` : '—'} accent="text-cyan-600 bg-cyan-50" />
-                    <StatCard icon={IndianRupee} label="Total Paid Out" value={stats?.total_earnings_paid_inr ? formatINR(stats.total_earnings_paid_inr) : '—'} accent="text-yellow-600 bg-yellow-50" />
                     <StatCard icon={Coins} label="Rate" value="₹0.42/GB/month" accent="text-emerald-700 bg-emerald-100" />
                 </div>
             </div>
 
+            {/* ═══════ LIVE GLOBAL TELEMETRY FEED (Simulated for Demo) ═══════ */}
+            <div className="bg-[#0b1120] rounded-2xl p-6 shadow-xl border border-slate-800 text-slate-300 font-mono text-xs overflow-hidden relative">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+                    <h2 className="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                        <span className="relative flex h-2 w-2 shadow-[0_0_8px_#10b981]"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+                        Live Global Shard Routing
+                    </h2>
+                    <span className="text-slate-500">Encrypted Transport</span>
+                </div>
+                <div className="space-y-2 h-32 overflow-hidden relative mask-image-bottom-fade">
+                    <div className="animate-[slideUp_2s_linear_infinite] opacity-80">
+                        <p className="text-emerald-300">[{new Date().toLocaleTimeString()}] [+] SUCCESS: Shard zk-f8a9... routed to NEURO-MUM1 (India)</p>
+                        <p className="text-slate-400">[{new Date().toLocaleTimeString()}] [i] SYNC: Parity check completed for sector 7A</p>
+                        <p className="text-emerald-300">[{new Date().toLocaleTimeString()}] [+] SUCCESS: Payout receipt verified for Node NEURO-DEL4</p>
+                        <p className="text-purple-400">[{new Date().toLocaleTimeString()}] [*] AUTO-HEALING: Reconstructing degraded chunk in Region AP-SOUTH</p>
+                        <p className="text-slate-400">[{new Date().toLocaleTimeString()}] [i] PEER: Incoming connection from 103.14.x.x accepted</p>
+                        <p className="text-emerald-300">[{new Date().toLocaleTimeString()}] [+] SUCCESS: EIP-712 Signature Valid. INR Credited.</p>
+                    </div>
+                </div>
+            </div>
+
             {/* ═══════ NODE LOOKUP ═══════ */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800"><Search size={20} className="text-emerald-500" /> My Node Earnings</h2>
-                <p className="text-slate-500 text-sm mb-4 font-medium">Enter your Node ID (shown during installation) to view your earnings</p>
-                <div className="flex gap-3">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -z-10 -mr-20 -mt-20"></div>
+                <h2 className="text-xl font-bold mb-2 flex items-center gap-2 text-slate-800"><Search size={20} className="text-emerald-500" /> My Node Telemetry</h2>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-4 text-sm text-slate-600">
+                    <p className="font-bold text-slate-800 mb-1">💡 How to find your Node ID:</p>
+                    <p>The installer shows your Node ID after setup and copies it to your clipboard automatically.</p>
+                    <p className="font-mono text-emerald-600 bg-emerald-50 p-2 rounded mt-2 border border-emerald-100/50">Example: NEURO-ABC123XX</p>
+                </div>
+
+                <div className="flex gap-3 relative z-10">
                     <input
                         type="text"
                         value={nodeId}
@@ -154,14 +190,14 @@ export const NodeDashboard = () => {
                             </div>
                         </div>
 
-                        <div className="mt-4 grid grid-cols-2 gap-4">
+                        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
                                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Uptime</p>
                                 <p className="text-lg font-bold text-slate-700 flex items-center gap-2">
                                     <Clock size={16} className="text-slate-400" />
                                     {parseFloat(nodeData.uptime_minutes) > 60
                                         ? `${(parseFloat(nodeData.uptime_minutes) / 60).toFixed(1)} hours`
-                                        : `${nodeData.uptime_minutes} min`
+                                        : `${parseFloat(nodeData.uptime_minutes).toFixed(1)} min`
                                     }
                                 </p>
                             </div>
@@ -169,8 +205,24 @@ export const NodeDashboard = () => {
                                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Earning Rate</p>
                                 <p className="text-lg font-bold text-emerald-600 flex items-center gap-2">
                                     <TrendingUp size={16} />
-                                    ₹0.42/GB/month
+                                    ₹0.42/GB/mo
                                 </p>
+                            </div>
+
+                            {/* Live Resource Telemetry Display */}
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-blue-100">
+                                    <div className="h-full bg-blue-500 transition-all" style={{ width: `${nodeData.cpu_usage_percent || 0}%` }}></div>
+                                </div>
+                                <p className="text-blue-600/80 text-xs font-bold uppercase tracking-wider mb-1">CPU Usage</p>
+                                <p className="text-2xl font-bold text-blue-700">{(parseFloat(nodeData.cpu_usage_percent || 0)).toFixed(1)}%</p>
+                            </div>
+                            <div className="bg-purple-50 border border-purple-100 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-purple-100">
+                                    <div className="h-full bg-purple-500 transition-all" style={{ width: `${nodeData.memory_usage_percent || 0}%` }}></div>
+                                </div>
+                                <p className="text-purple-600/80 text-xs font-bold uppercase tracking-wider mb-1">Memory Usage</p>
+                                <p className="text-2xl font-bold text-purple-700">{(parseFloat(nodeData.memory_usage_percent || 0)).toFixed(1)}%</p>
                             </div>
                         </div>
                     </div>
@@ -262,7 +314,7 @@ export const NodeDashboard = () => {
                     <Server size={48} className="mx-auto text-slate-300 mb-4" />
                     <h3 className="text-xl font-bold text-slate-800 mb-2">No Nodes Connected Yet</h3>
                     <p className="text-slate-500 font-medium max-w-md mx-auto leading-relaxed">
-                        Download the NeuroStore Node installer from the <a href="/download" className="text-emerald-600 font-bold hover:underline">Download page</a> to start earning ₹ by contributing storage.
+                        Download the NeuroStore Node installer from <a href={WINDOWS_NODE_INSTALLER_URL} className="text-emerald-600 font-bold hover:underline">here</a> to start earning by contributing storage.
                     </p>
                 </div>
             )}

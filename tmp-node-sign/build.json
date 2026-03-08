@@ -1,0 +1,19 @@
+﻿{
+    "package":  "neuro-node",
+    "artifact":  "neuro-node-windows-x86_64",
+    "version":  "0.1.0",
+    "target":  "x86_64-pc-windows-msvc",
+    "profile":  "release",
+    "git_sha":  "abc123def456",
+    "build_digest":  "db62c14d2a1ed91e5cac27c433bf59e610c4f1532495b52fd12ff32fcc0b08ff",
+    "build_signature":  "f186142495df4201ca6daeb306e87b323189a24682ab1908268045aef3318635",
+    "issued_at":  "2026-03-07T22:03:02.1146727Z",
+    "payload":  {
+                    "package":  "neuro-node",
+                    "version":  "0.1.0",
+                    "target":  "x86_64-pc-windows-msvc",
+                    "profile":  "release",
+                    "git_sha":  "abc123def456",
+                    "artifact":  "neuro-node-windows-x86_64"
+                }
+}

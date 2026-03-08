@@ -1,0 +1,107 @@
+﻿node.exe : Retrieving 
+projectΓÇª
+At C:\Users\Janyshh\App
+Data\Roaming\npm\vercel
+.ps1:24 char:5
++     & "node$exe"  "$b
+asedir/node_modules/ver
+cel/dist/vc.js" $args
++     ~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : 
+NotSpecified    : 
+(Retrieving proje    
+ctΓÇª:String) [], R    
+emoteException
+    + 
+FullyQualifiedErr    
+orId : NativeComman    
+dError
+ 
+Deploying 23bcs10804-91
+77s-projects/frontend
+Uploading 
+[--------------------] 
+(0.0B/54.4KB)
+Uploading 
+[======--------------] 
+(18.1KB/54.4KB)
+Uploading 
+[============--------] 
+(34.1KB/54.4KB)
+Uploading 
+[==================--] 
+(49.3KB/54.4KB)
+Uploading 
+[====================] 
+(54.4KB/54.4KB)
+Inspect: https://vercel
+.com/23bcs10804-9177s-p
+rojects/frontend/B4pdWA
+aWjZVrGEEQyYnwUrZpgGXq 
+[4s]
+Production: https://fro
+ntend-aymzo6233-23bcs10
+804-9177s-projects.verc
+el.app [4s]
+Building...
+Building...
+Building: Running 
+build in Washington, 
+D.C., USA (East) ΓÇô 
+iad1
+Building: Build 
+machine configuration: 
+2 cores, 8 GB
+Building: Retrieving 
+list of deployment 
+files...
+Building: Downloading 
+52 deployment files...
+Building: Restored 
+build cache from 
+previous deployment (Hu
+7YuQvWaprYXC7GU4d4DHbM8
+HN9)
+Building: Running 
+"vercel build"
+Building: Vercel CLI 
+50.28.0
+Building: Running 
+"install" command: 
+`npm install`...
+Building: up to date, 
+audited 189 packages 
+in 1s
+Building: 40 packages 
+are looking for funding
+Building: run `npm 
+fund` for details
+Building: 2 
+vulnerabilities (1 
+moderate, 1 high)
+Building: To address 
+all issues, run:
+Building: npm audit fix
+Building: Run `npm 
+audit` for details.
+Building: > 
+frontend@0.0.0 build
+Building: > vite build
+Building: vite v7.3.1 
+building client 
+environment for 
+production...
+Building: 
+transforming...
+[2K[1A[2K[GProducti
+on: https://frontend-ay
+mzo6233-23bcs10804-9177
+s-projects.vercel.app 
+[16s]
+Completing...
+Aliased: https://neuros
+tore.vercel.app [17s]
+https://frontend-aymzo6233-23bcs10804-9177s-projects.vercel.app

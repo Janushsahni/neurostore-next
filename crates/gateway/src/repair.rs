@@ -11,7 +11,9 @@ use crate::AppState;
 struct DegradedObject {
     bucket: String,
     key: String,
+    cid: String,
     shards: i32,
+    recovery_threshold: i32,
 }
 
 pub struct RepairDaemon {
@@ -45,7 +47,7 @@ impl RepairDaemon {
         
         let recent_objects = sqlx::query_as::<_, DegradedObject>(
             r#"
-            SELECT bucket, key, shards
+            SELECT bucket, key, cid, shards, recovery_threshold
             FROM objects 
             ORDER BY created_at DESC
             LIMIT 100
@@ -83,7 +85,7 @@ impl RepairDaemon {
         
         let hot_objects_res = sqlx::query_as::<_, DegradedObject>(
             r#"
-            SELECT bucket, key, shards
+            SELECT bucket, key, cid, shards, recovery_threshold
             FROM objects 
             WHERE metadata_json->>'heat_score' > '1000' 
               AND shards < 100
@@ -166,9 +168,9 @@ impl RepairDaemon {
         
         let degraded_objects_res = sqlx::query_as::<_, DegradedObject>(
             r#"
-            SELECT bucket, key, shards
-            FROM objects 
-            WHERE shards < 20 AND shards >= recovery_threshold
+            SELECT o.bucket, o.key, o.cid, o.shards, o.recovery_threshold
+            FROM objects o
+            WHERE o.shards < 20 AND o.shards >= o.recovery_threshold
             "#
         )
         .fetch_all(&self.state.db)
@@ -184,25 +186,151 @@ impl RepairDaemon {
 
                 for obj in objects {
                     let missing = 20 - obj.shards;
-                    warn!(
-                        "DEGRADED: Object {}/{} has {}/{} shards ({} missing). Manual intervention or P2P repair pipeline needed.",
-                        obj.bucket, obj.key, obj.shards, 20, missing
-                    );
-
-                    // Mark the object as degraded in metadata for dashboard visibility
-                    let _ = sqlx::query(
-                        "UPDATE objects SET metadata_json = jsonb_set(COALESCE(metadata_json, '{}'::jsonb), '{repair_status}', $1::jsonb) WHERE bucket = $2 AND key = $3"
+                    
+                    // 1. Identify surviving shards in the Swarm
+                    let healthy_shards_res = sqlx::query(
+                        r#"
+                        SELECT os.chunk_cid, os.chunk_index, os.peer_id
+                        FROM object_shards os
+                        LEFT JOIN node_registry nr ON nr.node_id = os.peer_id
+                        WHERE os.object_cid = $1
+                          AND (nr.last_heartbeat_at IS NULL OR nr.last_heartbeat_at > NOW() - INTERVAL '10 minutes')
+                        "#
                     )
-                    .bind(serde_json::json!({
-                        "status": "degraded",
-                        "healthy_shards": obj.shards,
-                        "target_shards": 20,
-                        "detected_at": chrono::Utc::now().to_rfc3339()
-                    }).to_string())
-                    .bind(&obj.bucket)
-                    .bind(&obj.key)
-                    .execute(&self.state.db)
+                    .bind(&obj.cid)
+                    .fetch_all(&self.state.db)
                     .await;
+                    
+                    if let Ok(healthy_shards) = healthy_shards_res {
+                        let healthy_count = healthy_shards.len();
+                        
+                        if healthy_count < obj.recovery_threshold as usize {
+                            error!("FATAL: Object {}/{} has fallen below Recovery Threshold ({} < {}). Data is irrecoverably lost.", 
+                                obj.bucket, obj.key, healthy_count, obj.recovery_threshold);
+                            continue;
+                        }
+
+                        info!("Initiating Self-Healing for {}/{} ({} missing parity). Reconstructing from {} surviving chunks...", 
+                            obj.bucket, obj.key, missing, healthy_count);
+
+                        // 2. Fetch surviving shards from P2P Swarm
+                        let mut retrieved_blocks: std::collections::HashMap<usize, Vec<u8>> = std::collections::HashMap::new();
+                        
+                        for row in &healthy_shards {
+                            let chunk_cid: String = row.get("chunk_cid");
+                            let chunk_index: i32 = row.get("chunk_index");
+                            let preferred_peer: Option<String> = row.try_get("peer_id").ok();
+
+                            let (tx, rx) = tokio::sync::oneshot::channel();
+                            let _ = self.state.p2p_tx.send(crate::p2p::SwarmRequest::Retrieve {
+                                cid: chunk_cid.clone(),
+                                preferred_peer_id: preferred_peer,
+                                tx,
+                            }).await;
+
+                            if let Ok(ack) = tokio::time::timeout(tokio::time::Duration::from_secs(10), rx).await {
+                                if let Ok(ack_data) = ack {
+                                    if let Some(data) = ack_data.data {
+                                        retrieved_blocks.insert(chunk_index as usize, data);
+                                    }
+                                }
+                            }
+                            
+                            if retrieved_blocks.len() >= obj.recovery_threshold as usize {
+                                break;
+                            }
+                        }
+
+                        if retrieved_blocks.len() < obj.recovery_threshold as usize {
+                            error!("Repair aborted for {}/{}: Swarm retrieval failed (timed out or nodes rejected transfer).", obj.bucket, obj.key);
+                            continue;
+                        }
+
+                        // 3. Reed-Solomon Erasure Decoding
+                        let data_shards = obj.recovery_threshold as usize;
+                        let parity_shards = 20 - data_shards;
+                        
+                        let encoder = match crate::erasure::ErasureEncoder::new(data_shards, parity_shards) {
+                            Ok(e) => e,
+                            Err(e) => { error!("RS Init failed: {:?}", e); continue; }
+                        };
+
+                        let mut rs_matrix: Vec<Option<Vec<u8>>> = vec![None; 20];
+                        for (idx, data) in retrieved_blocks.into_iter() {
+                            if idx < 20 {
+                                rs_matrix[idx] = Some(data);
+                            }
+                        }
+
+                        let decoded_original_data = match encoder.decode(rs_matrix.clone()) {
+                            Ok(data) => data,
+                            Err(e) => { error!("RS Decode failed for {}/{}: {:?}", obj.bucket, obj.key, e); continue; }
+                        };
+
+                        // 4. Reed-Solomon Re-encoding
+                        let fresh_shards = match encoder.encode(&decoded_original_data) {
+                            Ok(s) => s,
+                            Err(e) => { error!("RS Re-encode failed: {:?}", e); continue; }
+                        };
+
+                        // 5. Inject missing shards back into the swarm
+                        let mut successfully_repaired = 0;
+                        
+                        for i in 0..20 {
+                            if rs_matrix[i].is_none() {
+                                let fresh_data = &fresh_shards[i];
+                                
+                                let mut hasher = sha2::Sha256::new();
+                                sha2::Digest::update(&mut hasher, fresh_data);
+                                let new_cid = format!("chunk-{}", hex::encode(hasher.finalize()));
+
+                                let (tx, rx) = tokio::sync::oneshot::channel();
+                                let cmd = neuro_protocol::ChunkCommand::Store(neuro_protocol::StoreChunkRequest {
+                                    cid: new_cid.clone(),
+                                    data: fresh_data.clone(),
+                                });
+
+                                let _ = self.state.p2p_tx.send(crate::p2p::SwarmRequest::Store {
+                                    command: cmd,
+                                    geofence: "IN".to_string(),
+                                    tx,
+                                }).await;
+
+                                if let Ok(ack) = tokio::time::timeout(tokio::time::Duration::from_secs(15), rx).await {
+                                    if let Ok(ack_data) = ack {
+                                        if ack_data.stored {
+                                            // 6. DB Update only on physical storage success
+                                            let _ = sqlx::query(
+                                                r#"
+                                                INSERT INTO object_shards (object_cid, chunk_index, chunk_cid, peer_id, size_bytes)
+                                                VALUES ($1, $2, $3, $4, $5)
+                                                "#
+                                            )
+                                            .bind(&obj.cid)
+                                            .bind(i as i32)
+                                            .bind(&new_cid)
+                                            .bind(&ack_data.peer_id)
+                                            .bind(fresh_data.len() as i32)
+                                            .execute(&self.state.db)
+                                            .await;
+                                            
+                                            successfully_repaired += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 7. Update Object Shard Metadata
+                        let _ = sqlx::query("UPDATE objects SET shards = shards + $1 WHERE cid = $2")
+                            .bind(successfully_repaired)
+                            .bind(&obj.cid)
+                            .execute(&self.state.db)
+                            .await;
+
+                        info!("Self-Healing Complete for {}/{}: Re-encoded & Distributed {} missing shards.", 
+                            obj.bucket, obj.key, successfully_repaired);
+                    }
                 }
             }
             Err(e) => {

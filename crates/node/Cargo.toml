@@ -1,7 +1,14 @@
 [package]
-name = "neuro-node"
+name = "neuronode"
 version = "0.1.0"
 edition = "2021"
+description = "NeuroStore Node"
+license = "MIT"
+authors = ["Janush Sahni"]
+
+[[bin]]
+name = "neuro-node"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
@@ -11,7 +18,7 @@ rand = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
 bytes = { workspace = true }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "sync"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "sync", "net", "time"] }
 clap = { version = "4", features = ["derive"] }
 sled = "0.34"
 libp2p = { version = "0.53", features = [
@@ -42,6 +49,12 @@ libp2p-identity = "0.2"
 base64 = "0.22"
 aes-gcm = "0.10.3"
 reqwest = { version = "0.12", features = ["json"] }
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
+subtle = "2.5"
+hmac = "0.12"
+sysinfo = "0.30"
+whoami = "1.5.1"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7"
@@ -55,4 +68,3 @@ lto = true       # Link Time Optimization (Removes dead code)
 strip = true     # Strip symbols from binary
 codegen-units = 1 # Maximize size reduction
 panic = "abort"  # Remove panic unwinding overhead
-

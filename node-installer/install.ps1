@@ -11,6 +11,7 @@ $ServiceName = "NeurostoreNode"
 $DefaultStoragePath = Join-Path $env:ProgramData "NeuroStore\node-data"
 $DefaultConfigPath = Join-Path $env:ProgramData "NeuroStore\config\node-config.json"
 $DefaultGatewayUrl = "https://neurostore-backend-production.up.railway.app"
+$DefaultFrontendUrl = "https://neurostore-next.vercel.app"
 $DefaultRelayUrl = "wss://demo.neurostore.network/v1/nodes/ws"
 $DefaultWalletAddress = "0x0000000000000000000000000000000000000000"
 $DefaultDeclaredLocation = "IN"
@@ -38,8 +39,33 @@ function Ensure-AdminAndRun {
     }
 
     $argumentList = @('-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $ScriptPath)) + $Arguments
-    $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $argumentList -Verb RunAs -Wait -PassThru
+    $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $argumentList -Verb RunAs -WindowStyle Hidden -Wait -PassThru
     return $process.ExitCode
+}
+
+function Get-InstalledNodeId {
+    param(
+        [string]$ExePath,
+        [string]$ConfigPath
+    )
+
+    if (-not (Test-Path $ExePath)) {
+        return $null
+    }
+
+    try {
+        $peerId = & $ExePath --setup-config-path $ConfigPath --print-peer-id 2>$null
+        if ([string]::IsNullOrWhiteSpace($peerId)) {
+            return $null
+        }
+        $peerId = $peerId.Trim()
+        if ($peerId.Length -lt 8) {
+            return $null
+        }
+        return "NEURO-{0}" -f $peerId.Substring(0, 8).ToUpperInvariant()
+    } catch {
+        return $null
+    }
 }
 
 function Show-InputDialog {
@@ -158,6 +184,7 @@ $relayUrl = $DefaultRelayUrl
 $walletAddress = $DefaultWalletAddress
 $declaredLocation = $DefaultDeclaredLocation
 $nodeSecret = $DefaultNodeSecret
+$frontendUrl = $DefaultFrontendUrl
 if ($advanced -eq 'Yes') {
     $gatewayInput = Show-InputDialog -Title 'Gateway URL' -Prompt 'HTTPS gateway URL for heartbeats and control plane:' -DefaultValue $gatewayUrl
     if ([string]::IsNullOrWhiteSpace($gatewayInput)) { exit 0 }
@@ -178,6 +205,10 @@ if ($advanced -eq 'Yes') {
     $locationInput = Show-InputDialog -Title 'Node Region' -Prompt 'Enter the declared node location (examples: IN, IN-KA, US-CA).' -DefaultValue $declaredLocation
     if ([string]::IsNullOrWhiteSpace($locationInput)) { exit 0 }
     $declaredLocation = $locationInput.ToUpperInvariant()
+
+    $frontendInput = Show-InputDialog -Title 'Frontend URL' -Prompt 'Enter the website URL for the earnings dashboard.' -DefaultValue $frontendUrl
+    if ([string]::IsNullOrWhiteSpace($frontendInput)) { exit 0 }
+    $frontendUrl = $frontendInput.TrimEnd('/')
 }
 
 $arguments = @(
@@ -198,9 +229,26 @@ if ($exitCode -ne 0) {
     exit $exitCode
 }
 
+$serviceExePath = Join-Path (Split-Path $InstallServiceScript -Parent) 'neuro-node.exe'
+$nodeId = Get-InstalledNodeId -ExePath $serviceExePath -ConfigPath $DefaultConfigPath
+if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
+    Set-Clipboard -Value $nodeId
+}
+
+$dashboardUrl = "$frontendUrl/dashboard/node"
+if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
+    $dashboardUrl = "$dashboardUrl?node_id=$([uri]::EscapeDataString($nodeId))"
+}
+
 [System.Windows.MessageBox]::Show(
-    "NeuroStore Node is now installed as a Windows service.`n`nStorage path: $storagePath`nCapacity: $maxGb GB`nConfig: $DefaultConfigPath",
+    "NeuroStore Node is now installed as a silent background service.`n`nNode ID: $nodeId`nStorage path: $storagePath`nCapacity: $maxGb GB`nConfig: $DefaultConfigPath`n`nYour Node ID has been copied to the clipboard.",
     'NeuroStore Node',
     'OK',
     'Information'
 ) | Out-Null
+
+try {
+    Start-Process $dashboardUrl | Out-Null
+} catch {
+    Write-Warning "Failed to open dashboard URL: $dashboardUrl"
+}
