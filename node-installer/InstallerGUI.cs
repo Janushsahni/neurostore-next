@@ -21,99 +21,99 @@ namespace NeuroStore.Installer
 
         public SetupForm()
         {
-            this.Text = "NeuroStore Node Client Setup";
-            this.Size = new Size(540, 360);
+            this.Text = "NeuroStore Core Node Installer";
+            this.Size = new Size(540, 400);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            this.BackColor = Color.FromArgb(245, 247, 250); // Light slate
-            this.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+            this.BackColor = Color.FromArgb(15, 23, 42); // Dark slate
+            this.Font = new Font("Segoe UI", 10f, FontStyle.Regular);
 
-            // Header Icon / Banner
+            // Header Banner
             Panel pnlHeader = new Panel();
-            pnlHeader.BackColor = Color.FromArgb(16, 185, 129); // Emerald 500
-            pnlHeader.Size = new Size(540, 60);
+            pnlHeader.BackColor = Color.FromArgb(16, 185, 129); // Emerald
+            pnlHeader.Size = new Size(540, 70);
             pnlHeader.Location = new Point(0, 0);
 
             Label lblHeader = new Label();
-            lblHeader.Text = "NeuroStore Node Setup";
-            lblHeader.Font = new Font("Segoe UI", 16f, FontStyle.Bold);
+            lblHeader.Text = "Deploy Storage Node";
+            lblHeader.Font = new Font("Segoe UI", 18f, FontStyle.Bold);
             lblHeader.ForeColor = Color.White;
             lblHeader.AutoSize = true;
-            lblHeader.Location = new Point(20, 15);
+            lblHeader.Location = new Point(20, 18);
             pnlHeader.Controls.Add(lblHeader);
             this.Controls.Add(pnlHeader);
 
-            // Intro text
-            Label lblIntro = new Label();
-            lblIntro.Text = "Welcome to the NeuroStore decentralized storage network.\nEarn by securely renting out your excess hard drive space.";
-            lblIntro.Location = new Point(20, 80);
-            lblIntro.Size = new Size(490, 40);
-            this.Controls.Add(lblIntro);
-
             // Storage Size Label
             Label lblSize = new Label();
-            lblSize.Text = "Storage Allocation (GB):";
-            lblSize.Location = new Point(20, 135);
+            lblSize.Text = "1. Rent Space (GB):";
+            lblSize.ForeColor = Color.LightGray;
+            lblSize.Location = new Point(30, 95);
             lblSize.AutoSize = true;
             this.Controls.Add(lblSize);
 
-            // Storage Size Input
             txtStorageSize = new TextBox();
-            txtStorageSize.Text = "100";
-            txtStorageSize.Location = new Point(180, 132);
-            txtStorageSize.Size = new Size(100, 25);
+            txtStorageSize.Text = "50";
+            txtStorageSize.Location = new Point(30, 125);
+            txtStorageSize.Size = new Size(120, 25);
+            txtStorageSize.BackColor = Color.FromArgb(30, 41, 59);
+            txtStorageSize.ForeColor = Color.White;
+            txtStorageSize.BorderStyle = BorderStyle.FixedSingle;
             this.Controls.Add(txtStorageSize);
 
             // Storage Path Label
             Label lblPath = new Label();
-            lblPath.Text = "Encrypted Shard Vault:";
-            lblPath.Location = new Point(20, 185);
+            lblPath.Text = "2. Base Directory for Vault:";
+            lblPath.ForeColor = Color.LightGray;
+            lblPath.Location = new Point(30, 175);
             lblPath.AutoSize = true;
             this.Controls.Add(lblPath);
 
-            // Storage Path Input
-            string defaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "NeuroStore", "node-data");
+            string defaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "NeuroStore");
             txtStoragePath = new TextBox();
             txtStoragePath.Text = defaultPath;
-            txtStoragePath.Location = new Point(180, 182);
-            txtStoragePath.Size = new Size(240, 25);
+            txtStoragePath.Location = new Point(30, 205);
+            txtStoragePath.Size = new Size(390, 25);
+            txtStoragePath.BackColor = Color.FromArgb(30, 41, 59);
+            txtStoragePath.ForeColor = Color.White;
+            txtStoragePath.BorderStyle = BorderStyle.FixedSingle;
             this.Controls.Add(txtStoragePath);
 
-            // Browse Button
             btnBrowse = new Button();
-            btnBrowse.Text = "...";
-            btnBrowse.Location = new Point(430, 181);
-            btnBrowse.Size = new Size(40, 26);
+            btnBrowse.Text = "Browse";
+            btnBrowse.Location = new Point(430, 203);
+            btnBrowse.Size = new Size(70, 28);
+            btnBrowse.BackColor = Color.FromArgb(51, 65, 85);
+            btnBrowse.ForeColor = Color.White;
+            btnBrowse.FlatStyle = FlatStyle.Flat;
+            btnBrowse.FlatAppearance.BorderSize = 0;
             btnBrowse.Click += BtnBrowse_Click;
+            btnBrowse.Cursor = Cursors.Hand;
             this.Controls.Add(btnBrowse);
 
-            // Status Label
             lblStatus = new Label();
-            lblStatus.Text = "Ready to install.";
-            lblStatus.ForeColor = Color.Gray;
-            lblStatus.Location = new Point(20, 230);
+            lblStatus.Text = "A locked encrypted vault will be created automatically.";
+            lblStatus.ForeColor = Color.DarkGray;
+            lblStatus.Location = new Point(30, 250);
             lblStatus.Size = new Size(490, 20);
             this.Controls.Add(lblStatus);
 
-            // Progress Bar
             prgInstall = new ProgressBar();
-            prgInstall.Location = new Point(20, 255);
-            prgInstall.Size = new Size(490, 10);
+            prgInstall.Location = new Point(30, 280);
+            prgInstall.Size = new Size(470, 10);
             prgInstall.Style = ProgressBarStyle.Continuous;
             this.Controls.Add(prgInstall);
 
-            // Install Button
             btnInstall = new Button();
-            btnInstall.Text = "Install Network Node";
-            btnInstall.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+            btnInstall.Text = "Initialize Node && Lock Vault";
+            btnInstall.Font = new Font("Segoe UI", 11f, FontStyle.Bold);
             btnInstall.BackColor = Color.FromArgb(16, 185, 129);
             btnInstall.ForeColor = Color.White;
             btnInstall.FlatStyle = FlatStyle.Flat;
             btnInstall.FlatAppearance.BorderSize = 0;
-            btnInstall.Location = new Point(350, 280);
-            btnInstall.Size = new Size(160, 35);
+            btnInstall.Location = new Point(140, 310);
+            btnInstall.Size = new Size(260, 45);
             btnInstall.Click += BtnInstall_Click;
             btnInstall.Cursor = Cursors.Hand;
             this.Controls.Add(btnInstall);
@@ -123,7 +123,7 @@ namespace NeuroStore.Installer
         {
             using (FolderBrowserDialog fbd = new FolderBrowserDialog())
             {
-                fbd.Description = "Select a location for the NeuroStore Encrypted Vault";
+                fbd.Description = "Select a Base Directory for the NeuroStore Vault";
                 fbd.SelectedPath = txtStoragePath.Text;
                 if (fbd.ShowDialog() == DialogResult.OK)
                 {
@@ -137,13 +137,13 @@ namespace NeuroStore.Installer
             int size;
             if (!int.TryParse(txtStorageSize.Text, out size) || size <= 0)
             {
-                MessageBox.Show("Please enter a valid amount of gigabytes.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Please enter a valid amount of rent space (GB).", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(txtStoragePath.Text))
             {
-                MessageBox.Show("Please select a valid storage path.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Please select a base directory.", "Input Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -153,38 +153,55 @@ namespace NeuroStore.Installer
             txtStorageSize.Enabled = false;
 
             lblStatus.Text = "Extracting decentralized node payload...";
-            lblStatus.ForeColor = Color.Black;
+            lblStatus.ForeColor = Color.LightGray;
             prgInstall.Value = 20;
 
             try
             {
-                // Ensure base program data directory exists
-                string programData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "NeuroStore");
+                string programData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "NeuroStoreCore");
                 Directory.CreateDirectory(programData);
 
                 string exeDest = Path.Combine(programData, EmbeddedNodeExe);
                 ExtractResource("NeuroStore.Installer.neuro-node.exe", exeDest);
 
-                prgInstall.Value = 50;
+                prgInstall.Value = 40;
                 lblStatus.Text = "Generating unique cryptographic node identity...";
                 
-                // Get the Node ID and pre-allocate folder
-                string nodeId = GenerateNodeId(exeDest, txtStoragePath.Text);
+                Directory.CreateDirectory(txtStoragePath.Text);
+                string tempVault = Path.Combine(txtStoragePath.Text, "NS_TEMP_" + Guid.NewGuid().ToString().Substring(0, 8));
+                Directory.CreateDirectory(tempVault);
+
+                string nodeId = GenerateNodeId(exeDest, tempVault);
                 
-                prgInstall.Value = 70;
+                string finalPath = Path.Combine(txtStoragePath.Text, nodeId);
+                if (Directory.Exists(finalPath)) 
+                {
+                    Directory.Delete(tempVault, true);
+                    nodeId = GenerateNodeId(exeDest, finalPath);
+                } 
+                else 
+                {
+                    Directory.Move(tempVault, finalPath);
+                }
+
+                prgInstall.Value = 60;
+                lblStatus.Text = "Locking the vault against unauthorized access...";
+
+                File.SetAttributes(finalPath, File.GetAttributes(finalPath) | FileAttributes.Hidden | FileAttributes.System);
+                RunCmd("cmd.exe", "/c icacls \"" + finalPath + "\" /inheritance:r /grant:r \"SYSTEM\":(OI)(CI)F /grant:r \"Administrators\":(OI)(CI)F");
+
+                prgInstall.Value = 80;
                 lblStatus.Text = "Registering Windows Background Service...";
 
-                InstallService(exeDest, size, txtStoragePath.Text, nodeId);
+                InstallService(exeDest, size, finalPath, nodeId);
 
                 prgInstall.Value = 100;
                 lblStatus.Text = "Installation successful!";
                 lblStatus.ForeColor = Color.FromArgb(16, 185, 129);
 
-                MessageBox.Show("NeuroStore Node installed successfully as a silent background service.\nYour Node ID is: " + nodeId, "Setup Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Node ID: " + nodeId + " is now active.\nYour storage vault is secured and locked at:\n" + finalPath, "Setup Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                // Open the Web Dashboard
                 Process.Start("https://neurostore-next.vercel.app/dashboard/node?node_id=" + nodeId);
-
                 Application.Exit();
             }
             catch (Exception ex)
