@@ -7,6 +7,7 @@ use anyhow::Context;
 use clap::Parser;
 use p2p::{build_node, drive_node, parse_listen_multiaddr};
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 use std::{
     collections::HashSet,
     fs,
