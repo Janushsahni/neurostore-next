@@ -2,7 +2,7 @@ export const getApiBase = () => {
     let url = import.meta.env.VITE_API_URL || "";
 
     if (!url) {
-        return "http://localhost:9009";
+        return "https://neurostore-backend-production.up.railway.app";
     }
 
     url = url.replace(/\/$/, "");
