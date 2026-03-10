@@ -337,6 +337,8 @@ pub struct HeartbeatRequest {
     pub cpu_usage_percent: Option<f64>,
     pub memory_usage_percent: Option<f64>,
     pub ingress_url: Option<String>,
+    pub hostname: Option<String>,
+    pub device_fingerprint: Option<String>,
     pub timestamp: Option<String>,
     pub build_digest: Option<String>,
     pub build_signature: Option<String>,
@@ -344,6 +346,7 @@ pub struct HeartbeatRequest {
 
 pub async fn node_heartbeat(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(payload): Json<HeartbeatRequest>,
 ) -> impl IntoResponse {
     if let Err(err) = verify_node_build(
@@ -358,6 +361,14 @@ pub async fn node_heartbeat(
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "invalid node_id" })))
             .into_response();
     }
+
+    let caller_ip = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .map(|v| v.trim().to_string())
+        .or_else(|| headers.get("x-real-ip").and_then(|v| v.to_str().ok()).map(|v| v.to_string()))
+        .unwrap_or_else(|| "unknown".to_string());
 
     let used_gb = payload.used_gb.unwrap_or(0.0).max(0.0);
     let max_gb = payload.max_gb.unwrap_or(50.0).max(0.0);
@@ -419,6 +430,9 @@ pub async fn node_heartbeat(
             pending_earnings_inr: incremental_earnings,
             last_heartbeat_at: Utc::now(),
             dirty: true,
+            hostname: payload.hostname.clone(),
+            device_fingerprint: payload.device_fingerprint.clone(),
+            ip_address: Some(caller_ip),
         },
     )
     .await;
@@ -432,6 +446,58 @@ pub async fn node_heartbeat(
         "storage_write_mode": "buffered",
     })))
         .into_response()
+}
+
+pub async fn get_admin_inventory(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    // Basic Admin Check (Real prod would verify JWT role)
+    let auth_header = headers.get("Authorization").and_then(|h| h.to_str().ok());
+    if auth_header.is_none() && crate::handlers::auth::get_cookie_value(&headers, "neuro_auth").is_none() {
+        return (StatusCode::UNAUTHORIZED, "Admin access required").into_response();
+    }
+
+    let nodes = sqlx::query_as::<_, (String, String, String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, Option<String>, f32, f32)>(
+        r#"SELECT node_id, status, os, version, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, hostname, device_fingerprint, ip_address, cpu_usage_percent, memory_usage_percent
+           FROM node_registry ORDER BY last_heartbeat_at DESC"#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let nodes_json: Vec<serde_json::Value> = nodes
+        .iter()
+        .map(|n| {
+            let last_hb = n.9;
+            let status = if let Some(hb) = last_hb {
+                let diff = Utc::now().signed_duration_since(hb).num_seconds();
+                if diff > 120 { "offline" }
+                else if diff > 60 { "stale" }
+                else { "online" }
+            } else { "offline" };
+
+            serde_json::json!({
+                "node_id": n.0,
+                "status": status,
+                "os": n.2,
+                "version": n.3,
+                "shard_count": n.4,
+                "used_gb": format!("{:.3}", n.5),
+                "max_gb": format!("{:.1}", n.6),
+                "total_earned_inr": format!("{:.2}", n.7),
+                "uptime_minutes": format!("{:.1}", n.8),
+                "last_heartbeat_at": last_hb.map(|d| d.to_rfc3339()),
+                "hostname": n.10,
+                "device_fingerprint": n.11,
+                "ip_address": n.12,
+                "cpu_usage_percent": format!("{:.1}", n.13),
+                "memory_usage_percent": format!("{:.1}", n.14),
+            })
+        })
+        .collect();
+
+    (StatusCode::OK, Json(nodes_json)).into_response()
 }
 
 fn verify_node_build(
@@ -806,8 +872,9 @@ async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()
             r#"
             INSERT INTO node_registry (
                 node_id, status, os, version, shard_count, used_gb, max_gb, free_gb,
-                uptime_minutes, total_earned_inr, last_heartbeat_at, cpu_usage_percent, memory_usage_percent
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                uptime_minutes, total_earned_inr, last_heartbeat_at, cpu_usage_percent, memory_usage_percent,
+                hostname, device_fingerprint, ip_address
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             ON CONFLICT (node_id) DO UPDATE SET
                 status = excluded.status,
                 os = excluded.os,
@@ -820,7 +887,10 @@ async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()
                 total_earned_inr = GREATEST(node_registry.total_earned_inr, excluded.total_earned_inr),
                 last_heartbeat_at = excluded.last_heartbeat_at,
                 cpu_usage_percent = excluded.cpu_usage_percent,
-                memory_usage_percent = excluded.memory_usage_percent
+                memory_usage_percent = excluded.memory_usage_percent,
+                hostname = COALESCE(excluded.hostname, node_registry.hostname),
+                device_fingerprint = COALESCE(excluded.device_fingerprint, node_registry.device_fingerprint),
+                ip_address = COALESCE(excluded.ip_address, node_registry.ip_address)
             "#,
         )
         .bind(&entry.node_id)
@@ -836,6 +906,9 @@ async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()
         .bind(entry.last_heartbeat_at)
         .bind(entry.cpu_usage_percent as f32)
         .bind(entry.memory_usage_percent as f32)
+        .bind(entry.hostname)
+        .bind(entry.device_fingerprint)
+        .bind(entry.ip_address)
         .execute(&state.db)
         .await?;
 

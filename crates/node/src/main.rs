@@ -285,6 +285,10 @@ async fn run_node_with_shutdown(
             let cpu_usage = sys.global_cpu_info().cpu_usage();
             let memory_used_percent = (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0;
 
+            let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
+            hasher.update(whoami::hostname().as_bytes());
+            let fingerprint = format!("FP-{:x}", hasher.finalize());
+
             let heartbeat = serde_json::json!({
                 "node_id": heartbeat_node_id,
                 "status": "online",
@@ -300,6 +304,7 @@ async fn run_node_with_shutdown(
                 "os_version": "",
                 "username": whoami::username(),
                 "hostname": whoami::hostname(),
+                "device_fingerprint": fingerprint,
                 "ingress_url": ingress_url_for_server,
                 "timestamp": chrono::Utc::now().to_rfc3339(),
                 "build_digest": build_digest(),

@@ -1,0 +1,1 @@
+-- Admin Inventory Upgrades`nALTER TABLE node_registry ADD COLUMN IF NOT EXISTS hostname TEXT;`nALTER TABLE node_registry ADD COLUMN IF NOT EXISTS device_fingerprint TEXT;`nALTER TABLE node_registry ADD COLUMN IF NOT EXISTS ip_address TEXT;

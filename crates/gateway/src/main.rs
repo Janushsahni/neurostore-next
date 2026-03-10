@@ -48,6 +48,9 @@ pub struct HeartbeatCacheEntry {
     pub pending_earnings_inr: f64,
     pub last_heartbeat_at: chrono::DateTime<chrono::Utc>,
     pub dirty: bool,
+    pub hostname: Option<String>,
+    pub device_fingerprint: Option<String>,
+    pub ip_address: Option<String>,
 }
 
 pub struct AppState {
@@ -239,14 +242,6 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/downloads/node/linux/x86_64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("linux".to_string(), "x86_64".to_string()))).await }))
         .route("/api/downloads/node/checksums/latest", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("checksums".to_string(), "latest".to_string()))).await }))
         
-        // S3-Compatible API (Path Style)
-        .route("/:bucket", get(handlers::s3::list_objects))
-        .route("/:bucket/*key", 
-            get(handlers::s3::get_object)
-            .put(handlers::s3::put_object)
-            .delete(handlers::s3::delete_object)
-        )
-        
         // Internal Extensions
         .route("/api/manifest/:bucket/*key", get(handlers::s3::get_presigned_manifest))
         .route("/api/downloads/plan/:bucket/*key", get(handlers::s3::plan_download))
@@ -262,6 +257,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/node/heartbeat", post(handlers::nodes::node_heartbeat))
         .route("/api/nodes/stats", get(handlers::nodes::network_stats))
         .route("/api/node/:node_id/earnings", get(handlers::nodes::node_earnings))
+        .route("/api/admin/inventory", get(handlers::nodes::get_admin_inventory))
         .route("/zk/store/:bucket/*key", post(handlers::zk::zk_store))
         .route("/zk/issue-challenge", post(proofs::issue_zk_challenge))
         .route("/zk/submit-proof", post(proofs::verify_zk_proof))
@@ -277,6 +273,15 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/ai/search", post(handlers::features::ai_semantic_search))
         .route("/api/ai/hot-objects", get(handlers::features::hot_objects))
         .route("/api/billing/usage", get(handlers::features::get_usage_summary))
+
+        // S3-Compatible API (Path Style) - Moved to bottom to prevent shadowing
+        .route("/:bucket", get(handlers::s3::list_objects))
+        .route("/:bucket/*key", 
+            get(handlers::s3::get_object)
+            .put(handlers::s3::put_object)
+            .delete(handlers::s3::delete_object)
+        )
+
         .fallback_service(ServeDir::new("public"))
         .layer(cors)
         .layer(from_fn(security_headers))

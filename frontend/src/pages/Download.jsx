@@ -23,7 +23,7 @@ export const Download = () => {
                 </p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden relative z-10">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden relative z-10 mb-12">
                 <div className="flex border-b border-slate-200 bg-slate-50/50">
                     <button
                         onClick={() => setActiveOS('windows')}
@@ -145,6 +145,35 @@ export const Download = () => {
                             </div>
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* How to Earn Section */}
+            <div className="mt-16 bg-gradient-to-br from-emerald-900 to-slate-900 rounded-3xl p-8 md:p-12 text-white shadow-2xl relative overflow-hidden">
+                <div className="absolute -right-20 -top-20 w-96 h-96 bg-emerald-500/20 rounded-full blur-[80px]"></div>
+                <div className="relative z-10">
+                    <h2 className="text-3xl md:text-4xl font-display font-extrabold mb-6">How You Earn as a Node</h2>
+                    <p className="text-emerald-100 text-lg mb-10 max-w-2xl">
+                        Turn your unused hard drive space into a passive income stream. NeuroStore pays you for providing reliable, decentralized storage to the network.
+                    </p>
+
+                    <div className="grid md:grid-cols-3 gap-8">
+                        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6">
+                            <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-xl font-bold mb-4">1</div>
+                            <h3 className="text-xl font-bold mb-2">Provide Storage</h3>
+                            <p className="text-emerald-100/80 text-sm">Allocate anywhere from 50GB to 10TB of your idle disk space. The node securely encrypts and stores user data fragments.</p>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6">
+                            <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-xl font-bold mb-4">2</div>
+                            <h3 className="text-xl font-bold mb-2">Maintain Uptime</h3>
+                            <p className="text-emerald-100/80 text-sm">Keep your device online. You earn Proof of Storage rewards continuously just by keeping the fragments available to the network.</p>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6">
+                            <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center text-xl font-bold mb-4">3</div>
+                            <h3 className="text-xl font-bold mb-2">Get Paid</h3>
+                            <p className="text-emerald-100/80 text-sm">Receive payouts directly in fiat or crypto. The more data you store and serve, the higher your monthly earnings.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

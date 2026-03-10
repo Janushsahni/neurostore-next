@@ -208,3 +208,20 @@ export async function decryptEscrowPayload(encodedPayload, recoveryPhrase) {
     const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
     return TEXT_DECODER.decode(plaintext);
 }
+
+/**
+ * Signs a receipt for node payouts.
+ */
+export async function signPayoutReceipt(payload) {
+    // Generate a simple hash of the payload as a signature for now
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify(payload));
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    return {
+        ...payload,
+        signature
+    };
+}

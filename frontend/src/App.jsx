@@ -19,6 +19,7 @@ import { S3Migration } from "./pages/S3Migration";
 import { About } from "./pages/About";
 import { Contact } from "./pages/Contact";
 import { ObjectExplorer } from "./pages/ObjectExplorer";
+import { AdminInventory } from "./pages/AdminInventory";
 import { ProtocolSimulation } from "./components/ProtocolSimulation";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
@@ -138,9 +139,9 @@ const LandingPage = () => (
               <Link to="/login?intent=node" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-md hover:shadow-lg">
                 Start Earning Now <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
               </Link>
-              <a href={WINDOWS_NODE_INSTALLER_URL} className="w-full py-3.5 rounded-xl flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all">
+              <Link to="/download" className="w-full py-3.5 rounded-xl flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all">
                 Download Software
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -362,6 +363,7 @@ const AppContent = () => {
           <Route path="/explorer/:bucket/*" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute>} />
           <Route path="/s3-migration" element={<ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute>} />
           <Route path="/download" element={<Download />} />
+          <Route path="/admin/inventory" element={<AdminInventory />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
