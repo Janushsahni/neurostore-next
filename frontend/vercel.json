@@ -1,4 +1,7 @@
 {
+    "installCommand": "npm ci || npm install",
+    "buildCommand": "vite build",
+    "outputDirectory": "dist",
     "rewrites": [
         {
             "source": "/(.*)",
