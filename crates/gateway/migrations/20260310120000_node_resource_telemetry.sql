@@ -1,0 +1,1 @@
+-- Add real-time resource telemetry fields to node registry`nALTER TABLE node_registry ADD COLUMN IF NOT EXISTS cpu_usage_percent REAL DEFAULT 0.0;`nALTER TABLE node_registry ADD COLUMN IF NOT EXISTS memory_usage_percent REAL DEFAULT 0.0;

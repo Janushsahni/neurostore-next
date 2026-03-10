@@ -539,6 +539,25 @@ pub async fn network_stats(State(state): State<Arc<AppState>>) -> impl IntoRespo
         })
         .collect();
 
+    let recent_activity = sqlx::query_as::<_, (String, f64, String, String)>(
+        "SELECT node_id, amount_inr, reason, created_at::text FROM node_earnings ORDER BY created_at DESC LIMIT 10"
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let recent_activity_json: Vec<serde_json::Value> = recent_activity
+        .iter()
+        .map(|(node_id, amount, reason, ts)| {
+            serde_json::json!({
+                "node_id": node_id,
+                "amount_inr": format!("{:.4}", amount),
+                "reason": reason,
+                "timestamp": ts,
+            })
+        })
+        .collect();
+
     (StatusCode::OK, Json(serde_json::json!({
         "total_nodes": total_nodes,
         "active_nodes": active_nodes,
@@ -548,6 +567,7 @@ pub async fn network_stats(State(state): State<Arc<AppState>>) -> impl IntoRespo
         "total_earnings_paid_inr": format!("{:.2}", total_earnings_inr),
         "earning_rate_inr_per_gb_month": "0.42",
         "top_nodes": top_nodes_json,
+        "recent_activity": recent_activity_json,
     })))
         .into_response()
 }
@@ -561,8 +581,8 @@ pub async fn node_earnings(
             .into_response();
     }
 
-    let node = sqlx::query_as::<_, (String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>)>(
-        r#"SELECT node_id, status, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, os, version
+    let node = sqlx::query_as::<_, (String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, f32, f32)>(
+        r#"SELECT node_id, status, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, os, version, cpu_usage_percent, memory_usage_percent
            FROM node_registry WHERE node_id = $1"#,
     )
     .bind(&node_id)
@@ -610,7 +630,19 @@ pub async fn node_earnings(
                 cache.os,
                 cache.version,
             ),
-            (Some(node), None) => (node.1, node.2, node.3, node.4, node.5, node.6, 0.0, 0.0, node.7, node.8.unwrap_or_else(|| "Unknown".to_string()), node.9.unwrap_or_else(|| "1.0.0".to_string())),
+            (Some(node), None) => (
+                node.1,
+                node.2,
+                node.3,
+                node.4,
+                node.5,
+                node.6,
+                node.10 as f64,
+                node.11 as f64,
+                node.7,
+                node.8.unwrap_or_else(|| "Unknown".to_string()),
+                node.9.unwrap_or_else(|| "1.0.0".to_string())
+            ),
             (None, Some(cache)) => (
                 cache.status,
                 cache.shard_count,
@@ -774,8 +806,8 @@ async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()
             r#"
             INSERT INTO node_registry (
                 node_id, status, os, version, shard_count, used_gb, max_gb, free_gb,
-                uptime_minutes, total_earned_inr, last_heartbeat_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                uptime_minutes, total_earned_inr, last_heartbeat_at, cpu_usage_percent, memory_usage_percent
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT (node_id) DO UPDATE SET
                 status = excluded.status,
                 os = excluded.os,
@@ -786,7 +818,9 @@ async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()
                 free_gb = excluded.free_gb,
                 uptime_minutes = excluded.uptime_minutes,
                 total_earned_inr = GREATEST(node_registry.total_earned_inr, excluded.total_earned_inr),
-                last_heartbeat_at = excluded.last_heartbeat_at
+                last_heartbeat_at = excluded.last_heartbeat_at,
+                cpu_usage_percent = excluded.cpu_usage_percent,
+                memory_usage_percent = excluded.memory_usage_percent
             "#,
         )
         .bind(&entry.node_id)
@@ -800,6 +834,8 @@ async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()
         .bind(entry.uptime_minutes)
         .bind(total_earned_inr)
         .bind(entry.last_heartbeat_at)
+        .bind(entry.cpu_usage_percent as f32)
+        .bind(entry.memory_usage_percent as f32)
         .execute(&state.db)
         .await?;
 

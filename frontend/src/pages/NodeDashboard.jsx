@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins } from 'lucide-react';
 import { apiJson } from '../lib/apiClient';
 
-const WINDOWS_NODE_INSTALLER_URL = "/neuro-node-windows.exe";
+const WINDOWS_NODE_INSTALLER_URL = `${import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:9009"}/api/downloads/node/windows/x86_64`;
 
 export const NodeDashboard = () => {
     const [stats, setStats] = useState(null);
@@ -101,7 +101,46 @@ export const NodeDashboard = () => {
                 </div>
             </div>
 
-            {/* Live telemetry feed removed (Backend-driven only) */}
+            {/* ═══════ NETWORK ACTIVITY ═══════ */}
+            {stats?.recent_activity?.length > 0 && (
+                <div>
+                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800"><Activity size={20} className="text-blue-500" /> Live Network Activity</h2>
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50 border-b border-slate-200">
+                                    <tr className="text-slate-500 text-left font-semibold">
+                                        <th className="py-3 px-4">Node ID</th>
+                                        <th className="py-3 px-4">Activity</th>
+                                        <th className="py-3 px-4">Reward</th>
+                                        <th className="py-3 px-4 text-right">Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {stats.recent_activity.map((act, i) => (
+                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="py-3 px-4 font-mono font-bold text-slate-600">{act.node_id}</td>
+                                            <td className="py-3 px-4">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight ${
+                                                    act.reason.includes('uptime') ? 'bg-emerald-50 text-emerald-600' : 
+                                                    act.reason.includes('shard') ? 'bg-purple-50 text-purple-600' : 
+                                                    'bg-blue-50 text-blue-600'
+                                                }`}>
+                                                    {act.reason.replace(/_/g, ' ')}
+                                                </span>
+                                            </td>
+                                            <td className="py-3 px-4 font-bold text-slate-900">₹{act.amount_inr}</td>
+                                            <td className="py-3 px-4 text-slate-400 text-right font-medium">
+                                                {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ═══════ NODE LOOKUP ═══════ */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden">
