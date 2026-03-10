@@ -1395,6 +1395,11 @@ pub struct DedupRequest {
     pub etag: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub struct RenameObjectRequest {
+    pub new_key: String,
+}
+
 pub async fn deduplicate_object(
     State(state): State<Arc<AppState>>,
     Path((bucket, key)): Path<(String, String)>,
@@ -1477,6 +1482,102 @@ pub async fn deduplicate_object(
         Ok(None) => (StatusCode::NOT_FOUND, "CID/ETag verification failed").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response(),
     }
+}
+
+pub async fn rename_object(
+    State(state): State<Arc<AppState>>,
+    Path((bucket, key)): Path<(String, String)>,
+    headers: HeaderMap,
+    axum::Json(payload): axum::Json<RenameObjectRequest>,
+) -> impl IntoResponse {
+    if let Err(err) = validate_csrf(&headers) {
+        return err.into_response();
+    }
+    let user_email = match validate_s3_auth(&headers, &state) {
+        Ok(email) => email,
+        Err(err) => return err.into_response(),
+    };
+    if let Err(err) = authorize_bucket(&state, &bucket, &user_email).await {
+        return err.into_response();
+    }
+
+    let old_key = key.trim_start_matches('/').to_string();
+    let new_key = payload.new_key.trim().trim_start_matches('/').to_string();
+    if new_key.is_empty() || new_key.len() > 1024 {
+        return (StatusCode::BAD_REQUEST, "invalid new_key").into_response();
+    }
+    if new_key == old_key {
+        return (StatusCode::OK, Json(serde_json::json!({ "status": "unchanged" }))).into_response();
+    }
+
+    let old_object_key = object_key_locator(&state, &bucket, &old_key);
+    let new_object_key = object_key_locator(&state, &bucket, &new_key);
+    let new_encrypted_key = match encrypt_object_key(&state, &new_key) {
+        Ok(v) => v,
+        Err(err) => return err.into_response(),
+    };
+
+    let existing = match sqlx::query_as::<_, crate::models::Object>(
+        "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
+    )
+    .bind(&bucket)
+    .bind(&old_object_key)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(obj)) => obj,
+        Ok(None) => return (StatusCode::NOT_FOUND, "NoSuchKey").into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response(),
+    };
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response(),
+    };
+
+    if sqlx::query(
+        r#"
+        INSERT INTO objects (bucket, key, encrypted_key, etag, cid, shards, recovery_threshold, size, metadata_json)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        "#
+    )
+    .bind(&bucket)
+    .bind(&new_object_key)
+    .bind(&new_encrypted_key)
+    .bind(&existing.etag)
+    .bind(&existing.cid)
+    .bind(existing.shards)
+    .bind(existing.recovery_threshold)
+    .bind(existing.size)
+    .bind(&existing.metadata_json)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        return (StatusCode::CONFLICT, "target key already exists").into_response();
+    }
+
+    if sqlx::query("DELETE FROM objects WHERE bucket = $1 AND key = $2")
+        .bind(&bucket)
+        .bind(&old_object_key)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "rename delete failed").into_response();
+    }
+
+    if tx.commit().await.is_err() {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "rename commit failed").into_response();
+    }
+
+    (StatusCode::OK, Json(serde_json::json!({
+        "status": "renamed",
+        "old_key": old_key,
+        "new_key": new_key,
+        "cid": existing.cid,
+    })))
+        .into_response()
 }
 
 pub async fn delete_object(

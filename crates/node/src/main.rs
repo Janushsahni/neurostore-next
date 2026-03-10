@@ -206,8 +206,6 @@ async fn run_node_with_shutdown(
     shutdown_rx: oneshot::Receiver<()>,
 ) -> anyhow::Result<()> {
     fs::create_dir_all(&runtime.storage_path)?;
-
-    let store = Arc::new(SecureBlockStore::new(&runtime.storage_path, runtime.max_gb));
     let keypair = load_or_create_identity(&runtime.storage_path)?;
     let peer_id = keypair.public().to_peer_id().to_string();
     let node_id = format!("NEURO-{}", &peer_id[..8].to_uppercase());
@@ -218,6 +216,8 @@ async fn run_node_with_shutdown(
         final_storage_path.push(&node_id);
     }
     fs::create_dir_all(&final_storage_path)?;
+    let final_storage_path_string = final_storage_path.to_string_lossy().to_string();
+    let store = Arc::new(SecureBlockStore::new(&final_storage_path_string, runtime.max_gb));
 
     let bootstrap_addrs = runtime
         .bootstrap
@@ -239,7 +239,7 @@ async fn run_node_with_shutdown(
     info!(peer_id = %node.peer_id, node_id = %node_id, "Node identity loaded");
     info!(
         max_gb = runtime.max_gb,
-        path = %runtime.storage_path,
+        path = %final_storage_path_string,
         "Node storage allocation configured"
     );
 
@@ -288,7 +288,7 @@ async fn run_node_with_shutdown(
             let heartbeat = serde_json::json!({
                 "node_id": heartbeat_node_id,
                 "status": "online",
-                "shard_count": 0, // TODO: count shards from store
+                "shard_count": heartbeat_store.get_shard_count(),
                 "used_gb": used_gb,
                 "max_gb": heartbeat_max_gb,
                 "free_gb": (heartbeat_max_gb as f64) - used_gb,

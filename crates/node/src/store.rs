@@ -172,6 +172,16 @@ impl SecureBlockStore {
     pub fn get_used_bytes(&self) -> u64 {
         read_used_bytes(&self.db).unwrap_or(0)
     }
+
+    pub fn get_shard_count(&self) -> i32 {
+        if let Ok(entries) = fs::read_dir(&self.shards_path) {
+            entries.filter_map(Result::ok)
+                .filter(|e| e.path().is_file() && e.path().extension().and_then(|s| s.to_str()) == Some("neuro"))
+                .count() as i32
+        } else {
+            0
+        }
+    }
 }
 
 fn read_used_bytes(db: &Db) -> Result<u64, sled::Error> {

@@ -428,8 +428,30 @@ export const DriveDashboard = () => {
         toast.success(`Secure proof link for "${fileName}" copied to clipboard!`, { icon: '🔗' });
     };
 
-    const handleRename = () => {
-        toast('Immutable WORM storage active. Renaming blocked by compliance.', { icon: '🛡️' });
+    const handleRename = async (fileName) => {
+        const newKey = window.prompt('Enter the new file name', fileName);
+        if (!newKey || newKey.trim() === fileName) return;
+
+        try {
+            const res = await fetch(`${S3_GATEWAY_URL}/api/object/rename/${BUCKET_NAME}/${encodeKey(fileName)}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders(),
+                },
+                body: JSON.stringify({ new_key: newKey.trim() }),
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(errorText || `Rename failed with status ${res.status}`);
+            }
+
+            toast.success(`Renamed to "${newKey.trim()}"`);
+            fetchFiles();
+        } catch (err) {
+            toast.error(err.message || 'Rename failed');
+        }
     };
 
     const filteredFiles = files.filter(f => {

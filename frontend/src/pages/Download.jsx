@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Download as DownloadIcon, AlertTriangle, Terminal, Monitor, Apple } from 'lucide-react';
+import { API_BASE } from '../lib/config';
 
 export const Download = () => {
     const [activeOS, setActiveOS] = useState('windows');
 
-    const windowsMsiUrl = '/neuro-node-windows.exe';
-    const windowsZipUrl = '/neuro-node-windows.exe';
-    const checksumsUrl = 'https://github.com/Janushsahni/neurostore-next/releases/latest/download/SHA256SUMS.txt';
-    const macArmUrl = 'https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-arm64.tar.gz';
-    const macX64Url = 'https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-x86_64.tar.gz';
-    const linuxUrl = 'https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-linux-x86_64.tar.gz';
+    const windowsMsiUrl = `${API_BASE}/api/downloads/node/windows/x86_64`;
+    const windowsZipUrl = `${API_BASE}/api/downloads/node/windows-portable/x86_64`;
+    const checksumsUrl = `${API_BASE}/api/downloads/node/checksums/latest`;
+    const macArmUrl = `${API_BASE}/api/downloads/node/macos/arm64`;
+    const macX64Url = `${API_BASE}/api/downloads/node/macos/x86_64`;
+    const linuxUrl = `${API_BASE}/api/downloads/node/linux/x86_64`;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-8 max-w-4xl mx-auto py-12 animate-in fade-in">
@@ -53,12 +54,15 @@ export const Download = () => {
 
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6">
                                     <a
-                                        href="/neuro-node-windows.exe"
+                                        href={windowsMsiUrl}
                                         download
                                         className="btn-primary inline-flex items-center gap-3 px-6 py-3.5 text-basis shadow-md"
                                     >
                                         <DownloadIcon size={20} />
-                                        Download Windows Installer (.exe)
+                                        Download Windows Installer (.msi)
+                                    </a>
+                                    <a href={windowsZipUrl} className="inline-flex items-center gap-3 border border-slate-300 text-slate-600 bg-white px-6 py-3.5 rounded-xl text-sm font-bold hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
+                                        Portable Bundle (.zip)
                                     </a>
                                 </div>
                                 <a href={checksumsUrl} className="text-sm font-semibold text-emerald-700 hover:underline">Download SHA256 checksums</a>

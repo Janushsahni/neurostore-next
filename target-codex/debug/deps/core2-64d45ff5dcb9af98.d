@@ -1,0 +1,12 @@
+S:\neurostore-next\neurostore-next\target-codex\debug\deps\core2-64d45ff5dcb9af98.d: C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\lib.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\error.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\mod.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\cursor.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\error.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\impls.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\traits.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\util.rs
+
+S:\neurostore-next\neurostore-next\target-codex\debug\deps\libcore2-64d45ff5dcb9af98.rmeta: C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\lib.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\error.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\mod.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\cursor.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\error.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\impls.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\traits.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\util.rs
+
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\lib.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\error.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\mod.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\cursor.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\error.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\impls.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\traits.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\core2-0.4.0\src\io\util.rs:

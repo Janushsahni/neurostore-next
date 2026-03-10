@@ -101,26 +101,7 @@ export const NodeDashboard = () => {
                 </div>
             </div>
 
-            {/* ═══════ LIVE GLOBAL TELEMETRY FEED (Simulated for Demo) ═══════ */}
-            <div className="bg-[#0b1120] rounded-2xl p-6 shadow-xl border border-slate-800 text-slate-300 font-mono text-xs overflow-hidden relative">
-                <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                    <h2 className="text-sm font-bold text-emerald-400 flex items-center gap-2">
-                        <span className="relative flex h-2 w-2 shadow-[0_0_8px_#10b981]"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
-                        Live Global Shard Routing
-                    </h2>
-                    <span className="text-slate-500">Encrypted Transport</span>
-                </div>
-                <div className="space-y-2 h-32 overflow-hidden relative mask-image-bottom-fade">
-                    <div className="animate-[slideUp_2s_linear_infinite] opacity-80">
-                        <p className="text-emerald-300">[{new Date().toLocaleTimeString()}] [+] SUCCESS: Shard zk-f8a9... routed to NEURO-MUM1 (India)</p>
-                        <p className="text-slate-400">[{new Date().toLocaleTimeString()}] [i] SYNC: Parity check completed for sector 7A</p>
-                        <p className="text-emerald-300">[{new Date().toLocaleTimeString()}] [+] SUCCESS: Payout receipt verified for Node NEURO-DEL4</p>
-                        <p className="text-purple-400">[{new Date().toLocaleTimeString()}] [*] AUTO-HEALING: Reconstructing degraded chunk in Region AP-SOUTH</p>
-                        <p className="text-slate-400">[{new Date().toLocaleTimeString()}] [i] PEER: Incoming connection from 103.14.x.x accepted</p>
-                        <p className="text-emerald-300">[{new Date().toLocaleTimeString()}] [+] SUCCESS: EIP-712 Signature Valid. INR Credited.</p>
-                    </div>
-                </div>
-            </div>
+            {/* Live telemetry feed removed (Backend-driven only) */}
 
             {/* ═══════ NODE LOOKUP ═══════ */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden">
@@ -165,9 +146,16 @@ export const NodeDashboard = () => {
                                 <h2 className="text-3xl font-display font-extrabold text-emerald-600 tracking-tight">{nodeData.node_id}</h2>
                                 <p className="text-slate-500 font-medium text-sm mt-1">Your personal node earnings dashboard</p>
                             </div>
-                            <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${nodeData.status === 'online' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                                {nodeData.status === 'online' ? '● ONLINE' : '● OFFLINE'}
-                            </span>
+                            <div className="text-right">
+                                <span className={`px-4 py-1.5 inline-block rounded-full text-xs font-bold uppercase tracking-wider ${nodeData.status === 'online' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                                    {nodeData.status === 'online' ? '● ONLINE' : '● OFFLINE'}
+                                </span>
+                                {nodeData.last_heartbeat_at && (
+                                    <p className="text-slate-400 text-xs font-medium mt-2">
+                                        Last loop: {new Date(nodeData.last_heartbeat_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                )}
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -202,10 +190,11 @@ export const NodeDashboard = () => {
                                 </p>
                             </div>
                             <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
-                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Earning Rate</p>
-                                <p className="text-lg font-bold text-emerald-600 flex items-center gap-2">
-                                    <TrendingUp size={16} />
-                                    ₹0.42/GB/mo
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">System Info</p>
+                                <p className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                                    <Server size={16} className="text-slate-400" />
+                                    <span>{nodeData.os || 'Unknown OS'}</span>
+                                    <span className="text-slate-400 text-sm ml-1">v{nodeData.version || '1.0'}</span>
                                 </p>
                             </div>
 

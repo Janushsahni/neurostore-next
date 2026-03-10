@@ -7,3 +7,4 @@ pub mod webhooks;
 pub mod features;
 pub mod nodes;
 pub mod admin;
+pub mod downloads;

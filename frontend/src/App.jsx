@@ -23,7 +23,7 @@ import { ProtocolSimulation } from "./components/ProtocolSimulation";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
 
-const WINDOWS_NODE_INSTALLER_URL = "/neuro-node-windows.exe";
+const WINDOWS_NODE_INSTALLER_URL = `${import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:9009"}/api/downloads/node/windows/x86_64`;
 
 // ── Animated Counter ──
 const AnimCounter = ({ end, suffix = "", prefix = "" }) => {

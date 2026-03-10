@@ -42,6 +42,8 @@ pub struct HeartbeatCacheEntry {
     pub max_gb: f64,
     pub free_gb: f64,
     pub uptime_minutes: f64,
+    pub cpu_usage_percent: f64,
+    pub memory_usage_percent: f64,
     pub persisted_total_earned_inr: f64,
     pub pending_earnings_inr: f64,
     pub last_heartbeat_at: chrono::DateTime<chrono::Utc>,
@@ -230,6 +232,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/auth/google/login", get(handlers::oauth::google_login))
         .route("/api/auth/google/callback", get(handlers::oauth::google_callback))
         .route("/api/admin/controls", get(handlers::admin::get_controls).post(handlers::admin::patch_controls))
+        .route("/api/downloads/node/:os/:arch", get(handlers::downloads::proxy_node_download))
         
         // S3-Compatible API (Path Style)
         .route("/:bucket", get(handlers::s3::list_objects))
@@ -246,6 +249,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/uploads/direct/commit/:bucket/*key", post(handlers::s3::commit_direct_upload))
         .route("/api/client-manifest/:bucket/*key", post(handlers::s3::put_client_manifest))
         .route("/api/deduplicate/:bucket/*key", post(handlers::s3::deduplicate_object))
+        .route("/api/object/rename/:bucket/*key", post(handlers::s3::rename_object))
         .route("/api/reconstruct/:bucket/*key", post(handlers::s3::reconstruct_metadata))
         .route("/api/object/shards/:bucket/*key", get(handlers::s3::get_object_shards))
         .route("/api/compliance/sovereignty/:bucket", get(handlers::compliance::sovereignty_audit))

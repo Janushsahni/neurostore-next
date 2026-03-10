@@ -6,7 +6,7 @@ import { apiJson } from "../lib/apiClient";
 import { API_BASE } from "../lib/config";
 import { decryptEscrowPayload } from "../lib/crypto";
 
-const WINDOWS_NODE_INSTALLER_URL = "/neuro-node-windows.exe";
+const WINDOWS_NODE_INSTALLER_URL = `${API_BASE}/api/downloads/node/windows/x86_64`;
 
 const GoogleIcon = () => (
     <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">

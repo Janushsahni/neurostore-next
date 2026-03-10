@@ -334,6 +334,8 @@ pub struct HeartbeatRequest {
     pub version: Option<String>,
     pub os: Option<String>,
     pub os_version: Option<String>,
+    pub cpu_usage_percent: Option<f64>,
+    pub memory_usage_percent: Option<f64>,
     pub ingress_url: Option<String>,
     pub timestamp: Option<String>,
     pub build_digest: Option<String>,
@@ -365,6 +367,8 @@ pub async fn node_heartbeat(
     let version = payload.version.as_deref().unwrap_or("1.0.0");
     let os = payload.os.as_deref().unwrap_or("Unknown");
     let status = payload.status.as_deref().unwrap_or("online");
+    let cpu_usage_percent = payload.cpu_usage_percent.unwrap_or(0.0).clamp(0.0, 100.0);
+    let memory_usage_percent = payload.memory_usage_percent.unwrap_or(0.0).clamp(0.0, 100.0);
 
     let payouts_locked = crate::handlers::admin::load_controls(&state)
         .await
@@ -409,6 +413,8 @@ pub async fn node_heartbeat(
             max_gb,
             free_gb,
             uptime_minutes: uptime_min,
+            cpu_usage_percent,
+            memory_usage_percent,
             persisted_total_earned_inr: persisted_total,
             pending_earnings_inr: incremental_earnings,
             last_heartbeat_at: Utc::now(),
@@ -555,8 +561,8 @@ pub async fn node_earnings(
             .into_response();
     }
 
-    let node = sqlx::query_as::<_, (String, String, i32, f64, f64, f64, f64)>(
-        r#"SELECT node_id, status, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes
+    let node = sqlx::query_as::<_, (String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>)>(
+        r#"SELECT node_id, status, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, os, version
            FROM node_registry WHERE node_id = $1"#,
     )
     .bind(&node_id)
@@ -589,7 +595,7 @@ pub async fn node_earnings(
         })
         .collect();
 
-    let (status, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes) =
+    let (status, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, cpu_usage_percent, memory_usage_percent, last_heartbeat_at, os, version) =
         match (node, cached_entry) {
             (Some(_node), Some(cache)) => (
                 cache.status,
@@ -598,8 +604,13 @@ pub async fn node_earnings(
                 cache.max_gb,
                 cache.persisted_total_earned_inr + cache.pending_earnings_inr,
                 cache.uptime_minutes,
+                cache.cpu_usage_percent,
+                cache.memory_usage_percent,
+                Some(cache.last_heartbeat_at),
+                cache.os,
+                cache.version,
             ),
-            (Some(node), None) => (node.1, node.2, node.3, node.4, node.5, node.6),
+            (Some(node), None) => (node.1, node.2, node.3, node.4, node.5, node.6, 0.0, 0.0, node.7, node.8.unwrap_or_else(|| "Unknown".to_string()), node.9.unwrap_or_else(|| "1.0.0".to_string())),
             (None, Some(cache)) => (
                 cache.status,
                 cache.shard_count,
@@ -607,12 +618,24 @@ pub async fn node_earnings(
                 cache.max_gb,
                 cache.persisted_total_earned_inr + cache.pending_earnings_inr,
                 cache.uptime_minutes,
+                cache.cpu_usage_percent,
+                cache.memory_usage_percent,
+                Some(cache.last_heartbeat_at),
+                cache.os,
+                cache.version,
             ),
             (None, None) => {
                 return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "node not found" })))
                     .into_response();
             }
         };
+
+    let mut display_status = status;
+    if let Some(hb) = last_heartbeat_at {
+        if chrono::Utc::now().signed_duration_since(hb).num_minutes() > 2 {
+            display_status = "offline".to_string();
+        }
+    }
 
     if let Some(cache) = {
         let cache = state.heartbeat_buffer.read().await;
@@ -658,13 +681,18 @@ pub async fn node_earnings(
 
     (StatusCode::OK, Json(serde_json::json!({
         "node_id": node_id,
-        "status": status,
+        "status": display_status,
+        "os": os,
+        "version": version,
+        "last_heartbeat_at": last_heartbeat_at.map(|d| d.to_rfc3339()),
         "shard_count": shard_count,
         "used_gb": format!("{:.3}", used_gb),
         "max_gb": format!("{:.1}", max_gb),
         "total_earned_inr": format!("{:.2}", total_earned_inr),
         "withdrawable_amount_inr": format!("{:.2}", withdrawable_amount),
         "uptime_minutes": format!("{:.1}", uptime_minutes),
+        "cpu_usage_percent": format!("{:.1}", cpu_usage_percent),
+        "memory_usage_percent": format!("{:.1}", memory_usage_percent),
         "monthly_projection_inr": format!("{:.2}", monthly_projection),
         "payout_status": if is_quarantined { "HOLD" } else { "ACTIVE" },
         "payout_hold_reason": hold_reason,
@@ -706,6 +734,8 @@ async fn cache_heartbeat(state: &Arc<AppState>, incoming: crate::HeartbeatCacheE
     entry.max_gb = incoming.max_gb;
     entry.free_gb = incoming.free_gb;
     entry.uptime_minutes = incoming.uptime_minutes;
+    entry.cpu_usage_percent = incoming.cpu_usage_percent;
+    entry.memory_usage_percent = incoming.memory_usage_percent;
     entry.last_heartbeat_at = incoming.last_heartbeat_at;
     entry.persisted_total_earned_inr = entry
         .persisted_total_earned_inr
