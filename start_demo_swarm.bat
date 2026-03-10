@@ -33,10 +33,10 @@ mkdir demo_swarm\node4 2>nul
 
 echo       Generating geo-distributed configuration profiles...
 :: We use IN for India to bypass the strict geofencing rules we just added to the Enterprise Backend
-powershell -Command "Set-Content demo_swarm\node1\setup.json '{\"storage_path\":\"demo_swarm/node1\",\"max_gb\":10,\"ingress_port\":9101,\"wallet_address\":\"0xDemoWalletMumbai123\",\"declared_location\":\"IN\",\"auto_register\":true}'"
-powershell -Command "Set-Content demo_swarm\node2\setup.json '{\"storage_path\":\"demo_swarm/node2\",\"max_gb\":15,\"ingress_port\":9102,\"wallet_address\":\"0xDemoWalletDelhi456\",\"declared_location\":\"IN\",\"auto_register\":true}'"
-powershell -Command "Set-Content demo_swarm\node3\setup.json '{\"storage_path\":\"demo_swarm/node3\",\"max_gb\":25,\"ingress_port\":9103,\"wallet_address\":\"0xDemoWalletBangalore789\",\"declared_location\":\"IN\",\"auto_register\":true}'"
-powershell -Command "Set-Content demo_swarm\node4\setup.json '{\"storage_path\":\"demo_swarm/node4\",\"max_gb\":50,\"ingress_port\":9104,\"wallet_address\":\"0xDemoWalletHyderabad012\",\"declared_location\":\"IN\",\"auto_register\":true}'"
+powershell -Command "Set-Content demo_swarm\node1\setup.json '{\"storage_path\":\"demo_swarm/node1\",\"max_gb\":10,\"ingress_port\":9101,\"wallet_address\":\"0xDemoWalletMumbai123\",\"declared_location\":\"IN\",\"auto_register\":true,\"gateway_url\":\"https://neurostore-backend-production.up.railway.app\"}'"
+powershell -Command "Set-Content demo_swarm\node2\setup.json '{\"storage_path\":\"demo_swarm/node2\",\"max_gb\":15,\"ingress_port\":9102,\"wallet_address\":\"0xDemoWalletDelhi456\",\"declared_location\":\"IN\",\"auto_register\":true,\"gateway_url\":\"https://neurostore-backend-production.up.railway.app\"}'"
+powershell -Command "Set-Content demo_swarm\node3\setup.json '{\"storage_path\":\"demo_swarm/node3\",\"max_gb\":25,\"ingress_port\":9103,\"wallet_address\":\"0xDemoWalletBangalore789\",\"declared_location\":\"IN\",\"auto_register\":true,\"gateway_url\":\"https://neurostore-backend-production.up.railway.app\"}'"
+powershell -Command "Set-Content demo_swarm\node4\setup.json '{\"storage_path\":\"demo_swarm/node4\",\"max_gb\":50,\"ingress_port\":9104,\"wallet_address\":\"0xDemoWalletHyderabad012\",\"declared_location\":\"IN\",\"auto_register\":true,\"gateway_url\":\"https://neurostore-backend-production.up.railway.app\"}'"
 
 echo.
 echo [3/3] Launching localized swarm. Watch the windows spawn!
