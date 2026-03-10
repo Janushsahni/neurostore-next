@@ -232,7 +232,12 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/auth/google/login", get(handlers::oauth::google_login))
         .route("/api/auth/google/callback", get(handlers::oauth::google_callback))
         .route("/api/admin/controls", get(handlers::admin::get_controls).post(handlers::admin::patch_controls))
-        .route("/api/downloads/node/:os/:arch", get(handlers::downloads::proxy_node_download))
+        .route("/api/downloads/node/windows/x86_64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("windows".to_string(), "x86_64".to_string()))).await }))
+        .route("/api/downloads/node/windows-portable/x86_64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("windows-portable".to_string(), "x86_64".to_string()))).await }))
+        .route("/api/downloads/node/macos/arm64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("macos".to_string(), "arm64".to_string()))).await }))
+        .route("/api/downloads/node/macos/x86_64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("macos".to_string(), "x86_64".to_string()))).await }))
+        .route("/api/downloads/node/linux/x86_64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("linux".to_string(), "x86_64".to_string()))).await }))
+        .route("/api/downloads/node/checksums/latest", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("checksums".to_string(), "latest".to_string()))).await }))
         
         // S3-Compatible API (Path Style)
         .route("/:bucket", get(handlers::s3::list_objects))
