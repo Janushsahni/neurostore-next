@@ -400,6 +400,12 @@ fn resolve_setup_config(
         return Ok(defaults);
     }
 
+    #[cfg(windows)]
+    if args.interactive_setup || launched_without_flags {
+        return run_interactive_setup(&defaults, config_path);
+    }
+
+    #[cfg(not(windows))]
     if args.interactive_setup || (launched_without_flags && has_terminal) {
         return run_interactive_setup(&defaults, config_path);
     }
@@ -438,6 +444,18 @@ fn run_interactive_setup(
         println!("No saved setup found. Let's get you set up to earn by renting storage.");
     }
 
+    // --- PRE-GENERATE IDENTITY ---
+    // We want to show the Node ID *before* the setup starts so the user feels it's real.
+    // We'll store the master key in the config directory by default so it persists across setup changes.
+    let identity_dir = config_path.parent().unwrap_or(Path::new("."));
+    fs::create_dir_all(identity_dir)?;
+    let keypair = load_or_create_identity(&identity_dir.to_string_lossy())?;
+    let peer_id = keypair.public().to_peer_id().to_string();
+    let node_id = format!("NEURO-{}", &peer_id[..8].to_uppercase());
+
+    let welcome_msg = format!("This wizard will help you join the NeuroStore infrastructure as a node. \n\nYOUR ASSIGNED NODE ID: {}\n\nClick Continue to choose your storage settings.", node_id);
+    let _ = prompt_gui_fallback("NeuroStore Identity Registered", &welcome_msg, "Continue");
+
     let default_relay = baseline
         .relay_url
         .clone()
@@ -450,87 +468,54 @@ fn run_interactive_setup(
     let default_ingress_port = baseline.ingress_port.to_string();
     let default_public_ingress_url = baseline.public_ingress_url.clone().unwrap_or_default();
 
+    // Suggest adding the Node ID to the path
+    let mut suggested_path = PathBuf::from(&baseline.storage_path);
+    if !suggested_path.to_string_lossy().contains(&node_id) {
+        suggested_path.push(&node_id);
+    }
+
     let storage_path_input = prompt_path_gui_fallback(
-        "NeuroStore Storage Location",
-        "Choose where NeuroStore should keep encrypted shard data.",
-        &baseline.storage_path,
+        &format!("Storage Location for {}", node_id),
+        &format!("Choose where {} should keep encrypted shard data.", node_id),
+        &suggested_path.to_string_lossy(),
     )?;
 
     // Native Cross-Platform GUI Prompts!
     let max_gb_input = prompt_gui_fallback(
-        "NeuroStore Storage Allocation",
-        "How many Gigabytes (GB) of storage do you want to rent out? (e.g. 50, 100, 500)",
+        "Storage Allocation",
+        "How many Gigabytes (GB) of storage do you want to rent out? (e.g. 100, 500, 1000)",
         &baseline.max_gb.to_string(),
     )?;
     
     let relay_url_input = prompt_gui_fallback(
-        "NeuroStore Network Joining",
-        "Enter the Control Plane WS Relay URL. (If joining a friend's Ngrok link, paste it here):",
+        "Network Relay",
+        "Enter the Control Plane Relay (Default usually works):",
         &default_relay,
     )?;
 
-    let gateway_url_input = prompt_gui_fallback(
-        "NeuroStore Gateway",
-        "Enter the HTTPS gateway URL used for heartbeats and control plane requests.",
-        &default_gateway,
-    )?;
-
-    let node_secret_input = prompt_gui_fallback(
-        "NeuroStore Onboarding Secret",
-        "Enter the node onboarding secret used to register this node with the gateway. Leave blank to skip automatic registration.",
-        &default_node_secret,
-    )?;
-
-    let ingress_port_input = prompt_gui_fallback(
-        "NeuroStore Direct Ingress Port",
-        "Enter the local port to expose direct shard upload/download on.",
-        &default_ingress_port,
-    )?;
-
-    let public_ingress_url_input = prompt_gui_fallback(
-        "NeuroStore Public Ingress URL",
-        "Enter the public base URL browsers should use to reach this node (leave blank for local testing only).",
-        &default_public_ingress_url,
-    )?;
-
     let wallet_address_input = prompt_gui_fallback(
-        "NeuroStore Payout Wallet",
-        "Enter the payout wallet address for this node.",
+        "Payout Wallet",
+        "Enter your ERC-20 / EVM address for node rentals payout:",
         &baseline.wallet_address,
-    )?;
-
-    let declared_location_input = prompt_gui_fallback(
-        "NeuroStore Node Region",
-        "Enter the declared node location (examples: IN, IN-KA, US-CA).",
-        &baseline.declared_location,
     )?;
 
     let max_gb = max_gb_input.parse::<u64>().unwrap_or(baseline.max_gb);
     let relay_url = if relay_url_input.is_empty() { None } else { Some(relay_url_input) };
-    let gateway_url = if gateway_url_input.is_empty() {
-        baseline.gateway_url.clone()
-    } else {
-        Some(gateway_url_input)
-    };
+    let gateway_url = baseline.gateway_url.clone();
+
+    // Auto-register using standard secrets if not provided
+    let node_secret = baseline.node_secret.clone();
 
     let setup = SetupConfig {
         storage_path: normalize_storage_path(&storage_path_input),
         max_gb,
         relay_url,
         gateway_url,
-        node_secret: normalize_optional_secret(if node_secret_input.is_empty() {
-            baseline.node_secret.clone()
-        } else {
-            Some(node_secret_input)
-        }),
-        ingress_port: ingress_port_input.parse::<u16>().unwrap_or(baseline.ingress_port),
-        public_ingress_url: normalize_optional_secret(if public_ingress_url_input.is_empty() {
-            baseline.public_ingress_url.clone()
-        } else {
-            Some(public_ingress_url_input)
-        }),
+        node_secret,
+        ingress_port: baseline.ingress_port,
+        public_ingress_url: baseline.public_ingress_url.clone(),
         wallet_address: normalize_wallet_address(&wallet_address_input),
-        declared_location: normalize_declared_location(&declared_location_input),
+        declared_location: baseline.declared_location.clone(),
         auto_register: true,
     };
     save_setup_config(config_path, &setup)?;
