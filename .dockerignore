@@ -1,7 +1,25 @@
-.git
-target/
-frontend/node_modules/
-node_modules/
-deploy/db/
-*.log
-*.tmp
+# Build artifacts
+/target
+/target-codex*
+/frontend/node_modules
+/frontend/dist
+/node_modules
+/apps/**/node_modules
+
+# IDE / OS
+.vs/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Railway / debug output
+*_out.txt
+*_out_utf8.txt
+trace.txt
+
+# Deploy artifacts not needed in Docker context
+/deploy/certs/*.pem
+/deploy/k8s/generated/
+/node-installer/
+/.github/
