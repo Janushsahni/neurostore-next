@@ -536,9 +536,8 @@ export const DriveDashboard = () => {
                             </span>
                         </div>
                         <div className="bg-slate-100 rounded-lg p-3 text-xs shadow-inner border border-slate-200/50">
-                            <div className="flex justify-between mb-1.5"><span className="text-slate-500 font-medium">Uplink</span><span className="text-emerald-600 font-bold font-mono">1.2 Gbps</span></div>
-                            <div className="flex justify-between mb-1.5"><span className="text-slate-500 font-medium">Nodes</span><span className="text-slate-700 font-bold">14,392</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Latency</span><span className="text-slate-700 font-bold">14ms</span></div>
+                            <div className="flex justify-between mb-1.5"><span className="text-slate-500 font-medium">Status</span><span className="text-emerald-600 font-bold">Encrypted</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Protocol</span><span className="text-slate-700 font-bold">Neuro v3</span></div>
                         </div>
                     </div>
 
@@ -665,7 +664,7 @@ export const DriveDashboard = () => {
                                                 <th className="p-4 text-right">Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-100 italic">
+                                        <tbody className="divide-y divide-slate-100">
                                             {filteredFiles.map(file => (
                                                 <tr key={file.id} className="hover:bg-slate-50/80 transition-colors group cursor-pointer" onClick={() => handleDownload(file.name, 'preview')}>
                                                     <td className="p-4">{getFileIcon(file.type)}</td>
@@ -715,17 +714,6 @@ export const DriveDashboard = () => {
                     <ShieldCheck size={16} className="text-emerald-500" /> Security Console
                 </h3>
 
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
-                    <Cpu size={16} className="text-emerald-500" /> AI Auto-Tagging
-                </h3>
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-5 text-sm font-medium text-emerald-800 mb-8">
-                    <p className="mb-3">Our on-device AI automatically categorizes your photos and documents without seeing the content.</p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                        <span className="bg-white border border-emerald-200 text-emerald-600 px-2 py-1 rounded text-xs font-bold shadow-sm">#receipts</span>
-                        <span className="bg-white border border-emerald-200 text-emerald-600 px-2 py-1 rounded text-xs font-bold shadow-sm">#family</span>
-                        <span className="bg-white border border-emerald-200 text-emerald-600 px-2 py-1 rounded text-xs font-bold shadow-sm">#work</span>
-                    </div>
-                </div>
 
                 <div className="mt-auto">
                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-start gap-3">

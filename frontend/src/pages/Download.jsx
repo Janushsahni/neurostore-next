@@ -5,12 +5,12 @@ import { API_BASE } from '../lib/config';
 export const Download = () => {
     const [activeOS, setActiveOS] = useState('windows');
 
-    const windowsMsiUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe`;
-    const windowsZipUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe`; // Use same for zip 
-    const checksumsUrl = `#`;
-    const macArmUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos`;
-    const macX64Url = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos`;
-    const linuxUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-linux`;
+    const windowsMsiUrl = `/api/downloads/node/windows/x86_64`;
+    const windowsZipUrl = `/api/downloads/node/windows-portable/x86_64`;
+    const checksumsUrl = `/api/downloads/node/checksums/latest`;
+    const macArmUrl = `/api/downloads/node/macos/arm64`;
+    const macX64Url = `/api/downloads/node/macos/x86_64`;
+    const linuxUrl = `/api/downloads/node/linux/x86_64`;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-8 max-w-4xl mx-auto py-12 animate-in fade-in">

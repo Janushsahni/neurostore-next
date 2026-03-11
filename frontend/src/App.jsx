@@ -20,27 +20,11 @@ import { About } from "./pages/About";
 import { Contact } from "./pages/Contact";
 import { ObjectExplorer } from "./pages/ObjectExplorer";
 import AdminNodes from "./pages/AdminNodes";
-import { ProtocolSimulation } from "./components/ProtocolSimulation";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
 
 const WINDOWS_NODE_INSTALLER_URL = "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe";
 
-// ── Animated Counter ──
-const AnimCounter = ({ end, suffix = "", prefix = "" }) => {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    let start = 0;
-    const step = Math.ceil(end / 40);
-    const timer = setInterval(() => {
-      start += step;
-      if (start >= end) { setVal(end); clearInterval(timer); }
-      else setVal(start);
-    }, 30);
-    return () => clearInterval(timer);
-  }, [end]);
-  return <>{prefix}{val.toLocaleString("en-IN")}{suffix}</>;
-};
 
 const FeatureCard = ({ icon: Icon, title, description, badge, color = "text-primary" }) => (
   <article className="glass-card interactive-card p-6 md:p-8 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all duration-300">
@@ -165,10 +149,29 @@ const LandingPage = () => (
       </div>
     </section>
 
-    {/* ── PROTOCOL SIMULATION ── */}
-    <ProtocolSimulation />
+    {/* ── CORE CAPABILITIES ── */}
+    <section className="px-6 py-20 relative">
+      <div className="mx-auto max-w-6xl relative z-10">
+        <div className="grid gap-6 md:grid-cols-3">
+          <FeatureCard
+            icon={ShieldCheck}
+            title="P2P Managed Ledger"
+            description="No centralized database of locations. Shard mapping is sharded across the swarm."
+          />
+          <FeatureCard
+            icon={Globe}
+            title="Proof of Residency"
+            description="Verified geographical locations for data compliance and low-latency storage."
+          />
+          <FeatureCard
+            icon={Zap}
+            title="BFT Self-Healing"
+            description="Autonomous data reconstruction if a subset of nodes goes offline."
+          />
+        </div>
+      </div>
+    </section>
 
-    {/* ── ABOUT COMPANY ── */}
     <section className="px-6 py-24 bg-white relative border-t border-slate-100">
       <div className="mx-auto max-w-5xl relative z-10">
         <div className="grid gap-12 md:grid-cols-2 items-center">

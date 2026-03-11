@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins } from 'lucide-react';
 import { apiJson } from '../lib/apiClient';
 
-const WINDOWS_NODE_INSTALLER_URL = "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe";
+const WINDOWS_NODE_INSTALLER_URL = "/api/downloads/node/windows/x86_64";
 
 export const NodeDashboard = () => {
     const [stats, setStats] = useState(null);

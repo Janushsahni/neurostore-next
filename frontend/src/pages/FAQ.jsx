@@ -7,17 +7,17 @@ export const FAQ = () => {
     const faqs = [
         {
             question: "How is NeuroStore better than Filecoin?",
-            answer: "Filecoin requires massive computational overhead for Proof-of-Replication (PoRep) and Proof-of-Spacetime (PoSt). This means only massive data centers with 128GB+ RAM servers can afford to be Filecoin nodes. NeuroStore removes this bottleneck by using a lightweight AI Sentinel to verify uptime (pings) combined with Reed-Solomon Erasure Coding. This allows literally anyone with an idle laptop hard drive to become a node, massively decentralizing the network and driving the price per GB down by 90% compared to Filecoin.",
+            answer: "Filecoin requires massive computational overhead for Proof-of-Replication (PoRep) and Proof-of-Spacetime (PoSt). This means only massive data centers with 128GB+ RAM servers can afford to be Filecoin nodes. NeuroStore removes this bottleneck by using a lightweight Reputation Monitoring System to verify uptime combined with Reed-Solomon Erasure Coding. This allows literally anyone with an idle laptop hard drive to become a node, massively decentralizing the network and driving the price per GB down by 90% compared to Filecoin.",
             icon: <Cpu className="text-emerald-600" size={24} />
         },
         {
-            question: "How does the Blockchain Ledger ensure data safety?",
-            answer: "When a file is uploaded, our network generates a cryptographic Content ID (CID) representing the file's hash. The locations of the shards (which nodes hold which pieces) are committed to a fast Blockchain Ledger. This ensures the mapping between your account and your file's location is immutable, censorship-resistant, and cannot be tampered with by any central authority or rogue database admin.",
+            question: "How does the Distributed Ledger ensure data safety?",
+            answer: "When a file is uploaded, our network generates a cryptographic Content ID (CID) representing the file's hash. The locations of the shards (which nodes hold which pieces) are committed to a fast Distributed Ledger. This ensures the mapping between your account and your file's location is immutable, censorship-resistant, and cannot be tampered with by any central authority or rogue database admin.",
             icon: <Blocks className="text-blue-600" size={24} />
         },
         {
             question: "If a node goes offline permanently, do I lose my file?",
-            answer: "No. We use Reed-Solomon Erasure Coding (e.g. 10 Data pieces + 5 Parity pieces). This means your file is split across 15 different nodes globally. You only need ANY 10 nodes to stay online to achieve 100% data recovery with zero quality loss. If 5 nodes simultaneously explode, your file instantly reconstructs via the AI Sentinel triggering a self-repair operation.",
+            answer: "No. We use Reed-Solomon Erasure Coding (e.g. 10 Data pieces + 5 Parity pieces). This means your file is split across 15 different nodes globally. You only need ANY 10 nodes to stay online to achieve 100% data recovery with zero quality loss. If 5 nodes simultaneously explode, your file instantly reconstructs via the system triggering a self-repair operation.",
             icon: <Database className="text-purple-600" size={24} />
         },
         {
@@ -34,7 +34,7 @@ export const FAQ = () => {
             <div className="max-w-4xl mx-auto relative z-10">
                 <div className="text-center mb-16">
                     <h1 className="text-4xl md:text-5xl font-display font-extrabold mb-6 text-slate-900 tracking-tight">Frequently Asked Questions</h1>
-                    <p className="text-lg text-slate-500 font-medium">Learn how our Erasure Coding and AI architecture guarantees 100% data resilience.</p>
+                    <p className="text-lg text-slate-500 font-medium">Learn how our Erasure Coding architecture guarantees 100% data resilience.</p>
                 </div>
 
                 <div className="space-y-4">
