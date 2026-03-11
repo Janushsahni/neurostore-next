@@ -77,8 +77,8 @@
     <!-- Launch setup GUI after install completes -->
     <CustomAction Id="LaunchSetupGUI"
                   Directory="INSTALLFOLDER"
-                  ExeCommand="[System64Folder]WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]install-node-gui.ps1&quot;"
-                  Execute="deferred"
+                  ExeCommand="[System64Folder]WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File &quot;[INSTALLFOLDER]install-node-gui.ps1&quot;"
+                  Execute="immediate"
                   Return="asyncNoWait"
                   Impersonate="yes" />
 
