@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins } from 'lucide-react';
 import { apiJson } from '../lib/apiClient';
+import { API_BASE } from '../lib/config';
 
-const WINDOWS_NODE_INSTALLER_URL = "/api/downloads/node/windows/x86_64";
+const WINDOWS_NODE_INSTALLER_URL = `${API_BASE}/api/downloads/node/windows/x86_64`;
 
 export const NodeDashboard = () => {
     const [stats, setStats] = useState(null);

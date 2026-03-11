@@ -22,8 +22,9 @@ import { ObjectExplorer } from "./pages/ObjectExplorer";
 import AdminNodes from "./pages/AdminNodes";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
+import { API_BASE } from "./lib/config";
 
-const WINDOWS_NODE_INSTALLER_URL = "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe";
+const WINDOWS_NODE_INSTALLER_URL = `${API_BASE}/api/downloads/node/windows/x86_64`;
 
 
 const FeatureCard = ({ icon: Icon, title, description, badge, color = "text-primary" }) => (
