@@ -8,13 +8,13 @@ fn download_target(os: &str, arch: &str) -> Option<(&'static str, &'static str, 
     match (os, arch) {
         ("windows", "x86_64") => Some((
             "NODE_WINDOWS_INSTALLER_URL",
-            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe",
-            "neuro-node.exe",
+            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi",
+            "neuro-node-windows-x86_64.msi",
         )),
         ("windows-portable", "x86_64") => Some((
             "NODE_WINDOWS_PORTABLE_URL",
-            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe",
-            "neuro-node.exe",
+            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip",
+            "neuro-node-windows-x86_64.zip",
         )),
         ("macos", "arm64") => Some((
             "NODE_MACOS_ARM64_URL",
