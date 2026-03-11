@@ -774,10 +774,18 @@ fn normalize_optional_secret(value: Option<String>) -> Option<String> {
 }
 
 fn resolve_public_ingress_url(runtime: &RuntimeConfig) -> Option<String> {
-    runtime
-        .public_ingress_url
-        .clone()
-        .or_else(|| Some(format!("http://127.0.0.1:{}", runtime.ingress_port)))
+    // If the operator explicitly configured a public ingress URL, use that.
+    if let Some(ref url) = runtime.public_ingress_url {
+        if !url.is_empty() {
+            return Some(url.clone());
+        }
+    }
+
+    // Otherwise, DON'T fall back to 127.0.0.1 — that's unreachable from
+    // other machines.  Returning None causes the gateway to use
+    // "gateway-relay" mode, which proxies the data through the gateway
+    // itself, solving NAT traversal automatically.
+    None
 }
 
 fn normalize_wallet_address(value: &str) -> String {
