@@ -132,6 +132,7 @@ struct RuntimeConfig {
     wallet_address: String,
     declared_location: String,
     auto_register: bool,
+    identity_dir: std::path::PathBuf,
 }
 
 #[tokio::main]
@@ -199,6 +200,7 @@ fn build_runtime_config(args: &Args) -> anyhow::Result<RuntimeConfig> {
         wallet_address: normalize_wallet_address(&setup.wallet_address),
         declared_location: normalize_declared_location(&setup.declared_location),
         auto_register: setup.auto_register,
+        identity_dir: config_path.parent().unwrap_or(Path::new(".")).to_path_buf(),
     })
 }
 
@@ -207,7 +209,8 @@ async fn run_node_with_shutdown(
     shutdown_rx: oneshot::Receiver<()>,
 ) -> anyhow::Result<()> {
     fs::create_dir_all(&runtime.storage_path)?;
-    let keypair = load_or_create_identity(&runtime.storage_path)?;
+    fs::create_dir_all(&runtime.identity_dir)?;
+    let keypair = load_or_create_identity(&runtime.identity_dir.to_string_lossy())?;
     let peer_id = keypair.public().to_peer_id().to_string();
     let node_id = format!("NEURO-{}", &peer_id[..8].to_uppercase());
 
