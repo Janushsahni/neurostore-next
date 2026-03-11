@@ -8,28 +8,28 @@ fn download_target(os: &str, arch: &str) -> Option<(&'static str, &'static str, 
     match (os, arch) {
         ("windows", "x86_64") => Some((
             "NODE_WINDOWS_INSTALLER_URL",
-            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi",
-            "neuro-node-windows-x86_64.msi",
+            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe",
+            "neuro-node.exe",
         )),
         ("windows-portable", "x86_64") => Some((
             "NODE_WINDOWS_PORTABLE_URL",
-            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip",
-            "neuro-node-windows-x86_64.zip",
+            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe",
+            "neuro-node.exe",
         )),
         ("macos", "arm64") => Some((
             "NODE_MACOS_ARM64_URL",
-            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-arm64.tar.gz",
-            "neuro-node-macos-arm64.tar.gz",
+            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos",
+            "neuro-node-macos",
         )),
         ("macos", "x86_64") => Some((
             "NODE_MACOS_X86_64_URL",
-            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-x86_64.tar.gz",
-            "neuro-node-macos-x86_64.tar.gz",
+            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos",
+            "neuro-node-macos",
         )),
         ("linux", "x86_64") => Some((
             "NODE_LINUX_X86_64_URL",
-            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-linux-x86_64.tar.gz",
-            "neuro-node-linux-x86_64.tar.gz",
+            "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-linux",
+            "neuro-node-linux",
         )),
         ("checksums", "latest") => Some((
             "NODE_RELEASE_CHECKSUMS_URL",

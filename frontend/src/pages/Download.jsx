@@ -5,12 +5,12 @@ import { API_BASE } from '../lib/config';
 export const Download = () => {
     const [activeOS, setActiveOS] = useState('windows');
 
-    const windowsMsiUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
-    const windowsZipUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip`;
-    const checksumsUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/SHA256SUMS.txt`;
-    const macArmUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-arm64.tar.gz`;
-    const macX64Url = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-x86_64.tar.gz`;
-    const linuxUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-linux-x86_64.tar.gz`;
+    const windowsMsiUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe`;
+    const windowsZipUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe`; // Use same for zip 
+    const checksumsUrl = `#`;
+    const macArmUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos`;
+    const macX64Url = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos`;
+    const linuxUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-linux`;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-8 max-w-4xl mx-auto py-12 animate-in fade-in">
@@ -59,7 +59,7 @@ export const Download = () => {
                                         className="btn-primary inline-flex items-center gap-3 px-6 py-3.5 text-basis shadow-md"
                                     >
                                         <DownloadIcon size={20} />
-                                        Download Windows Installer (.msi)
+                                        Download Windows Node (.exe)
                                     </a>
                                     <a href={windowsZipUrl} className="inline-flex items-center gap-3 border border-slate-300 text-slate-600 bg-white px-6 py-3.5 rounded-xl text-sm font-bold hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
                                         Portable Bundle (.zip)

@@ -24,7 +24,7 @@ import { ProtocolSimulation } from "./components/ProtocolSimulation";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
 
-const WINDOWS_NODE_INSTALLER_URL = "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi";
+const WINDOWS_NODE_INSTALLER_URL = "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe";
 
 // ── Animated Counter ──
 const AnimCounter = ({ end, suffix = "", prefix = "" }) => {

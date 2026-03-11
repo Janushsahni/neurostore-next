@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins } from 'lucide-react';
 import { apiJson } from '../lib/apiClient';
 
-const WINDOWS_NODE_INSTALLER_URL = "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi";
+const WINDOWS_NODE_INSTALLER_URL = "https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node.exe";
 
 export const NodeDashboard = () => {
     const [stats, setStats] = useState(null);
@@ -122,8 +122,8 @@ export const NodeDashboard = () => {
                                             <td className="py-3 px-4 font-mono font-bold text-slate-600">{act.node_id}</td>
                                             <td className="py-3 px-4">
                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight ${act.reason.includes('uptime') ? 'bg-emerald-50 text-emerald-600' :
-                                                        act.reason.includes('shard') ? 'bg-purple-50 text-purple-600' :
-                                                            'bg-blue-50 text-blue-600'
+                                                    act.reason.includes('shard') ? 'bg-purple-50 text-purple-600' :
+                                                        'bg-blue-50 text-blue-600'
                                                     }`}>
                                                     {act.reason.replace(/_/g, ' ')}
                                                 </span>
