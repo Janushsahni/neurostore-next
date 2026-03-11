@@ -5,12 +5,12 @@ import { API_BASE } from '../lib/config';
 export const Download = () => {
     const [activeOS, setActiveOS] = useState('windows');
 
-    const windowsMsiUrl = `${API_BASE}/api/downloads/node/windows/x86_64`;
-    const windowsZipUrl = `${API_BASE}/api/downloads/node/windows-portable/x86_64`;
-    const checksumsUrl = `${API_BASE}/api/downloads/node/checksums/latest`;
-    const macArmUrl = `${API_BASE}/api/downloads/node/macos/arm64`;
-    const macX64Url = `${API_BASE}/api/downloads/node/macos/x86_64`;
-    const linuxUrl = `${API_BASE}/api/downloads/node/linux/x86_64`;
+    const windowsMsiUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
+    const windowsZipUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.zip`;
+    const checksumsUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/SHA256SUMS.txt`;
+    const macArmUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-arm64.tar.gz`;
+    const macX64Url = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-macos-x86_64.tar.gz`;
+    const linuxUrl = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-linux-x86_64.tar.gz`;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-8 max-w-4xl mx-auto py-12 animate-in fade-in">
