@@ -50,7 +50,7 @@ export const Download = () => {
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="space-y-4 mb-8">
                                 <h2 className="text-2xl font-bold tracking-tight text-slate-800">Windows GUI Installer</h2>
-                                <p className="text-slate-600 font-medium">Download the real installer. It opens setup UI, asks storage size and folder, installs a background service, and auto-starts on reboot.</p>
+                                <p className="text-slate-600 font-medium">Download the MSI installer — it installs files, opens the setup GUI automatically, registers a background service, and auto-starts on reboot.</p>
 
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6">
                                     <a
@@ -59,7 +59,7 @@ export const Download = () => {
                                         className="btn-primary inline-flex items-center gap-3 px-6 py-3.5 text-basis shadow-md"
                                     >
                                         <DownloadIcon size={20} />
-                                        Download Windows Node (.exe)
+                                        Download Windows Installer (.msi)
                                     </a>
                                     <a href={windowsZipUrl} className="inline-flex items-center gap-3 border border-slate-300 text-slate-600 bg-white px-6 py-3.5 rounded-xl text-sm font-bold hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
                                         Portable Bundle (.zip)
@@ -71,12 +71,12 @@ export const Download = () => {
                             <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-6 mb-8 text-emerald-900 shadow-sm">
                                 <h3 className="font-bold text-emerald-800 mb-3 flex items-center gap-2"><Monitor size={18} /> Expected Flow</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm font-medium">
-                                    <div className="flex items-center gap-2">GUI asks storage folder</div>
-                                    <div className="flex items-center gap-2">GUI asks storage capacity</div>
-                                    <div className="flex items-center gap-2">Service installs and starts</div>
-                                    <div className="flex items-center gap-2">Node ID shown after install</div>
-                                    <div className="flex items-center gap-2">Runs silently in background</div>
-                                    <div className="flex items-center gap-2">Auto-start after reboot</div>
+                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">1</span> Run the .msi installer</div>
+                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">2</span> Setup GUI opens automatically</div>
+                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">3</span> Pick storage folder and capacity</div>
+                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">4</span> Service installs and starts</div>
+                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">5</span> Node ID is shown and copied</div>
+                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">6</span> Runs silently, auto-starts on reboot</div>
                                 </div>
                             </div>
 

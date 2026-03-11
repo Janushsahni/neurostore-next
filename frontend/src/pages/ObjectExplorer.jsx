@@ -75,7 +75,7 @@ export const ObjectExplorer = () => {
                             </div>
                             <div>
                                 <h1 className="text-3xl font-display font-extrabold tracking-tight">Technical Proof of Asset</h1>
-                                <p className="text-xs text-slate-500 uppercase tracking-[0.2em] mt-1">NeuroStore Protocol v3.0 // ZK-Shard Explorer</p>
+                                <p className="text-xs text-slate-500 uppercase tracking-[0.2em] mt-1">NeuroStore Protocol // Shard Explorer</p>
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-4 text-sm">
@@ -158,7 +158,7 @@ export const ObjectExplorer = () => {
                         <div className="bg-slate-950/50 border border-slate-800 rounded-3xl p-8 relative overflow-hidden backdrop-blur-sm group hover:border-emerald-500/30 transition-all">
                             <h3 className="font-bold text-xl mb-6 flex items-center gap-2">
                                 <Globe size={20} className="text-emerald-500" />
-                                Swarm Resonance
+                                Object Status
                             </h3>
                             <div className="space-y-6 relative z-10">
                                 <div className="flex items-center justify-between group">
@@ -176,7 +176,7 @@ export const ObjectExplorer = () => {
                         <div className="bg-[#0b1120] border border-blue-500/20 rounded-3xl p-8 shadow-[0_15px_50px_rgba(0,0,0,0.5)]">
                             <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
                                 <Lock size={20} className="text-blue-400" />
-                                P2P Proof
+                                Shard Detail
                             </h3>
                             <p className="text-xs text-slate-400 mb-6 leading-relaxed">
                                 This object is mapped to the decentralized swarm using <span className="text-blue-400 font-bold">Reed-Solomon Erasure Coding</span>.

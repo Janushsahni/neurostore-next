@@ -68,7 +68,7 @@ export const DriveDashboard = () => {
                     size: (size / (1024 * 1024)).toFixed(2) + " MB",
                     date: new Date(node.getElementsByTagName("LastModified")[0].textContent).toLocaleDateString(),
                     status: 'Encrypted',
-                    shards: '10+5',
+                    shards: '—',
                     type
                 };
             });
@@ -525,34 +525,7 @@ export const DriveDashboard = () => {
                     </button>
                 </div>
 
-                {/* ── ADVANCED TELEMETRY (Real World Feel) ── */}
-                <div className="mt-6 px-2 space-y-4 border-t border-slate-200 pt-6">
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><Activity size={12} /> Network Sync</span>
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                        </div>
-                        <div className="bg-slate-100 rounded-lg p-3 text-xs shadow-inner border border-slate-200/50">
-                            <div className="flex justify-between mb-1.5"><span className="text-slate-500 font-medium">Status</span><span className="text-emerald-600 font-bold">Encrypted</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500 font-medium">Protocol</span><span className="text-slate-700 font-bold">Neuro v3</span></div>
-                        </div>
-                    </div>
 
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><Shield size={12} /> Cryptography</span>
-                            <ShieldCheck size={14} className="text-emerald-500" />
-                        </div>
-                        <div className="bg-[#0b1120] rounded-lg p-3 text-xs shadow-inner border border-slate-800 text-slate-400 font-mono">
-                            <div className="flex justify-between mb-1"><span className="text-slate-500">Algorithm</span><span className="text-emerald-400">AES-256-GCM</span></div>
-                            <div className="flex justify-between mb-1"><span className="text-slate-500">Sharding</span><span className="text-emerald-400">RS (10+10)</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500">Vault Key</span><span className="text-emerald-400">{vaultPassword ? 'SECURED' : 'LOCKED'}</span></div>
-                        </div>
-                    </div>
-                </div>
             </aside>
 
             {/* ═══════ CENTER MAIN AREA ═══════ */}
@@ -642,7 +615,7 @@ export const DriveDashboard = () => {
                                                 <button onClick={(e) => { e.stopPropagation(); handleDownload(file.name, 'download'); }} className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors" title="Download">
                                                     <Download size={14} />
                                                 </button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleRename(); }} className="p-1.5 text-slate-500 hover:text-amber-500 hover:bg-amber-50 rounded-md transition-colors" title="Rename">
+                                                <button onClick={(e) => { e.stopPropagation(); handleRename(file.name); }} className="p-1.5 text-slate-500 hover:text-amber-500 hover:bg-amber-50 rounded-md transition-colors" title="Rename">
                                                     <Edit2 size={14} />
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); handleDelete(file.name); }} className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors" title="Delete">
@@ -670,7 +643,7 @@ export const DriveDashboard = () => {
                                                     <td className="p-4">{getFileIcon(file.type)}</td>
                                                     <td className="p-4 font-normal not-italic text-slate-700">
                                                         <p className="text-sm font-bold">{file.name}</p>
-                                                        <p className="text-[10px] text-slate-400 font-medium">Decentralized RS (10+5)</p>
+                                                        <p className="text-[10px] text-slate-400 font-medium">Encrypted</p>
                                                     </td>
                                                     <td className="p-4 hidden sm:table-cell text-xs font-medium text-slate-500 not-italic">{file.size}</td>
                                                     <td className="p-4 hidden md:table-cell not-italic">
@@ -689,7 +662,7 @@ export const DriveDashboard = () => {
                                                             <button onClick={(e) => { e.stopPropagation(); handleDownload(file.name, 'download'); }} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="Download">
                                                                 <Download size={16} />
                                                             </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); handleRename(); }} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all" title="Rename">
+                                                            <button onClick={(e) => { e.stopPropagation(); handleRename(file.name); }} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all" title="Rename">
                                                                 <Edit2 size={16} />
                                                             </button>
                                                             <button onClick={(e) => { e.stopPropagation(); handleDelete(file.name); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Delete">
@@ -710,9 +683,6 @@ export const DriveDashboard = () => {
 
             {/* ═══════ RIGHT SIDEBAR ═══════ */}
             <aside className="w-72 border-l border-slate-200 bg-white p-6 hidden lg:flex flex-col overflow-y-auto shrink-0 z-10">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6 flex items-center gap-2">
-                    <ShieldCheck size={16} className="text-emerald-500" /> Security Console
-                </h3>
 
 
                 <div className="mt-auto">
