@@ -450,6 +450,7 @@ async fn emergency_controls(
 ) -> Response {
     let method = request.method().clone();
     let path = request.uri().path().to_string();
+    tracing::warn!("====== INCOMING REQ: {} {} ======", method, path);
 
     if path.starts_with("/readyz") || path.starts_with("/api/health") || path.starts_with("/api/admin/controls") || path.starts_with("/api/downloads/node/") {
         return next.run(request).await;

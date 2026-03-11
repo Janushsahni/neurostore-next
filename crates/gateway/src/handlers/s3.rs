@@ -1199,6 +1199,16 @@ pub async fn get_object(
     Path((bucket, key)): Path<(String, String)>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
+    // Axum router bug workaround: /api/downloads/node is sometimes caught by /:bucket/*key
+    if bucket == "api" && key.starts_with("downloads/node/") {
+        let parts: Vec<&str> = key.split('/').collect();
+        if parts.len() == 4 {
+            let os = parts[2].to_string();
+            let arch = parts[3].to_string();
+            return crate::handlers::downloads::proxy_node_download(Path((os, arch))).await.into_response();
+        }
+    }
+
     let start_time = Instant::now();
     let user_email = match validate_s3_auth(&headers, &state) {
         Ok(email) => email,
