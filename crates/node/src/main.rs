@@ -289,6 +289,10 @@ async fn run_node_with_shutdown(
             let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
             hasher.update(whoami::hostname().as_bytes());
             let fingerprint = format!("FP-{:x}", hasher.finalize());
+            let mac_address = match mac_address::get_mac_address() {
+                Ok(Some(ma)) => ma.to_string(),
+                _ => fingerprint.clone(),
+            };
 
             let heartbeat = serde_json::json!({
                 "node_id": heartbeat_node_id,
@@ -306,6 +310,7 @@ async fn run_node_with_shutdown(
                 "username": whoami::username(),
                 "hostname": whoami::hostname(),
                 "device_fingerprint": fingerprint,
+                "mac_address": mac_address,
                 "ingress_url": ingress_url_for_server,
                 "timestamp": chrono::Utc::now().to_rfc3339(),
                 "build_digest": build_digest(),

@@ -19,7 +19,7 @@ import { S3Migration } from "./pages/S3Migration";
 import { About } from "./pages/About";
 import { Contact } from "./pages/Contact";
 import { ObjectExplorer } from "./pages/ObjectExplorer";
-import { AdminInventory } from "./pages/AdminInventory";
+import AdminNodes from "./pages/AdminNodes";
 import { ProtocolSimulation } from "./components/ProtocolSimulation";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
@@ -363,7 +363,7 @@ const AppContent = () => {
           <Route path="/explorer/:bucket/*" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute>} />
           <Route path="/s3-migration" element={<ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute>} />
           <Route path="/download" element={<Download />} />
-          <Route path="/admin/inventory" element={<AdminInventory />} />
+          <Route path="/admin/inventory" element={<AdminNodes />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />

@@ -191,16 +191,17 @@ pub async fn register_provider_node(
 
     let res = sqlx::query(
         r#"
-        INSERT INTO nodes (peer_id, wallet_address, storage_capacity_gb, country_code, ip_address, is_active, attestation_status, payout_hold_until, device_fingerprint, ingress_url)
-        VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8, $9)
+        INSERT INTO nodes (peer_id, wallet_address, storage_capacity_gb, country_code, ip_address, is_active, attestation_status, payout_hold_until, device_fingerprint, mac_address, ingress_url)
+        VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8, $9, $10)
         ON CONFLICT (peer_id) DO UPDATE SET
             storage_capacity_gb = excluded.storage_capacity_gb,
             ip_address = excluded.ip_address,
             attestation_status = excluded.attestation_status,
             payout_hold_until = excluded.payout_hold_until,
             device_fingerprint = excluded.device_fingerprint,
+            mac_address = excluded.mac_address,
             ingress_url = excluded.ingress_url,
-            is_active = CASE WHEN $10 THEN FALSE ELSE nodes.is_active END,
+            is_active = CASE WHEN $11 THEN FALSE ELSE nodes.is_active END,
             last_seen = CURRENT_TIMESTAMP
         "#,
     )
@@ -212,6 +213,7 @@ pub async fn register_provider_node(
     .bind(admission_status)
     .bind(payout_hold_until)
     .bind(payload.device_fingerprint.as_deref())
+    .bind(None::<String>) // Note: Registry payload does not currently capture mac_address upon setup, only Heartbeats do. We bind None to satisfy SQL.
     .bind(payload.ingress_url.as_deref())
     .bind(controls.quarantine_new_nodes || admission_status != "admitted")
     .execute(&state.db)
@@ -339,6 +341,7 @@ pub struct HeartbeatRequest {
     pub ingress_url: Option<String>,
     pub hostname: Option<String>,
     pub device_fingerprint: Option<String>,
+    pub mac_address: Option<String>,
     pub timestamp: Option<String>,
     pub build_digest: Option<String>,
     pub build_signature: Option<String>,
@@ -432,6 +435,7 @@ pub async fn node_heartbeat(
             dirty: true,
             hostname: payload.hostname.clone(),
             device_fingerprint: payload.device_fingerprint.clone(),
+            mac_address: payload.mac_address.clone(),
             ip_address: Some(caller_ip),
         },
     )
@@ -458,8 +462,8 @@ pub async fn get_admin_inventory(
         return (StatusCode::UNAUTHORIZED, "Admin access required").into_response();
     }
 
-    let nodes = sqlx::query_as::<_, (String, String, String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, Option<String>, f32, f32)>(
-        r#"SELECT node_id, status, os, version, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, hostname, device_fingerprint, ip_address, cpu_usage_percent, memory_usage_percent
+    let nodes = sqlx::query_as::<_, (String, String, String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, Option<String>, f32, f32, Option<String>)>(
+        r#"SELECT node_id, status, os, version, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, hostname, device_fingerprint, ip_address, cpu_usage_percent, memory_usage_percent, mac_address
            FROM node_registry ORDER BY last_heartbeat_at DESC"#,
     )
     .fetch_all(&state.db)
@@ -493,6 +497,7 @@ pub async fn get_admin_inventory(
                 "ip_address": n.12,
                 "cpu_usage_percent": format!("{:.1}", n.13),
                 "memory_usage_percent": format!("{:.1}", n.14),
+                "mac_address": n.15,
             })
         })
         .collect();

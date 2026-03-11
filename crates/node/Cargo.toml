@@ -55,6 +55,7 @@ subtle = "2.5"
 hmac = "0.12"
 sysinfo = "0.30"
 whoami = "1.5.1"
+mac_address = "1.1.8"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7"

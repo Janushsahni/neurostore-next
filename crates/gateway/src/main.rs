@@ -50,6 +50,7 @@ pub struct HeartbeatCacheEntry {
     pub dirty: bool,
     pub hostname: Option<String>,
     pub device_fingerprint: Option<String>,
+    pub mac_address: Option<String>,
     pub ip_address: Option<String>,
 }
 
@@ -235,12 +236,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/auth/google/login", get(handlers::oauth::google_login))
         .route("/api/auth/google/callback", get(handlers::oauth::google_callback))
         .route("/api/admin/controls", get(handlers::admin::get_controls).post(handlers::admin::patch_controls))
-        .route("/api/downloads/node/windows/x86_64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("windows".to_string(), "x86_64".to_string()))).await }))
-        .route("/api/downloads/node/windows-portable/x86_64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("windows-portable".to_string(), "x86_64".to_string()))).await }))
-        .route("/api/downloads/node/macos/arm64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("macos".to_string(), "arm64".to_string()))).await }))
-        .route("/api/downloads/node/macos/x86_64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("macos".to_string(), "x86_64".to_string()))).await }))
-        .route("/api/downloads/node/linux/x86_64", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("linux".to_string(), "x86_64".to_string()))).await }))
-        .route("/api/downloads/node/checksums/latest", get(|| async { handlers::downloads::proxy_node_download(axum::extract::Path(("checksums".to_string(), "latest".to_string()))).await }))
+        .route("/api/downloads/node/:os/:arch", get(|axum::extract::Path((os, arch)): axum::extract::Path<(String, String)>| async move { handlers::downloads::proxy_node_download(axum::extract::Path((os, arch))).await }))
         
         // Internal Extensions
         .route("/api/manifest/:bucket/*key", get(handlers::s3::get_presigned_manifest))
