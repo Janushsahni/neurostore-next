@@ -70,22 +70,6 @@ jobs:
           Copy-Item "deploy\windows\uninstall-service.bat" "$bundleRoot\uninstall-service.bat"
           Copy-Item "deploy\windows\show-node-address.ps1" "$bundleRoot\show-node-address.ps1"
           Copy-Item "deploy\windows\show-node-address.bat" "$bundleRoot\show-node-address.bat"
-          Copy-Item "deploy\windows\upload-image.ps1" "$bundleRoot\upload-image.ps1"
-          Copy-Item "deploy\windows\upload-image.bat" "$bundleRoot\upload-image.bat"
-          Copy-Item "deploy\windows\retrieve-image.ps1" "$bundleRoot\retrieve-image.ps1"
-          Copy-Item "deploy\windows\retrieve-image.bat" "$bundleRoot\retrieve-image.bat"
-          Copy-Item "deploy\windows\start-demo-portal.ps1" "$bundleRoot\start-demo-portal.ps1"
-          Copy-Item "deploy\windows\start-demo-portal.bat" "$bundleRoot\start-demo-portal.bat"
-          Copy-Item "deploy\windows\update-node.ps1" "$bundleRoot\update-node.ps1"
-          Copy-Item "deploy\windows\install-updater-task.ps1" "$bundleRoot\install-updater-task.ps1"
-          Copy-Item "deploy\windows\uninstall-updater-task.ps1" "$bundleRoot\uninstall-updater-task.ps1"
-          Copy-Item "deploy\windows\install-updater-task.bat" "$bundleRoot\install-updater-task.bat"
-          Copy-Item "deploy\windows\uninstall-updater-task.bat" "$bundleRoot\uninstall-updater-task.bat"
-          New-Item -ItemType Directory -Path "$bundleRoot\demo-portal\public" -Force | Out-Null
-          Copy-Item "apps\demo-portal\server.mjs" "$bundleRoot\demo-portal\server.mjs"
-          Copy-Item "apps\demo-portal\public\index.html" "$bundleRoot\demo-portal\public\index.html"
-          Copy-Item "apps\demo-portal\public\app.js" "$bundleRoot\demo-portal\public\app.js"
-          Copy-Item "apps\demo-portal\public\style.css" "$bundleRoot\demo-portal\public\style.css"
           Set-Content -Path "$bundleRoot\version.txt" -Value "${env:MSI_VERSION}"
 
           @"
@@ -115,27 +99,7 @@ jobs:
           3) Service name: NeurostoreNode (auto-start enabled)
           4) Official builds include embedded gateway admission metadata in build-info.json
 
-          Upload image to decentralized nodes:
-          1) Run upload-image.bat
-          2) Paste peer multiaddrs from your friends' laptops
-          3) Share manifest file with the uploader account
-
-          Retrieve image from decentralized nodes:
-          1) Run retrieve-image.bat
-          2) Provide manifest path and passphrase
-
-          Run local website upload portal:
-          1) Install Node.js 20+
-          2) Run start-demo-portal.bat
-          3) Open http://127.0.0.1:7070 and use login/upload/retrieve UI
-
-          Install automatic background updates:
-          1) Right-click install-updater-task.bat and Run as administrator
-          2) Task name: NeurostoreNodeAutoUpdate (default every 12 hours)
-          3) Updater script validates MSI SHA-256 before install
-
-          Optional manual command:
-          neuro-node.exe --storage-path .\node-data --max-gb 100 --listen /ip4/0.0.0.0/tcp/9000
+          Enjoy 100% genuine decentralized storage!
           "@ | Set-Content -Path "$bundleRoot\README.txt"
 
       - name: Prepare code-sign certificate
