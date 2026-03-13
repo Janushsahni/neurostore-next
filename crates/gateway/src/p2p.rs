@@ -1,28 +1,46 @@
-use libp2p::{
-    kad::{store::MemoryStore, Behaviour as Kademlia, Config as KadConfig},
-    noise, tcp, yamux, relay, autonat,
-    request_response::{self, Behaviour as RequestResponse, Codec as RequestResponseCodec},
-    swarm::{NetworkBehaviour, SwarmEvent},
-    identity, PeerId, Swarm, StreamProtocol, SwarmBuilder,
-};
-use futures::StreamExt;
-use tracing::{info, warn};
-use neuro_protocol::{AuditChunkRequest, ChunkCommand, ChunkReply};
-use std::io;
-use std::net::IpAddr;
-use std::collections::HashMap;
-use tokio::sync::{mpsc, oneshot};
-use tokio::time::{self, Duration, Instant};
-use rand::seq::IteratorRandom;
 use crate::geofence::GeoFenceManager;
 use crate::models::Node;
+use futures::StreamExt;
 use libp2p::request_response::OutboundRequestId;
+use libp2p::{
+    autonat, identity,
+    kad::{store::MemoryStore, Behaviour as Kademlia, Config as KadConfig},
+    noise, relay,
+    request_response::{self, Behaviour as RequestResponse, Codec as RequestResponseCodec},
+    swarm::{NetworkBehaviour, SwarmEvent},
+    tcp, yamux, PeerId, StreamProtocol, Swarm, SwarmBuilder,
+};
+use neuro_protocol::{AuditChunkRequest, ChunkCommand, ChunkReply};
+use rand::seq::IteratorRandom;
+use std::collections::HashMap;
+use std::io;
+use std::net::IpAddr;
+use tokio::sync::{mpsc, oneshot};
+use tokio::time::{self, Duration, Instant};
+use tracing::{info, warn};
 
 pub enum SwarmRequest {
-    Store { command: ChunkCommand, geofence: String, tx: oneshot::Sender<StoreAck> },
-    Retrieve { cid: String, preferred_peer_id: Option<String>, tx: oneshot::Sender<RetrieveAck> },
-    Delete { cid: String, tx: oneshot::Sender<bool> },
-    Audit { peer_id: String, cid: String, challenge_hex: String, nonce_hex: String, tx: oneshot::Sender<AuditAck> },
+    Store {
+        command: ChunkCommand,
+        geofence: String,
+        tx: oneshot::Sender<StoreAck>,
+    },
+    Retrieve {
+        cid: String,
+        preferred_peer_id: Option<String>,
+        tx: oneshot::Sender<RetrieveAck>,
+    },
+    Delete {
+        cid: String,
+        tx: oneshot::Sender<bool>,
+    },
+    Audit {
+        peer_id: String,
+        cid: String,
+        challenge_hex: String,
+        nonce_hex: String,
+        tx: oneshot::Sender<AuditAck>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -84,7 +102,6 @@ struct PendingAudit {
     challenge_hex: String,
     nonce_hex: String,
 }
-
 
 #[derive(Clone, Default)]
 pub struct ChunkCodec;
@@ -167,7 +184,6 @@ pub struct P2pNode {
     pending_audits: HashMap<OutboundRequestId, PendingAudit>,
 }
 
-
 impl P2pNode {
     pub async fn new() -> anyhow::Result<Self> {
         let local_key = identity::Keypair::generate_ed25519();
@@ -186,17 +202,17 @@ impl P2pNode {
                 let store = MemoryStore::new(local_peer_id);
                 let mut kad_config = KadConfig::default();
                 kad_config.set_protocol_names(vec![StreamProtocol::new("/neurostore/kad/1.0.0")]);
-                
+
                 // ── TRUST-WEIGHTED ROUTING (ECLIPSE ATTACK PROTECTION) ──
-                // By default, Kademlia adds every connected node to its routing table. 
+                // By default, Kademlia adds every connected node to its routing table.
                 // A malicious actor could spin up 10,000 Sybil nodes to surround our Gateway
                 // and give us false routing data ("Data not found" or blackholing requests).
                 // We lock down the DHT so it only trusts and routes through 'Authoritative Bootstrappers'.
-                
+
                 // In production, these would be the static IPs of our Tier-1 Gateways and trusted Data Centers.
                 let authoritative_bootstrappers = vec![
                     "/ip4/13.234.20.101/tcp/9010/p2p/QmTrustedGatewayNode1AlphaOmega",
-                    "/ip4/3.108.45.12/tcp/9010/p2p/QmTrustedGatewayNode2AlphaOmega"
+                    "/ip4/3.108.45.12/tcp/9010/p2p/QmTrustedGatewayNode2AlphaOmega",
                 ];
 
                 let mut kademlia = Kademlia::with_config(local_peer_id, store, kad_config);
@@ -204,15 +220,17 @@ impl P2pNode {
                 for addr_str in authoritative_bootstrappers {
                     if let Ok(multiaddr) = addr_str.parse::<libp2p::Multiaddr>() {
                         // Extract peer id from multiaddr to add to routing table
-                        if let Some(libp2p::multiaddr::Protocol::P2p(peer_id_hash)) = multiaddr.iter().last() {
+                        if let Some(libp2p::multiaddr::Protocol::P2p(peer_id_hash)) =
+                            multiaddr.iter().last()
+                        {
                             if let Ok(peer_id) = PeerId::from_multihash(peer_id_hash.into()) {
                                 kademlia.add_address(&peer_id, multiaddr);
                             }
                         }
                     }
                 }
-                
-                // To fully prevent Eclipse attacks, we can change the routing table 
+
+                // To fully prevent Eclipse attacks, we can change the routing table
                 // update mode so it doesn't automatically ingest unverified peers.
                 kademlia.set_mode(Some(libp2p::kad::Mode::Server));
 
@@ -223,7 +241,7 @@ impl P2pNode {
                     )),
                     request_response::Config::default(),
                 );
-                
+
                 let relay = relay::Behaviour::new(local_peer_id, relay::Config::default());
                 let autonat = autonat::Behaviour::new(local_peer_id, autonat::Config::default());
 
@@ -236,7 +254,7 @@ impl P2pNode {
             })?
             .build();
 
-        Ok(Self { 
+        Ok(Self {
             swarm,
             peer_ips: HashMap::new(),
             pending_retrievals: HashMap::new(),
@@ -246,11 +264,10 @@ impl P2pNode {
         })
     }
 
-
     pub async fn start(
-        &mut self, 
-        port: u16, 
-        mut rx: mpsc::Receiver<SwarmRequest>, 
+        &mut self,
+        port: u16,
+        mut rx: mpsc::Receiver<SwarmRequest>,
         geo: GeoFenceManager,
         db: sqlx::PgPool,
     ) -> anyhow::Result<()> {
@@ -292,7 +309,7 @@ impl P2pNode {
                         // ── COLLUSION-AWARE PLACEMENT ──
                         // We track which ASNs have already received shards for this specific CID
                         // to ensure no single entity controls the recovery threshold.
-                        // For a simplified implementation here, we just pick a random peer 
+                        // For a simplified implementation here, we just pick a random peer
                         // and log its ASN, but in a full stateful router, this history is persisted per-object.
                         let mut chosen_peer = None;
                         let mut attempts = 0;
@@ -473,7 +490,7 @@ impl P2pNode {
                     SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                         let remote_addr = endpoint.get_remote_address();
                         let mut node_ip = None;
-                        
+
                         for proto in remote_addr.iter() {
                             match proto {
                                 libp2p::multiaddr::Protocol::Ip4(ip) => {
@@ -520,8 +537,8 @@ impl P2pNode {
                         warn!("Node Disconnected: {:?}", peer_id);
                         self.peer_ips.remove(&peer_id);
                     }
-                    SwarmEvent::Behaviour(NeuroStoreBehaviourEvent::Chunk(request_response::Event::Message { 
-                        peer: _, message: request_response::Message::Response { request_id, response } 
+                    SwarmEvent::Behaviour(NeuroStoreBehaviourEvent::Chunk(request_response::Event::Message {
+                        peer: _, message: request_response::Message::Response { request_id, response }
                     })) => {
                         if let Some(pending) = self.pending_retrievals.remove(&request_id) {
                             if let ChunkReply::Retrieve(res) = response {

@@ -602,8 +602,12 @@ async fn run_upload(args: UploadArgs) -> Result<()> {
         }
 
         match swarm.select_next_some().await {
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message { 
-                message: RequestResponseMessage::Response { request_id, response },
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message {
+                message:
+                    RequestResponseMessage::Response {
+                        request_id,
+                        response,
+                    },
                 ..
             })) => {
                 if let Some(state) = inflight.remove(&request_id) {
@@ -633,24 +637,22 @@ async fn run_upload(args: UploadArgs) -> Result<()> {
                             *acked_by_cid.entry(state.dispatch.cid).or_insert(0) += 1;
                             acked_requests += 1;
                         }
-                        _ => {
-                            return Err(anyhow!(
-                                "unexpected response type for store request"
-                            ))
-                        }
+                        _ => return Err(anyhow!("unexpected response type for store request")),
                     }
                 }
             }
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::OutboundFailure {
-                request_id, error, ..
-            })) => {
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(
+                RequestResponseEvent::OutboundFailure {
+                    request_id, error, ..
+                },
+            )) => {
                 if let Some(mut state) = inflight.remove(&request_id) {
                     if state.attempt < 3 {
                         state.attempt += 1;
-                        let retry_id = swarm.behaviour_mut().chunk.send_request(
-                            &state.dispatch.peer_id,
-                            state.dispatch.request.clone(),
-                        );
+                        let retry_id = swarm
+                            .behaviour_mut()
+                            .chunk
+                            .send_request(&state.dispatch.peer_id, state.dispatch.request.clone());
                         state.started = Instant::now();
                         inflight.insert(retry_id, state);
                     } else {
@@ -671,7 +673,6 @@ async fn run_upload(args: UploadArgs) -> Result<()> {
             }
             _ => {}
         }
-
     }
 
     for ms in &manifest_shards {
@@ -768,7 +769,9 @@ async fn run_retrieve(args: RetrieveArgs) -> Result<()> {
     )
     .await?;
     if warm_connected.is_empty() {
-        return Err(anyhow!("unable to connect to any retrieval peer during warmup"));
+        return Err(anyhow!(
+            "unable to connect to any retrieval peer during warmup"
+        ));
     }
 
     let mut pending = VecDeque::<RetrieveAttemptState>::new();
@@ -814,16 +817,23 @@ async fn run_retrieve(args: RetrieveArgs) -> Result<()> {
         }
 
         match swarm.select_next_some().await {
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message { 
-                message: RequestResponseMessage::Response { request_id, response },
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message {
+                message:
+                    RequestResponseMessage::Response {
+                        request_id,
+                        response,
+                    },
                 ..
             })) => {
                 if let Some(mut state) = inflight.remove(&request_id) {
                     match response {
                         ChunkReply::Retrieve(reply) => {
                             let key = (state.chunk_index, state.shard_index);
-                            if let std::collections::hash_map::Entry::Vacant(e) = completed.entry(key) {
-                                let Ok(peer_id) = extract_peer_id(&state.peers[state.attempt]) else {
+                            if let std::collections::hash_map::Entry::Vacant(e) =
+                                completed.entry(key)
+                            {
+                                let Ok(peer_id) = extract_peer_id(&state.peers[state.attempt])
+                                else {
                                     return Err(anyhow!("invalid peer address in retrieve state"));
                                 };
                                 if reply.found
@@ -859,15 +869,13 @@ async fn run_retrieve(args: RetrieveArgs) -> Result<()> {
                                 }
                             }
                         }
-                        _ => {
-                            return Err(anyhow!(
-                                "unexpected response type for retrieve request"
-                            ))
-                        }
+                        _ => return Err(anyhow!("unexpected response type for retrieve request")),
                     }
                 }
             }
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::OutboundFailure { request_id, .. })) => {
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(
+                RequestResponseEvent::OutboundFailure { request_id, .. },
+            )) => {
                 if let Some(mut state) = inflight.remove(&request_id) {
                     state.attempt += 1;
                     if state.attempt < state.peers.len() {
@@ -877,7 +885,6 @@ async fn run_retrieve(args: RetrieveArgs) -> Result<()> {
             }
             _ => {}
         }
-
 
         if pending.is_empty() && inflight.is_empty() {
             break;
@@ -1048,8 +1055,12 @@ async fn run_store_prepared(args: StorePreparedArgs) -> Result<()> {
         }
 
         match swarm.select_next_some().await {
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message { 
-                message: RequestResponseMessage::Response { request_id, response },
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message {
+                message:
+                    RequestResponseMessage::Response {
+                        request_id,
+                        response,
+                    },
                 ..
             })) => {
                 if let Some(state) = inflight.remove(&request_id) {
@@ -1079,24 +1090,22 @@ async fn run_store_prepared(args: StorePreparedArgs) -> Result<()> {
                             *acked_by_cid.entry(state.dispatch.cid).or_insert(0) += 1;
                             acked_requests += 1;
                         }
-                        _ => {
-                            return Err(anyhow!(
-                                "unexpected response type for store request"
-                            ))
-                        }
+                        _ => return Err(anyhow!("unexpected response type for store request")),
                     }
                 }
             }
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::OutboundFailure {
-                request_id, error, ..
-            })) => {
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(
+                RequestResponseEvent::OutboundFailure {
+                    request_id, error, ..
+                },
+            )) => {
                 if let Some(mut state) = inflight.remove(&request_id) {
                     if state.attempt < 3 {
                         state.attempt += 1;
-                        let retry_id = swarm.behaviour_mut().chunk.send_request(
-                            &state.dispatch.peer_id,
-                            state.dispatch.request.clone(),
-                        );
+                        let retry_id = swarm
+                            .behaviour_mut()
+                            .chunk
+                            .send_request(&state.dispatch.peer_id, state.dispatch.request.clone());
                         state.started = Instant::now();
                         inflight.insert(retry_id, state);
                     } else {
@@ -1107,7 +1116,6 @@ async fn run_store_prepared(args: StorePreparedArgs) -> Result<()> {
                     }
                 }
             }
-
 
             SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
                 eprintln!(
@@ -1222,7 +1230,9 @@ async fn run_retrieve_raw(args: RetrieveRawArgs) -> Result<()> {
     )
     .await?;
     if warm_connected.is_empty() {
-        return Err(anyhow!("unable to connect to any retrieval peer during warmup"));
+        return Err(anyhow!(
+            "unable to connect to any retrieval peer during warmup"
+        ));
     }
 
     let mut pending = VecDeque::<RetrieveAttemptState>::new();
@@ -1268,16 +1278,23 @@ async fn run_retrieve_raw(args: RetrieveRawArgs) -> Result<()> {
         }
 
         match swarm.select_next_some().await {
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message { 
-                message: RequestResponseMessage::Response { request_id, response },
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message {
+                message:
+                    RequestResponseMessage::Response {
+                        request_id,
+                        response,
+                    },
                 ..
             })) => {
                 if let Some(mut state) = inflight.remove(&request_id) {
                     match response {
                         ChunkReply::Retrieve(reply) => {
                             let key = (state.chunk_index, state.shard_index);
-                            if let std::collections::hash_map::Entry::Vacant(e) = completed.entry(key) {
-                                let Ok(peer_id) = extract_peer_id(&state.peers[state.attempt]) else {
+                            if let std::collections::hash_map::Entry::Vacant(e) =
+                                completed.entry(key)
+                            {
+                                let Ok(peer_id) = extract_peer_id(&state.peers[state.attempt])
+                                else {
                                     return Err(anyhow!("invalid peer address in retrieve state"));
                                 };
                                 if reply.found
@@ -1314,15 +1331,13 @@ async fn run_retrieve_raw(args: RetrieveRawArgs) -> Result<()> {
                                 }
                             }
                         }
-                        _ => {
-                            return Err(anyhow!(
-                                "unexpected response type for retrieve request"
-                            ))
-                        }
+                        _ => return Err(anyhow!("unexpected response type for retrieve request")),
                     }
                 }
             }
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::OutboundFailure { request_id, .. })) => {
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(
+                RequestResponseEvent::OutboundFailure { request_id, .. },
+            )) => {
                 if let Some(mut state) = inflight.remove(&request_id) {
                     state.attempt += 1;
                     if state.attempt < state.peers.len() {
@@ -1332,7 +1347,6 @@ async fn run_retrieve_raw(args: RetrieveRawArgs) -> Result<()> {
             }
             _ => {}
         }
-
 
         if pending.is_empty() && inflight.is_empty() {
             break;
@@ -1492,8 +1506,12 @@ async fn run_audit(args: AuditArgs) -> Result<()> {
         }
 
         match swarm.select_next_some().await {
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message { 
-                message: RequestResponseMessage::Response { request_id, response },
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message {
+                message:
+                    RequestResponseMessage::Response {
+                        request_id,
+                        response,
+                    },
                 ..
             })) => {
                 if let Some(mut state) = inflight.remove(&request_id) {
@@ -1527,22 +1545,17 @@ async fn run_audit(args: AuditArgs) -> Result<()> {
                                     state.nonce_hex = random_nonce_hex();
                                     pending.push_back(state);
                                 } else {
-                                    return Err(anyhow!(
-                                        "audit failed for cid={}",
-                                        state.cid
-                                    ));
+                                    return Err(anyhow!("audit failed for cid={}", state.cid));
                                 }
                             }
                         }
-                        _ => {
-                            return Err(anyhow!(
-                                "unexpected response type for audit request"
-                            ))
-                        }
+                        _ => return Err(anyhow!("unexpected response type for audit request")),
                     }
                 }
             }
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::OutboundFailure { request_id, .. })) => {
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(
+                RequestResponseEvent::OutboundFailure { request_id, .. },
+            )) => {
                 if let Some(mut state) = inflight.remove(&request_id) {
                     state.attempt += 1;
                     if state.attempt < state.peers.len() {
@@ -1555,7 +1568,6 @@ async fn run_audit(args: AuditArgs) -> Result<()> {
             }
             _ => {}
         }
-
     }
 
     if passed != sample_count {
@@ -2141,19 +2153,25 @@ async fn send_chunk_request(
     let request_id = swarm.behaviour_mut().chunk.send_request(peer_id, request);
     loop {
         match swarm.select_next_some().await {
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message { 
-                message: RequestResponseMessage::Response { request_id: rid, response },
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::Message {
+                message:
+                    RequestResponseMessage::Response {
+                        request_id: rid,
+                        response,
+                    },
                 ..
             })) => {
                 if rid == request_id {
                     return Ok(response);
                 }
             }
-            SwarmEvent::Behaviour(UploaderEvent::Chunk(RequestResponseEvent::OutboundFailure {
-                request_id: rid,
-                error,
-                ..
-            })) => {
+            SwarmEvent::Behaviour(UploaderEvent::Chunk(
+                RequestResponseEvent::OutboundFailure {
+                    request_id: rid,
+                    error,
+                    ..
+                },
+            )) => {
                 if rid == request_id {
                     return Err(anyhow!(
                         "request to peer {} failed for request {:?}: {error}",
@@ -2166,7 +2184,6 @@ async fn send_chunk_request(
         }
     }
 }
-
 
 fn sign_action_report(report: &ActionReport, password: &str, salt: &str) -> Result<String> {
     let payload = serde_json::to_vec(&serde_json::json!({

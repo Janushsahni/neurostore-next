@@ -2,10 +2,11 @@ use crate::store::SecureBlockStore;
 use anyhow::Result;
 use futures::StreamExt;
 use libp2p::{
+    autonat, dcutr,
     gossipsub::{self, IdentTopic as Topic, MessageAuthenticity, ValidationMode},
     identify, identity,
     kad::{self, store::MemoryStore},
-    noise, ping, relay, autonat, dcutr,
+    noise, ping, relay,
     request_response::{
         self, Behaviour as RequestResponse, Codec as RequestResponseCodec,
         Event as RequestResponseEvent, Message as RequestResponseMessage,
@@ -23,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::{io, sync::Arc, time::Duration};
 use tokio::sync::oneshot;
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 #[derive(Clone, Default)]
 pub struct ChunkCodec;
@@ -263,21 +264,27 @@ pub async fn drive_node(
         .subscribe(&node.topic_announce)?;
 
     // V7 AutoNAT & DCUtR NAT Hole-Punching
-    // We negotiate a circuit via the Relay server. This enables 99% of residential 
+    // We negotiate a circuit via the Relay server. This enables 99% of residential
     // nodes behind NAT firewalls to accept direct libp2p uploads bypassing routers.
     if let Some(relay_str) = &node.relay_url {
         if let Ok(relay_addr) = relay_str.parse::<Multiaddr>() {
             info!("Dialing Web3 NAT Relay for Traversal: {}", relay_addr);
             let _ = node.swarm.dial(relay_addr.clone());
-            
+
             // Arm the DCUtR protocol by explicitly listening on the proxy circuit
             let circuit_listen = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
             match node.swarm.listen_on(circuit_listen.clone()) {
-                Ok(_) => info!("Hole-Punch Circuit Armored: Listening on {}", circuit_listen),
+                Ok(_) => info!(
+                    "Hole-Punch Circuit Armored: Listening on {}",
+                    circuit_listen
+                ),
                 Err(e) => warn!("Failed to arm DCUtR relay circuit: {}", e),
             }
         } else {
-            warn!("Failed to parse Multiaddr from Relay URL: {}. NAT traversal inactive.", relay_str);
+            warn!(
+                "Failed to parse Multiaddr from Relay URL: {}. NAT traversal inactive.",
+                relay_str
+            );
         }
     }
 
@@ -407,7 +414,7 @@ fn handle_chunk_command(node: &NeuroNode, cmd: ChunkCommand) -> ChunkReply {
             let mut accepted = register_audit_nonce(&node.audit_replay_guard, &cid, &nonce_hex);
             let maybe = node.store.retrieve_chunk(&cid).ok().flatten();
             let found = maybe.is_some();
-            
+
             let response_hash = if accepted {
                 if let Some(data) = maybe {
                     match compute_audit_response_hash(&challenge_hex, data.as_ref()) {
@@ -447,7 +454,6 @@ fn handle_chunk_command(node: &NeuroNode, cmd: ChunkCommand) -> ChunkReply {
             })
         }
         ChunkCommand::Delete(DeleteChunkRequest { cid }) => {
-
             let deleted = node.store.delete_chunk(&cid).ok().unwrap_or(false);
             let timestamp_ms = chrono::Utc::now().timestamp_millis() as u64;
             // PoE Payload: prove that [cid] was requested to be deleted at [timestamp]
@@ -484,7 +490,10 @@ fn register_audit_nonce(guard: &Mutex<HashMap<String, u64>>, cid: &str, nonce_he
     true
 }
 
-fn compute_audit_response_hash(challenge_hex: &str, data: &[u8]) -> Result<String, hex::FromHexError> {
+fn compute_audit_response_hash(
+    challenge_hex: &str,
+    data: &[u8],
+) -> Result<String, hex::FromHexError> {
     let mut hasher = Sha256::new();
     let challenge = hex::decode(challenge_hex)?;
     hasher.update(&challenge);
@@ -524,7 +533,6 @@ fn deny_chunk_command(cmd: ChunkCommand) -> ChunkReply {
         }),
     }
 }
-
 
 fn peer_id_from_multiaddr(addr: &Multiaddr) -> Option<PeerId> {
     addr.iter().find_map(|p| match p {

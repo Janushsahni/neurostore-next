@@ -89,7 +89,7 @@ struct NodeMetrics {
     pub bandwidth_mbps: f64,
     // RL Feature: Object heat (how frequently the peer is queried)
     #[serde(default)]
-    pub object_heat_index: f64, 
+    pub object_heat_index: f64,
     // RL Feature: Geolocation QoS penalty
     #[serde(default)]
     pub regional_qos_penalty: f64,
@@ -104,14 +104,14 @@ struct PolicyOutput {
     peer: String,
     score: f64,
     reputation: f64,
-    anomaly_level: String,      // none | warn | critical
-    anomaly_score: f64,         // composite z-score magnitude
-    trend: String,              // stable | improving | degrading
-    trend_velocity: f64,        // rate of change
-    action: String,             // promote | hold | probation | quarantine | evict
-    churn_probability: f64,     // 0.0 - 1.0 risk of node dropping offline
-    price_per_gb: f64,          // Dynamic $NEURO payout rate
-    confidence: f64,            // 0.0 - 1.0
+    anomaly_level: String,  // none | warn | critical
+    anomaly_score: f64,     // composite z-score magnitude
+    trend: String,          // stable | improving | degrading
+    trend_velocity: f64,    // rate of change
+    action: String,         // promote | hold | probation | quarantine | evict
+    churn_probability: f64, // 0.0 - 1.0 risk of node dropping offline
+    price_per_gb: f64,      // Dynamic $NEURO payout rate
+    confidence: f64,        // 0.0 - 1.0
     observations: u64,
     slo_violations: SloStatus,
     factors: ScoreFactors,
@@ -185,8 +185,8 @@ impl RunningStat {
 
 #[derive(Debug, Clone, Default)]
 struct TrendTracker {
-    velocity: f64,        // first derivative (rate of change)
-    acceleration: f64,    // second derivative (is degradation speeding up?)
+    velocity: f64,     // first derivative (rate of change)
+    acceleration: f64, // second derivative (is degradation speeding up?)
     prev_score: f64,
     initialized: bool,
 }
@@ -201,7 +201,8 @@ impl TrendTracker {
             return;
         }
         let new_velocity = score - self.prev_score;
-        self.acceleration = (1.0 - alpha) * self.acceleration + alpha * (new_velocity - self.velocity);
+        self.acceleration =
+            (1.0 - alpha) * self.acceleration + alpha * (new_velocity - self.velocity);
         self.velocity = (1.0 - alpha) * self.velocity + alpha * new_velocity;
         self.prev_score = score;
     }
@@ -233,7 +234,7 @@ struct PeerModel {
     consecutive_anomalies: u32,
     slo_violation_count: u32,
     heat_accumulator: f64, // Tracks long-term object query volume (RL reward signal)
-    
+
     // Predictive AI: Churn Signatures
     latency_jitter: RunningStat,
 }
@@ -293,14 +294,18 @@ fn compute_churn_probability(model: &PeerModel, metrics: &NodeMetrics) -> f64 {
     // Predictive AI: "Pre-emptive Self-Healing"
     // Identify the "signature" of a node about to go offline:
     // High Jitter + Dropping Bandwidth + Degrading Trend = Imminent Failure
-    
+
     let base: f64 = if model.reputation < 40.0 { 0.5 } else { 0.05 };
-    let trend_hit: f64 = if model.trend.velocity < -2.0 { 0.25 } else { 0.0 };
-    
+    let trend_hit: f64 = if model.trend.velocity < -2.0 {
+        0.25
+    } else {
+        0.0
+    };
+
     // Jitter Analysis (Variance in Latency)
     let jitter_z = model.latency_jitter.zscore(metrics.latency_ms);
     let jitter_penalty = if jitter_z > 2.0 { 0.15 } else { 0.0 };
-    
+
     // Bandwidth Drop Signature
     let bw_z = model.bandwidth_stat.zscore(metrics.bandwidth_mbps);
     let bandwidth_drop_penalty = if bw_z < -1.5 { 0.15 } else { 0.0 };
@@ -313,9 +318,9 @@ fn compute_dynamic_price(reputation: f64, action: &str) -> f64 {
     // User Charge: ₹1.00 / GB / Month
     // Max COGS budget: ₹0.50 (for 2.0x redundancy)
     // Target Physical Payout: ₹0.25 - ₹0.30 per GB
-    
-    let base_physical_payout = 0.25; 
-    
+
+    let base_physical_payout = 0.25;
+
     let multiplier = match action {
         "promote" => 1.2,         // Best nodes earn ₹0.30
         "hold" => 1.0,            // Healthy nodes earn ₹0.25
@@ -356,11 +361,11 @@ fn compute_anomaly_score(model: &PeerModel, metrics: &NodeMetrics) -> f64 {
     // Composite magnitude — high value = multi-dimensional outlier
     // Only penalize negative deviations for uptime/verify/bandwidth
     // and positive deviations for latency (higher latency = bad)
-    let lat_penalty = z_lat.max(0.0);          // high latency is bad
-    let up_penalty = (-z_up).max(0.0);         // low uptime is bad
-    let ver_penalty = (-z_ver).max(0.0);       // low verify is bad
-    let bw_penalty = (-z_bw).max(0.0);         // low bandwidth is bad
-    let qos_penalty = z_qos.max(0.0);          // high QoS routing penalty is bad
+    let lat_penalty = z_lat.max(0.0); // high latency is bad
+    let up_penalty = (-z_up).max(0.0); // low uptime is bad
+    let ver_penalty = (-z_ver).max(0.0); // low verify is bad
+    let bw_penalty = (-z_bw).max(0.0); // low bandwidth is bad
+    let qos_penalty = z_qos.max(0.0); // high QoS routing penalty is bad
 
     (lat_penalty * lat_penalty
         + up_penalty * up_penalty
@@ -382,23 +387,22 @@ fn anomaly_level(score: f64, threshold: f64) -> &'static str {
 
 // ── RL-Guided Redundancy Multiplier ─────────────────────────────
 fn compute_rl_redundancy(heat_accumulator: f64, reputation: f64, action: &str) -> f64 {
-    // Core RL Logic: Reward nodes that frequently serve high-heat data by 
+    // Core RL Logic: Reward nodes that frequently serve high-heat data by
     // dynamically instructing the gateway to replicate more data to them.
     // If the node is quarantined or evicted, strip redundancy to 0.5x to drain it.
     if action == "quarantine" || action == "evict" {
         return 0.5;
     }
-    
+
     // Base redundancy is 1.0 (Gateway defaults).
     // Hotter nodes get a multiplier up to 2.5x to cache data nearer to edge.
     let heat_bonus = (heat_accumulator / 100.0).clamp(0.0, 1.5);
-    
+
     // Highly reputable nodes naturally command slightly higher redundancy allocations.
     let rep_bonus = (reputation / 100.0) * 0.5;
 
     (1.0 + heat_bonus + rep_bonus).clamp(1.0, 2.5)
 }
-
 
 // ── Confidence Calculation ──────────────────────────────────────
 
@@ -541,19 +545,23 @@ fn process_adaptive(model: &mut PeerModel, metrics: &NodeMetrics, args: &Args) -
 
     // 3. Update running statistics
     // Jitter update (difference from current mean)
-    let lat_diff = if model.latency_stat.initialized { (metrics.latency_ms - model.latency_stat.mean).abs() } else { 0.0 };
+    let lat_diff = if model.latency_stat.initialized {
+        (metrics.latency_ms - model.latency_stat.mean).abs()
+    } else {
+        0.0
+    };
     model.latency_jitter.update(lat_diff, alpha);
-    
+
     model.latency_stat.update(metrics.latency_ms, alpha);
     model.uptime_stat.update(metrics.uptime_pct, alpha);
     model.verify_stat.update(metrics.verify_success_pct, alpha);
     model.bandwidth_stat.update(metrics.bandwidth_mbps, alpha);
     model.qos_stat.update(metrics.regional_qos_penalty, alpha);
     model.score_stat.update(score, alpha);
-    
+
     // Accumulate heat (decay over time)
     model.heat_accumulator = (1.0 - alpha) * model.heat_accumulator + metrics.object_heat_index;
-    
+
     model.observations += 1;
 
     // 4. Trend analysis
@@ -634,6 +642,10 @@ fn process_adaptive(model: &mut PeerModel, metrics: &NodeMetrics, args: &Args) -
         observations: model.observations,
         slo_violations: slo,
         factors,
-        recommended_redundancy_multiplier: compute_rl_redundancy(model.heat_accumulator, model.reputation, action),
+        recommended_redundancy_multiplier: compute_rl_redundancy(
+            model.heat_accumulator,
+            model.reputation,
+            action,
+        ),
     }
 }

@@ -1,35 +1,34 @@
+use crate::p2p::SwarmRequest;
 use axum::{
     extract::{Request, State},
     http::{HeaderValue, Method, StatusCode},
     middleware::{from_fn, Next},
-    response::{Response, IntoResponse},
+    response::{IntoResponse, Response},
     routing::{get, post},
-    Router,
-    Json,
+    Json, Router,
 };
-use tower_http::cors::{AllowOrigin, CorsLayer};
-use tower_http::services::ServeDir;
 use sqlx::postgres::PgPoolOptions;
-use std::net::SocketAddr;
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
-use tracing::{info, Level};
-use tracing_subscriber::FmtSubscriber;
 use tokio::sync::mpsc;
 use tokio::sync::RwLock;
-use crate::p2p::SwarmRequest;
+use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::services::ServeDir;
+use tracing::{info, Level};
+use tracing_subscriber::FmtSubscriber;
 
 use moka::future::Cache;
 
-pub mod models;
-pub mod handlers;
 pub mod erasure;
+pub mod handlers;
+pub mod models;
 pub mod p2p;
 
+pub mod crypto;
+pub mod geofence;
 pub mod proofs;
 pub mod repair;
-pub mod geofence;
-pub mod crypto;
 
 #[derive(Debug, Clone)]
 pub struct HeartbeatCacheEntry {
@@ -78,15 +77,14 @@ async fn main() -> anyhow::Result<()> {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)
         .finish();
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("setting default subscriber failed");
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     // Connect to PostgreSQL with retry logic (Railway may start DB after gateway)
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL environment variable is required");
+    let database_url =
+        std::env::var("DATABASE_URL").expect("DATABASE_URL environment variable is required");
 
     info!("Connecting to PostgreSQL...");
-    
+
     let mut pool_result = None;
     for attempt in 1..=5u32 {
         match PgPoolOptions::new()
@@ -102,7 +100,12 @@ async fn main() -> anyhow::Result<()> {
             }
             Err(e) => {
                 let wait = 2u64.pow(attempt);
-                tracing::warn!("DB connection attempt {} failed: {}. Retrying in {}s...", attempt, e, wait);
+                tracing::warn!(
+                    "DB connection attempt {} failed: {}. Retrying in {}s...",
+                    attempt,
+                    e,
+                    wait
+                );
                 tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
             }
         }
@@ -115,20 +118,26 @@ async fn main() -> anyhow::Result<()> {
     // Phase 10: Ignite the LibP2P Swarm Network (non-fatal on cloud platforms)
     let (p2p_tx, p2p_rx) = mpsc::channel(100);
     let geo_manager = geofence::GeoFenceManager::new();
-    
+
     match p2p::P2pNode::new().await {
         Ok(mut swarm_node) => {
             let geo_manager_clone = geofence::GeoFenceManager::new();
             let db_for_p2p = pool.clone();
             tokio::spawn(async move {
                 info!("Igniting LibP2P Kademlia DHT Swarm...");
-                if let Err(e) = swarm_node.start(9010, p2p_rx, geo_manager_clone, db_for_p2p).await {
+                if let Err(e) = swarm_node
+                    .start(9010, p2p_rx, geo_manager_clone, db_for_p2p)
+                    .await
+                {
                     tracing::error!("P2P Swarm error: {}", e);
                 }
             });
         }
         Err(e) => {
-            tracing::warn!("P2P Swarm disabled (cloud mode): {}. HTTP API will still function.", e);
+            tracing::warn!(
+                "P2P Swarm disabled (cloud mode): {}. HTTP API will still function.",
+                e
+            );
             // Drain the rx channel so senders don't block
             tokio::spawn(async move {
                 let mut rx = p2p_rx;
@@ -139,8 +148,13 @@ async fn main() -> anyhow::Result<()> {
 
     fn env_or_random(name: &str) -> String {
         std::env::var(name).unwrap_or_else(|_| {
-            let val: String = (0..32).map(|_| format!("{:02x}", rand::random::<u8>())).collect();
-            tracing::warn!("{} not set — using generated default. Set this in production!", name);
+            let val: String = (0..32)
+                .map(|_| format!("{:02x}", rand::random::<u8>()))
+                .collect();
+            tracing::warn!(
+                "{} not set — using generated default. Set this in production!",
+                name
+            );
             val
         })
     }
@@ -158,9 +172,9 @@ async fn main() -> anyhow::Result<()> {
 
     let edge_cache: Cache<String, axum::body::Bytes> = Cache::new(10_000);
 
-    let shared_state = Arc::new(AppState { 
-        db: pool, 
-        p2p_tx, 
+    let shared_state = Arc::new(AppState {
+        db: pool,
+        p2p_tx,
         edge_cache,
         geo: geo_manager,
         metadata_protector,
@@ -172,7 +186,6 @@ async fn main() -> anyhow::Result<()> {
         environment,
         heartbeat_buffer: RwLock::new(HashMap::new()),
     });
-
 
     // Phase 11: Ignite the Cryptographic Proof of Spacetime (PoSt) Daemon
     let post_daemon = proofs::ProofOfSpacetimeDaemon::new(Arc::clone(&shared_state));
@@ -208,9 +221,7 @@ async fn main() -> anyhow::Result<()> {
             "x-neuro-proof-token".parse().unwrap(),
             "x-neuro-client-manifest".parse().unwrap(),
         ])
-        .expose_headers([
-            axum::http::header::CONTENT_TYPE,
-        ])
+        .expose_headers([axum::http::header::CONTENT_TYPE])
         .allow_credentials(true);
 
     // Build the Axum Router
@@ -266,17 +277,16 @@ async fn main() -> anyhow::Result<()> {
         .route("/zk/store/:bucket/*key", post(handlers::zk::zk_store))
         .route("/zk/issue-challenge", post(proofs::issue_zk_challenge))
         .route("/zk/submit-proof", post(proofs::verify_zk_proof))
-        
         // S3-Compatible API (Path Style) - Moved to bottom to prevent shadowing
-        // We exclude /api from the bucket match in the handler if needed, 
+        // We exclude /api from the bucket match in the handler if needed,
         // but Axum precedence will now favor the nested /api router.
         .route("/:bucket", get(handlers::s3::list_objects))
-        .route("/:bucket/*key", 
+        .route(
+            "/:bucket/*key",
             get(handlers::s3::get_object)
-            .put(handlers::s3::put_object)
-            .delete(handlers::s3::delete_object)
+                .put(handlers::s3::put_object)
+                .delete(handlers::s3::delete_object),
         )
-
         .fallback_service(ServeDir::new("public"))
         .layer(cors)
         .layer(from_fn(security_headers))
@@ -289,19 +299,21 @@ async fn main() -> anyhow::Result<()> {
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(9009);
-        
+
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!("NeuroStore V3 Enterprise Gateway listening on {}", addr);
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }
 
-async fn health_check(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+async fn health_check(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let db_ok = sqlx::query_scalar::<_, i64>("SELECT 1")
         .fetch_one(&state.db)
         .await
@@ -331,7 +343,9 @@ async fn health_check(
             .map(|o| o.trim().to_lowercase())
             .any(|o| o.contains("localhost") || o.contains("127.0.0.1"));
         if has_localhost_origin {
-            warnings.push("ALLOWED_ORIGINS contains localhost while ENVIRONMENT=production".to_string());
+            warnings.push(
+                "ALLOWED_ORIGINS contains localhost while ENVIRONMENT=production".to_string(),
+            );
         }
     }
 
@@ -358,20 +372,14 @@ async fn health_check(
     }))
 }
 
-async fn security_headers(
-    request: Request,
-    next: Next,
-) -> Response {
+async fn security_headers(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
     headers.insert(
         "x-content-type-options",
         HeaderValue::from_static("nosniff"),
     );
-    headers.insert(
-        "x-frame-options",
-        HeaderValue::from_static("DENY"),
-    );
+    headers.insert("x-frame-options", HeaderValue::from_static("DENY"));
     headers.insert(
         "referrer-policy",
         HeaderValue::from_static("strict-origin-when-cross-origin"),
@@ -399,10 +407,7 @@ static RATE_LIMIT_CACHE: std::sync::LazyLock<moka::future::Cache<String, u32>> =
 
 const MAX_REQUESTS_PER_MINUTE: u32 = 200;
 
-async fn rate_limit(
-    request: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> Response {
+async fn rate_limit(request: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let trust_proxy_headers = std::env::var("TRUST_PROXY_HEADERS")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
@@ -443,15 +448,16 @@ async fn rate_limit(
     next.run(request).await
 }
 
-async fn emergency_controls(
-    request: Request,
-    next: Next,
-) -> Response {
+async fn emergency_controls(request: Request, next: Next) -> Response {
     let method = request.method().clone();
     let path = request.uri().path().to_string();
     tracing::warn!("====== INCOMING REQ: {} {} ======", method, path);
 
-    if path.starts_with("/readyz") || path.starts_with("/api/health") || path.starts_with("/api/admin/controls") || path.starts_with("/api/downloads/node/") {
+    if path.starts_with("/readyz")
+        || path.starts_with("/api/health")
+        || path.starts_with("/api/admin/controls")
+        || path.starts_with("/api/downloads/node/")
+    {
         return next.run(request).await;
     }
 
@@ -464,15 +470,14 @@ async fn emergency_controls(
         Ok(c) => c,
         Err(e) => {
             tracing::error!("Failed to load emergency controls: {}", e);
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                "control plane unavailable",
-            )
-                .into_response();
+            return (StatusCode::SERVICE_UNAVAILABLE, "control plane unavailable").into_response();
         }
     };
 
-    let is_write = matches!(method, Method::POST | Method::PUT | Method::DELETE | Method::PATCH);
+    let is_write = matches!(
+        method,
+        Method::POST | Method::PUT | Method::DELETE | Method::PATCH
+    );
 
     let exempt_write_paths = [
         "/auth/login",

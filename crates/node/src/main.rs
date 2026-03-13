@@ -1,7 +1,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+mod ingress;
 mod p2p;
 mod store;
-mod ingress;
 
 use anyhow::Context;
 use clap::Parser;
@@ -29,7 +29,6 @@ const DEFAULT_RELAY_URL: &str = "wss://demo.neurostore.network/v1/nodes/ws";
 const _CREATOR_SIG: &[u8] = b"SmFueXNoaCAtIE9yaWdpbmFsIENyZWF0b3Igb2YgTmV1cm9TdG9yZQ==";
 
 #[derive(Parser, Debug, Clone)]
-
 #[command(name = "neuro-node", version, about = "Decentralized storage node")]
 struct Args {
     #[arg(long, default_value_t = default_storage_path_string())]
@@ -141,9 +140,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Configure logging: file-based for service mode, stdout for foreground
     if args.run_as_service {
-        let log_dir = std::path::Path::new(&std::env::var("ProgramData").unwrap_or_else(|_| "C:\\ProgramData".to_string()))
-            .join("NeuroStore")
-            .join("logs");
+        let log_dir = std::path::Path::new(
+            &std::env::var("ProgramData").unwrap_or_else(|_| "C:\\ProgramData".to_string()),
+        )
+        .join("NeuroStore")
+        .join("logs");
         let _ = std::fs::create_dir_all(&log_dir);
         let file_appender = tracing_appender::rolling::daily(&log_dir, "neuro-node.log");
         let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -244,7 +245,10 @@ async fn run_node_with_shutdown(
     }
     fs::create_dir_all(&final_storage_path)?;
     let final_storage_path_string = final_storage_path.to_string_lossy().to_string();
-    let store = Arc::new(SecureBlockStore::new(&final_storage_path_string, runtime.max_gb));
+    let store = Arc::new(SecureBlockStore::new(
+        &final_storage_path_string,
+        runtime.max_gb,
+    ));
 
     let bootstrap_addrs = runtime
         .bootstrap
@@ -260,7 +264,14 @@ async fn run_node_with_shutdown(
         ensure_gateway_registration(runtime, &peer_id).await;
     }
 
-    let node = build_node(store.clone(), keypair, bootstrap_addrs, allowlist, runtime.relay_url.clone()).await?;
+    let node = build_node(
+        store.clone(),
+        keypair,
+        bootstrap_addrs,
+        allowlist,
+        runtime.relay_url.clone(),
+    )
+    .await?;
     let listen_addr = parse_listen_multiaddr(&runtime.listen)?;
 
     info!(peer_id = %node.peer_id, node_id = %node_id, "Node identity loaded");
@@ -271,9 +282,10 @@ async fn run_node_with_shutdown(
     );
 
     // ── GATEWAY HEARTBEAT BACKGROUND TASK ──
-    let gateway_url = runtime.gateway_url.clone().unwrap_or_else(||
-        "https://neurostore-backend-production.up.railway.app".to_string()
-    );
+    let gateway_url = runtime
+        .gateway_url
+        .clone()
+        .unwrap_or_else(|| "https://neurostore-backend-production.up.railway.app".to_string());
     let heartbeat_node_id = node_id.clone();
     let heartbeat_store = store.clone();
     let heartbeat_max_gb = runtime.max_gb;
@@ -292,7 +304,10 @@ async fn run_node_with_shutdown(
             tracing::warn!("NODE_INGRESS_SHARED_SECRET not set; direct node ingress disabled");
             return;
         }
-        if let Err(err) = ingress::serve_ingress(ingress_store, ingress_peer_id, ingress_secret, ingress_port).await {
+        if let Err(err) =
+            ingress::serve_ingress(ingress_store, ingress_peer_id, ingress_secret, ingress_port)
+                .await
+        {
             tracing::error!("Node ingress server failed: {}", err);
         }
     });
@@ -304,13 +319,14 @@ async fn run_node_with_shutdown(
         loop {
             interval.tick().await;
             sys.refresh_all();
-            
+
             let used_bytes = heartbeat_store.get_used_bytes();
             let used_gb = used_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
             let uptime_min = start_time.elapsed().as_secs_f64() / 60.0;
-            
+
             let cpu_usage = sys.global_cpu_info().cpu_usage();
-            let memory_used_percent = (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0;
+            let memory_used_percent =
+                (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0;
 
             let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
             hasher.update(whoami::hostname().as_bytes());
@@ -353,7 +369,8 @@ async fn run_node_with_shutdown(
                 Ok(resp) => {
                     if resp.status().is_success() {
                         if let Ok(body) = resp.json::<serde_json::Value>().await {
-                            let earned = body.get("total_earned_inr")
+                            let earned = body
+                                .get("total_earned_inr")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("0.00");
                             info!(
@@ -409,7 +426,10 @@ fn resolve_setup_config(
         node_secret: std::env::var("NEUROSTORE_NODE_SHARED_SECRET")
             .ok()
             .or_else(|| std::env::var("NODE_SHARED_SECRET").ok()),
-        ingress_port: std::env::var("NEUROSTORE_INGRESS_PORT").ok().and_then(|v| v.parse().ok()).unwrap_or(default_ingress_port()),
+        ingress_port: std::env::var("NEUROSTORE_INGRESS_PORT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(default_ingress_port()),
         public_ingress_url: std::env::var("NEUROSTORE_PUBLIC_INGRESS_URL").ok(),
         wallet_address: default_wallet_address(),
         declared_location: default_declared_location(),
@@ -444,7 +464,10 @@ fn resolve_setup_config(
             info!(path = %config_path.display(), "Loaded saved node setup");
             return Ok(setup);
         } else if explicit_config {
-            anyhow::bail!("Explicitly requested setup config not found at {}", config_path.display());
+            anyhow::bail!(
+                "Explicitly requested setup config not found at {}",
+                config_path.display()
+            );
         }
     }
 
@@ -512,7 +535,7 @@ fn run_interactive_setup(
         "How many Gigabytes (GB) of storage do you want to rent out? (e.g. 100, 500, 1000)",
         &baseline.max_gb.to_string(),
     )?;
-    
+
     let relay_url_input = prompt_gui_fallback(
         "Network Relay",
         "Enter the Control Plane Relay (Default usually works):",
@@ -526,7 +549,11 @@ fn run_interactive_setup(
     )?;
 
     let max_gb = max_gb_input.parse::<u64>().unwrap_or(baseline.max_gb);
-    let relay_url = if relay_url_input.is_empty() { None } else { Some(relay_url_input) };
+    let relay_url = if relay_url_input.is_empty() {
+        None
+    } else {
+        Some(relay_url_input)
+    };
     let gateway_url = baseline.gateway_url.clone();
 
     // Auto-register using standard secrets if not provided
@@ -549,7 +576,11 @@ fn run_interactive_setup(
     Ok(setup)
 }
 
-fn prompt_path_gui_fallback(title: &str, prompt: &str, default_value: &str) -> anyhow::Result<String> {
+fn prompt_path_gui_fallback(
+    title: &str,
+    prompt: &str,
+    default_value: &str,
+) -> anyhow::Result<String> {
     #[cfg(windows)]
     {
         use std::process::Command;
@@ -583,8 +614,8 @@ fn prompt_path_gui_fallback(title: &str, prompt: &str, default_value: &str) -> a
 fn prompt_gui_fallback(title: &str, prompt: &str, default_value: &str) -> anyhow::Result<String> {
     #[cfg(windows)]
     {
-        use std::process::Command;
         use std::fs;
+        use std::process::Command;
         let vbs_code = format!(
             "Dim userInput\nuserInput = InputBox(\"{}\", \"{}\", \"{}\")\nWScript.Echo userInput",
             prompt.replace("\"", "\"\""),
@@ -604,7 +635,7 @@ fn prompt_gui_fallback(title: &str, prompt: &str, default_value: &str) -> anyhow
             }
         }
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
@@ -633,7 +664,8 @@ fn prompt_gui_fallback(title: &str, prompt: &str, default_value: &str) -> anyhow
             .arg(&format!("--title={}", title))
             .arg(&format!("--text={}", prompt))
             .arg(&format!("--entry-text={}", default_value))
-            .output() {
+            .output()
+        {
             let res = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !res.is_empty() {
                 return Ok(res);
@@ -735,9 +767,7 @@ fn default_storage_path() -> PathBuf {
     }
 
     if let Some(xdg) = std::env::var_os("XDG_DATA_HOME") {
-        return PathBuf::from(xdg)
-            .join("neurostore")
-            .join("node-data");
+        return PathBuf::from(xdg).join("neurostore").join("node-data");
     }
     if let Some(home) = std::env::var_os("HOME") {
         return PathBuf::from(home)

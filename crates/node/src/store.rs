@@ -1,12 +1,12 @@
-use std::fs;
-use std::io::{Read, Write as IoWrite};
-use std::path::{Path, PathBuf};
 use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
     AeadCore, Aes256Gcm, Key, Nonce,
 };
 use sha2::Digest;
 use sled::Db;
+use std::fs;
+use std::io::{Read, Write as IoWrite};
+use std::path::{Path, PathBuf};
 
 const USED_BYTES_KEY: &[u8] = b"__meta:used_bytes";
 const ENCRYPTION_KEY: &[u8] = b"__meta:node_encryption_key";
@@ -73,7 +73,7 @@ impl SecureBlockStore {
 
     pub fn save_chunk(&self, cid: &str, raw_data: &[u8]) -> anyhow::Result<bool> {
         let path = self.shard_path(cid);
-        
+
         // Check if exists and get old size
         let old_size = if path.exists() {
             fs::metadata(&path)?.len()
@@ -85,7 +85,7 @@ impl SecureBlockStore {
 
         // Node-level End-to-End Encryption
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // 96-bits
-        
+
         let mut hasher = sha2::Sha256::new();
         sha2::Digest::update(&mut hasher, raw_data);
         let checksum = hasher.finalize();
@@ -110,7 +110,7 @@ impl SecureBlockStore {
 
         // PHYSICAL FILE CREATION: This is what the user wants to see
         fs::write(&path, encrypted_data)?;
-        
+
         write_used_bytes(&self.db, projected)?;
         self.db.flush()?;
 
@@ -127,28 +127,31 @@ impl SecureBlockStore {
         let mut payload = Vec::new();
         file.read_to_end(&mut payload)?;
 
-        if payload.len() < 12 + 32 { 
-            return Ok(Some(payload)); 
+        if payload.len() < 12 + 32 {
+            return Ok(Some(payload));
         }
 
         let nonce = Nonce::from_slice(&payload[0..12]);
         let stored_checksum = &payload[12..44];
         let ciphertext = &payload[44..];
-        
+
         match self.cipher.decrypt(nonce, ciphertext) {
             Ok(decrypted) => {
                 let mut hasher = sha2::Sha256::new();
                 sha2::Digest::update(&mut hasher, &decrypted);
                 let computed_checksum = hasher.finalize();
-                
+
                 if computed_checksum.as_slice() != stored_checksum {
-                    eprintln!("CRITICAL ALERT: Silent Bit-Rot detected for shard CID {}", cid);
+                    eprintln!(
+                        "CRITICAL ALERT: Silent Bit-Rot detected for shard CID {}",
+                        cid
+                    );
                     return Ok(None);
                 }
-                
+
                 Ok(Some(decrypted))
-            },
-            Err(_) => Ok(Some(payload)), 
+            }
+            Err(_) => Ok(Some(payload)),
         }
     }
 
@@ -157,7 +160,7 @@ impl SecureBlockStore {
         if path.exists() {
             let size = fs::metadata(&path)?.len();
             fs::remove_file(path)?;
-            
+
             let used_bytes = read_used_bytes(&self.db).unwrap_or(0);
             let updated = used_bytes.saturating_sub(size);
             write_used_bytes(&self.db, updated)?;
@@ -175,8 +178,12 @@ impl SecureBlockStore {
 
     pub fn get_shard_count(&self) -> i32 {
         if let Ok(entries) = fs::read_dir(&self.shards_path) {
-            entries.filter_map(Result::ok)
-                .filter(|e| e.path().is_file() && e.path().extension().and_then(|s| s.to_str()) == Some("neuro"))
+            entries
+                .filter_map(Result::ok)
+                .filter(|e| {
+                    e.path().is_file()
+                        && e.path().extension().and_then(|s| s.to_str()) == Some("neuro")
+                })
                 .count() as i32
         } else {
             0

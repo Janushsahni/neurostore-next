@@ -103,7 +103,7 @@ jobs:
           "@ | Set-Content -Path "$bundleRoot\README.txt"
 
       - name: Prepare code-sign certificate
-        if: ${{ secrets.WINDOWS_CODESIGN_PFX_B64 != '' && secrets.WINDOWS_CODESIGN_PASSWORD != '' }}
+        if: secrets.WINDOWS_CODESIGN_PFX_B64 != '' && secrets.WINDOWS_CODESIGN_PASSWORD != ''
         shell: pwsh
         run: |
           $pfxPath = "dist\codesign.pfx"
@@ -111,7 +111,7 @@ jobs:
           "WINDOWS_CODESIGN_PFX_PATH=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Sign neuro-node.exe
-        if: ${{ secrets.WINDOWS_CODESIGN_PFX_B64 != '' && secrets.WINDOWS_CODESIGN_PASSWORD != '' }}
+        if: secrets.WINDOWS_CODESIGN_PFX_B64 != '' && secrets.WINDOWS_CODESIGN_PASSWORD != ''
         shell: pwsh
         run: |
           $signtool = (Get-Command signtool.exe -ErrorAction Stop).Source
@@ -147,7 +147,7 @@ jobs:
             -o dist/neuro-node-windows-x86_64.msi
 
       - name: Sign MSI
-        if: ${{ secrets.WINDOWS_CODESIGN_PFX_B64 != '' && secrets.WINDOWS_CODESIGN_PASSWORD != '' }}
+        if: secrets.WINDOWS_CODESIGN_PFX_B64 != '' && secrets.WINDOWS_CODESIGN_PASSWORD != ''
         shell: pwsh
         run: |
           $signtool = (Get-Command signtool.exe -ErrorAction Stop).Source

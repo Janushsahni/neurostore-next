@@ -5,14 +5,14 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use std::sync::Arc;
-use serde::Deserialize;
-use neuro_protocol::{ChunkCommand, StoreChunkRequest};
 use base64::Engine;
+use neuro_protocol::{ChunkCommand, StoreChunkRequest};
+use serde::Deserialize;
+use std::sync::Arc;
 use tokio::time::{timeout, Duration};
 
-use crate::AppState;
 use crate::p2p::SwarmRequest;
+use crate::AppState;
 
 #[derive(Deserialize)]
 pub struct ZkPayload {
@@ -54,7 +54,15 @@ pub async fn zk_store(
     const MAX_SHARD_BYTES: usize = 50 * 1024 * 1024; // 50 MB per shard
 
     if payload.shards.len() > MAX_SHARDS_PER_UPLOAD {
-        return (StatusCode::BAD_REQUEST, format!("Too many shards: {}. Maximum is {}", payload.shards.len(), MAX_SHARDS_PER_UPLOAD)).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Too many shards: {}. Maximum is {}",
+                payload.shards.len(),
+                MAX_SHARDS_PER_UPLOAD
+            ),
+        )
+            .into_response();
     }
 
     let key = key.trim_start_matches('/').to_string();
@@ -63,7 +71,12 @@ pub async fn zk_store(
     let cid = payload.manifest_root.clone();
     let mut shard_placements: Vec<(i32, String, String, String, i64, bool)> = Vec::new();
 
-    tracing::info!("Zero-Knowledge payload received for {}/{}, dispatching {} pre-encrypted shards to DHT", bucket, key, payload.shards.len());
+    tracing::info!(
+        "Zero-Knowledge payload received for {}/{}, dispatching {} pre-encrypted shards to DHT",
+        bucket,
+        key,
+        payload.shards.len()
+    );
 
     let shards_count = payload.shards.len() as i32;
     let mut recovery_threshold = 10;
@@ -75,14 +88,28 @@ pub async fn zk_store(
         };
 
         if decoded_bytes.len() > MAX_SHARD_BYTES {
-            return (StatusCode::BAD_REQUEST, format!("Shard too large: {} bytes. Maximum is {} bytes", decoded_bytes.len(), MAX_SHARD_BYTES)).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Shard too large: {} bytes. Maximum is {} bytes",
+                    decoded_bytes.len(),
+                    MAX_SHARD_BYTES
+                ),
+            )
+                .into_response();
         }
 
         recovery_threshold = shard.data_shards as i32;
 
         // CDN Edge Caching: Pin hot shard to RAM cache for fast retrieval
         // without orchestrating a 10-node LibP2P Kademlia lookup.
-        state.edge_cache.insert(shard.cid.clone(), axum::body::Bytes::from(decoded_bytes.clone())).await;
+        state
+            .edge_cache
+            .insert(
+                shard.cid.clone(),
+                axum::body::Bytes::from(decoded_bytes.clone()),
+            )
+            .await;
 
         let cmd = ChunkCommand::Store(StoreChunkRequest {
             cid: shard.cid.clone(),
@@ -94,23 +121,45 @@ pub async fn zk_store(
         // IN-MH (Mumbai), IN-DL (Delhi), IN-TG (Hyderabad), IN-KA (Bangalore)
         let regions = ["IN-MH", "IN-DL", "IN-TG", "IN-KA"];
         let target_region = regions[shard.shard_index % regions.len()].to_string();
-        tracing::debug!("Dispatching shard {} to Enterprise Region {}", shard.shard_index, target_region);
+        tracing::debug!(
+            "Dispatching shard {} to Enterprise Region {}",
+            shard.shard_index,
+            target_region
+        );
 
         let (tx, rx) = tokio::sync::oneshot::channel();
-        if let Err(e) = state.p2p_tx.send(SwarmRequest::Store {
-            command: cmd,
-            geofence: target_region,
-            tx,
-        }).await {
+        if let Err(e) = state
+            .p2p_tx
+            .send(SwarmRequest::Store {
+                command: cmd,
+                geofence: target_region,
+                tx,
+            })
+            .await
+        {
             tracing::error!("Failed to route ZK shard to LibP2P Swarm: {}", e);
-            return (StatusCode::SERVICE_UNAVAILABLE, "Storage network queue unavailable").into_response();
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Storage network queue unavailable",
+            )
+                .into_response();
         }
         let ack = match timeout(Duration::from_secs(10), rx).await {
             Ok(Ok(ack)) => ack,
-            _ => return (StatusCode::SERVICE_UNAVAILABLE, "Shard storage acknowledgement failed").into_response(),
+            _ => {
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Shard storage acknowledgement failed",
+                )
+                    .into_response()
+            }
         };
         if !ack.stored {
-            return (StatusCode::SERVICE_UNAVAILABLE, "Shard storage acknowledgement failed").into_response();
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Shard storage acknowledgement failed",
+            )
+                .into_response();
         }
         shard_placements.push((
             shard.shard_index as i32,
@@ -155,7 +204,15 @@ pub async fn zk_store(
 
     match res {
         Ok(_) => {
-            for (shard_index, shard_cid, peer_id, country_code, receipt_timestamp_ms, receipt_signature_valid) in shard_placements {
+            for (
+                shard_index,
+                shard_cid,
+                peer_id,
+                country_code,
+                receipt_timestamp_ms,
+                receipt_signature_valid,
+            ) in shard_placements
+            {
                 let _ = sqlx::query(
                     r#"
                     INSERT INTO object_shards (
@@ -169,7 +226,7 @@ pub async fn zk_store(
                         receipt_timestamp_ms = excluded.receipt_timestamp_ms,
                         receipt_signature_valid = excluded.receipt_signature_valid,
                         last_verified_at = NOW()
-                    "#
+                    "#,
                 )
                 .bind(&cid)
                 .bind(&shard_cid)
@@ -185,7 +242,11 @@ pub async fn zk_store(
         }
         Err(e) => {
             tracing::error!("Failed to register ZK object in DB: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "ZK Object registration failed").into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "ZK Object registration failed",
+            )
+                .into_response()
         }
     }
 }

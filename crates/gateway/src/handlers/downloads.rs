@@ -41,7 +41,11 @@ fn download_target(os: &str, arch: &str) -> Option<(&'static str, &'static str, 
 }
 
 pub async fn proxy_node_download(Path((os, arch)): Path<(String, String)>) -> impl IntoResponse {
-    tracing::warn!("==== HIT PROXY NODE DOWNLOAD: os={}, arch={} ====", os, arch);
+    tracing::warn!(
+        "==== HIT PROXY NODE DOWNLOAD: os={}, arch={} ====",
+        os,
+        arch
+    );
     let Some((env_name, default_url, filename)) = download_target(&os, &arch) else {
         return (StatusCode::NOT_FOUND, "unsupported download target").into_response();
     };
@@ -62,7 +66,11 @@ pub async fn proxy_node_download(Path((os, arch)): Path<(String, String)>) -> im
             response.status(),
             source_url
         );
-        return (StatusCode::BAD_GATEWAY, "download upstream rejected request").into_response();
+        return (
+            StatusCode::BAD_GATEWAY,
+            "download upstream rejected request",
+        )
+            .into_response();
     }
 
     let content_type = response

@@ -1,3 +1,4 @@
+use crate::AppState;
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
@@ -5,9 +6,8 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use sqlx::Row;
-use crate::AppState;
+use std::sync::Arc;
 
 // ── PII AUTO-DETECTION (Aadhaar, PAN, Phone, Email) ──
 
@@ -68,7 +68,8 @@ fn detect_pii(content: &str) -> PiiDetectionResult {
     }
 
     // Email addresses
-    let email_pattern = regex_lite::Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").unwrap();
+    let email_pattern =
+        regex_lite::Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b").unwrap();
     let email_count = email_pattern.find_iter(content).count();
     if email_count > 0 {
         findings.push(PiiFinding {
@@ -95,10 +96,16 @@ fn detect_pii(content: &str) -> PiiDetectionResult {
     let has_critical = findings.iter().any(|f| f.severity == "CRITICAL");
     let has_high = findings.iter().any(|f| f.severity == "HIGH");
 
-    let risk_level = if has_critical { "CRITICAL" }
-        else if has_high { "HIGH" }
-        else if has_pii { "MEDIUM" }
-        else { "NONE" }.to_string();
+    let risk_level = if has_critical {
+        "CRITICAL"
+    } else if has_high {
+        "HIGH"
+    } else if has_pii {
+        "MEDIUM"
+    } else {
+        "NONE"
+    }
+    .to_string();
 
     let recommendation = if has_critical {
         "URGENT: Critical PII detected (Aadhaar). Encrypt immediately or quarantine this file."
@@ -108,9 +115,15 @@ fn detect_pii(content: &str) -> PiiDetectionResult {
         "Minor PII detected. Standard encryption recommended."
     } else {
         "No PII detected. File is clean."
-    }.to_string();
+    }
+    .to_string();
 
-    PiiDetectionResult { has_pii, findings, risk_level, recommendation }
+    PiiDetectionResult {
+        has_pii,
+        findings,
+        risk_level,
+        recommendation,
+    }
 }
 
 /// POST /api/pii/scan/:bucket/*key — Scan a stored object for PII
@@ -141,7 +154,11 @@ pub async fn scan_object_pii(
             let metadata: serde_json::Value = record
                 .try_get("metadata_json")
                 .unwrap_or_else(|_| serde_json::json!({}));
-            if metadata.get("zero_knowledge").and_then(|v| v.as_bool()).unwrap_or(false) {
+            if metadata
+                .get("zero_knowledge")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
                 return (
                     StatusCode::PRECONDITION_FAILED,
                     "PII scanning is unavailable for zero-knowledge objects without explicit client-side opt-in.",
@@ -175,7 +192,11 @@ pub async fn scan_object_pii(
             (StatusCode::OK, Json(result)).into_response()
         }
         Ok(None) => (StatusCode::NOT_FOUND, "Object not found").into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error: {}", e)).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+            .into_response(),
     }
 }
 
@@ -229,12 +250,16 @@ pub async fn list_versions(
         serde_json::json!({ "version_id": vid, "size": size, "etag": etag, "created_at": created })
     }).collect();
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "bucket": bucket,
-        "key": key,
-        "versions": version_list,
-        "count": version_list.len()
-    }))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "bucket": bucket,
+            "key": key,
+            "versions": version_list,
+            "count": version_list.len()
+        })),
+    )
+        .into_response()
 }
 
 // ── IMMUTABLE AUDIT TRAIL (WORM) ──
@@ -255,7 +280,9 @@ pub async fn configure_worm(
         Ok(email) => email,
         Err(err) => return err.into_response(),
     };
-    if let Err(err) = crate::handlers::s3::authorize_bucket(&state, &payload.bucket, &user_email).await {
+    if let Err(err) =
+        crate::handlers::s3::authorize_bucket(&state, &payload.bucket, &user_email).await
+    {
         return err.into_response();
     }
 
@@ -264,7 +291,7 @@ pub async fn configure_worm(
     }
 
     let res = sqlx::query(
-        "UPDATE buckets SET worm_enabled = TRUE, worm_retention_days = $1 WHERE name = $2"
+        "UPDATE buckets SET worm_enabled = TRUE, worm_retention_days = $1 WHERE name = $2",
     )
     .bind(payload.retention_days)
     .bind(&payload.bucket)
@@ -273,7 +300,11 @@ pub async fn configure_worm(
 
     match res {
         Ok(_) => {
-            tracing::info!("WORM mode enabled for bucket {} with {}-day retention", payload.bucket, payload.retention_days);
+            tracing::info!(
+                "WORM mode enabled for bucket {} with {}-day retention",
+                payload.bucket,
+                payload.retention_days
+            );
             (StatusCode::OK, Json(serde_json::json!({
                 "bucket": payload.bucket,
                 "worm_enabled": true,
@@ -323,11 +354,15 @@ pub async fn auto_tag_object(
         _ => (vec!["general", "file"], "General"),
     };
 
-    (StatusCode::OK, Json(AutoTagResult {
-        tags: tags.iter().map(|t| t.to_string()).collect(),
-        confidence: 0.85,
-        category: category.to_string(),
-    })).into_response()
+    (
+        StatusCode::OK,
+        Json(AutoTagResult {
+            tags: tags.iter().map(|t| t.to_string()).collect(),
+            confidence: 0.85,
+            category: category.to_string(),
+        }),
+    )
+        .into_response()
 }
 
 // ── USAGE / BILLING TRACKING ──
@@ -354,18 +389,22 @@ pub async fn get_usage_summary(
     let cost_per_gb = 0.80; // ₹0.80 per GB/month
     let estimated_monthly = storage_gb * cost_per_gb;
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "user": user_email,
-        "objects_count": usage.0,
-        "storage_bytes": usage.1,
-        "storage_gb": format!("{:.4}", storage_gb),
-        "pricing": {
-            "storage_per_gb_inr": cost_per_gb,
-            "egress_per_gb_inr": 0.50
-        },
-        "estimated_monthly_inr": format!("{:.2}", estimated_monthly),
-        "billing_model": "pay-per-second"
-    }))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "user": user_email,
+            "objects_count": usage.0,
+            "storage_bytes": usage.1,
+            "storage_gb": format!("{:.4}", storage_gb),
+            "pricing": {
+                "storage_per_gb_inr": cost_per_gb,
+                "egress_per_gb_inr": 0.50
+            },
+            "estimated_monthly_inr": format!("{:.2}", estimated_monthly),
+            "billing_model": "pay-per-second"
+        })),
+    )
+        .into_response()
 }
 
 // ── AI SEMANTIC SEARCH STUB ──
@@ -406,14 +445,18 @@ pub async fn ai_semantic_search(
             "relevance_score": 0.81,
             "snippet": "...confidentiality clause updated regarding the Reliance project...",
             "ai_tags": ["legal", "contract", "confidential"]
-        })
+        }),
     ];
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "query": payload.query,
-        "processing_time_ms": 142,
-        "results": mocked_results
-    }))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "query": payload.query,
+            "processing_time_ms": 142,
+            "results": mocked_results
+        })),
+    )
+        .into_response()
 }
 
 pub async fn hot_objects(
@@ -461,8 +504,12 @@ pub async fn hot_objects(
         })
         .collect();
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "user": user_email,
-        "objects": objects,
-    }))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "user": user_email,
+            "objects": objects,
+        })),
+    )
+        .into_response()
 }

@@ -31,9 +31,16 @@ pub async fn sovereignty_audit(
     headers: HeaderMap,
 ) -> impl IntoResponse {
     // Allow configurable jurisdiction (default: India)
-    let jurisdiction = params.get("jurisdiction").map(|s| s.to_uppercase()).unwrap_or_else(|| "IN".to_string());
+    let jurisdiction = params
+        .get("jurisdiction")
+        .map(|s| s.to_uppercase())
+        .unwrap_or_else(|| "IN".to_string());
     if jurisdiction.len() != 2 || !jurisdiction.chars().all(|c| c.is_ascii_uppercase()) {
-        return (StatusCode::BAD_REQUEST, "Invalid jurisdiction code. Use ISO 3166-1 alpha-2 (e.g., IN, US, DE)").into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            "Invalid jurisdiction code. Use ISO 3166-1 alpha-2 (e.g., IN, US, DE)",
+        )
+            .into_response();
     }
 
     let user_email = match crate::handlers::s3::validate_s3_auth(&headers, &state) {
@@ -52,11 +59,17 @@ pub async fn sovereignty_audit(
     };
     let owner_email: String = match bucket_row.try_get("owner_email") {
         Ok(v) => v,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Bucket row decode error").into_response(),
+        Err(_) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Bucket row decode error").into_response()
+        }
     };
 
     if owner_email != user_email {
-        return (StatusCode::FORBIDDEN, "AccessDenied: Bucket owned by another user").into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            "AccessDenied: Bucket owned by another user",
+        )
+            .into_response();
     }
 
     let stats = sqlx::query_as::<_, (i64, i64, i64)>(
@@ -91,14 +104,15 @@ pub async fn sovereignty_audit(
         && (verified_shards - total_shards).abs() < f64::EPSILON
         && (in_jurisdiction - total_shards).abs() < f64::EPSILON;
 
-    let evidence_level = if total_shards > 0.0 && (verified_shards - total_shards).abs() < f64::EPSILON {
-        "strong"
-    } else if verified_shards > 0.0 {
-        "partial"
-    } else {
-        "unverified"
-    }
-    .to_string();
+    let evidence_level =
+        if total_shards > 0.0 && (verified_shards - total_shards).abs() < f64::EPSILON {
+            "strong"
+        } else if verified_shards > 0.0 {
+            "partial"
+        } else {
+            "unverified"
+        }
+        .to_string();
 
     let percentage = if total_shards > 0.0 {
         ((in_jurisdiction / total_shards) * 100.0 * 100.0).round() / 100.0

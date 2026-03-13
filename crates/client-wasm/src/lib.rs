@@ -43,7 +43,8 @@ struct RawBundleShard {
 
 #[wasm_bindgen]
 pub fn reconstruct_bytes_wasm(bundle: JsValue, password: String) -> Result<Vec<u8>, JsValue> {
-    let bundle: RawBundleInput = from_value(bundle).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let bundle: RawBundleInput =
+        from_value(bundle).map_err(|e| JsValue::from_str(&e.to_string()))?;
     if bundle.shards.is_empty() {
         return Ok(Vec::new());
     }
@@ -64,8 +65,8 @@ pub fn reconstruct_bytes_wasm(bundle: JsValue, password: String) -> Result<Vec<u
         });
     }
 
-    let mut out =
-        reconstruct_bytes(&shards, &password, &bundle.salt).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let mut out = reconstruct_bytes(&shards, &password, &bundle.salt)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
     out.truncate(bundle.total_bytes);
     Ok(out)
 }

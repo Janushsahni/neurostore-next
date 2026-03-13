@@ -17,7 +17,6 @@ pub struct DeleteChunkRequest {
     pub cid: String,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditChunkRequest {
     pub cid: String,
@@ -40,7 +39,6 @@ pub struct DeleteChunkResponse {
     pub signature: Vec<u8>,
     pub public_key: Vec<u8>,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrieveChunkResponse {
@@ -69,7 +67,6 @@ pub enum ChunkCommand {
     Delete(DeleteChunkRequest),
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ChunkReply {
     Store(StoreChunkResponse),
@@ -77,7 +74,6 @@ pub enum ChunkReply {
     Audit(AuditChunkResponse),
     Delete(DeleteChunkResponse),
 }
-
 
 impl StoreChunkResponse {
     pub fn receipt_payload(cid: &str, len: usize, timestamp_ms: u64) -> Vec<u8> {
@@ -194,4 +190,3 @@ fn verify_signature(
     }
     public_key.verify(payload, signature)
 }
-

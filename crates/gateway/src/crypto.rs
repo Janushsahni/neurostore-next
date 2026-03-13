@@ -2,9 +2,9 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
-use hmac::{Hmac, Mac};
-use sha2::{Sha256, Digest};
 use base64::{engine::general_purpose, Engine as _};
+use hmac::{Hmac, Mac};
+use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -27,12 +27,12 @@ impl MetadataProtector {
         let mut hasher = Sha256::new();
         hasher.update(master_secret.as_bytes());
         let mut key = hasher.finalize();
-        
+
         let cipher = Aes256Gcm::new_from_slice(&key).expect("Invalid key length");
-        
+
         // SECURITY: Wipe the intermediate key from RAM immediately after use
-        key.zeroize(); 
-        
+        key.zeroize();
+
         let mut index_key = [0u8; 32];
         index_key.copy_from_slice(&key);
 
@@ -43,10 +43,11 @@ impl MetadataProtector {
         // Use a random nonce for every encryption to prevent pattern matching
         let mut nonce_bytes = [0u8; 12];
         rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes); 
+        let nonce = Nonce::from_slice(&nonce_bytes);
 
         // AES-256-GCM Encryption (authenticated encryption with associated data)
-        let ciphertext = self.cipher
+        let ciphertext = self
+            .cipher
             .encrypt(nonce, plain_text.as_bytes())
             .map_err(|e| format!("Encryption failed: {}", e))?;
 
@@ -70,21 +71,22 @@ impl MetadataProtector {
         let nonce = Nonce::from_slice(nonce_bytes);
 
         // AES-256-GCM Decryption
-        let plain_bytes = self.cipher
+        let plain_bytes = self
+            .cipher
             .decrypt(nonce, ciphertext)
             .map_err(|e| format!("Decryption failed: {}", e))?;
 
         let result = String::from_utf8(plain_bytes).map_err(|e| format!("UTF-8 failure: {}", e));
-        
+
         // SECURITY: Wipe sensitive decrypted RAM
         combined.zeroize();
-        
+
         result
     }
 
     pub fn blind_index(&self, namespace: &str, plain_text: &str) -> String {
-        let mut mac = <HmacSha256 as Mac>::new_from_slice(&self.index_key)
-            .expect("HMAC key length is valid");
+        let mut mac =
+            <HmacSha256 as Mac>::new_from_slice(&self.index_key).expect("HMAC key length is valid");
         mac.update(namespace.as_bytes());
         mac.update(b":");
         mac.update(plain_text.as_bytes());

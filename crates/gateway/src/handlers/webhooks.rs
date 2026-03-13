@@ -1,14 +1,14 @@
+use crate::AppState;
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     Json,
 };
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use crate::AppState;
 use hmac::Mac;
+use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
+use std::sync::Arc;
 
 // ── WEBHOOK NOTIFICATION SYSTEM ──
 // Allows customers to register webhook URLs that get called when
@@ -59,9 +59,7 @@ fn is_public_webhook_url(url: &str) -> bool {
                     || ipv4.is_unspecified())
             }
             IpAddr::V6(ipv6) => {
-                !(ipv6.is_loopback()
-                    || ipv6.is_multicast()
-                    || ipv6.is_unspecified())
+                !(ipv6.is_loopback() || ipv6.is_multicast() || ipv6.is_unspecified())
             }
         };
     }
@@ -79,19 +77,29 @@ pub async fn register_webhook(
         Ok(email) => email,
         Err(err) => return err.into_response(),
     };
-    if let Err(err) = crate::handlers::s3::authorize_bucket(&state, &payload.bucket, &user_email).await {
+    if let Err(err) =
+        crate::handlers::s3::authorize_bucket(&state, &payload.bucket, &user_email).await
+    {
         return err.into_response();
     }
 
     // Validate webhook URL
     if !is_public_webhook_url(&payload.url) {
-        return (StatusCode::BAD_REQUEST, "Webhook URL must be a public HTTPS endpoint").into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            "Webhook URL must be a public HTTPS endpoint",
+        )
+            .into_response();
     }
 
     let valid_events = ["object.created", "object.deleted", "object.accessed"];
     for event in &payload.events {
         if !valid_events.contains(&event.as_str()) {
-            return (StatusCode::BAD_REQUEST, format!("Invalid event type: {}. Valid: {:?}", event, valid_events)).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("Invalid event type: {}. Valid: {:?}", event, valid_events),
+            )
+                .into_response();
         }
     }
 
@@ -108,7 +116,7 @@ pub async fn register_webhook(
         ON CONFLICT (bucket, url) DO UPDATE SET
             events = excluded.events,
             secret = excluded.secret
-        "#
+        "#,
     )
     .bind(&payload.bucket)
     .bind(&payload.url)
@@ -120,18 +128,30 @@ pub async fn register_webhook(
 
     match res {
         Ok(_) => {
-            tracing::info!("Webhook registered for bucket {} -> {}", payload.bucket, payload.url);
-            (StatusCode::CREATED, Json(serde_json::json!({
-                "status": "registered",
-                "bucket": payload.bucket,
-                "url": payload.url,
-                "events": payload.events,
-                "signing_secret": webhook_secret
-            }))).into_response()
+            tracing::info!(
+                "Webhook registered for bucket {} -> {}",
+                payload.bucket,
+                payload.url
+            );
+            (
+                StatusCode::CREATED,
+                Json(serde_json::json!({
+                    "status": "registered",
+                    "bucket": payload.bucket,
+                    "url": payload.url,
+                    "events": payload.events,
+                    "signing_secret": webhook_secret
+                })),
+            )
+                .into_response()
         }
         Err(e) => {
             tracing::error!("Failed to register webhook: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Webhook registration failed").into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Webhook registration failed",
+            )
+                .into_response()
         }
     }
 }
@@ -151,7 +171,7 @@ pub async fn list_webhooks(
     }
 
     let rows = sqlx::query_as::<_, (String, serde_json::Value, String)>(
-        "SELECT url, events, created_at::text FROM webhooks WHERE bucket = $1 AND owner_email = $2"
+        "SELECT url, events, created_at::text FROM webhooks WHERE bucket = $1 AND owner_email = $2",
     )
     .bind(&bucket)
     .bind(&user_email)
@@ -163,19 +183,17 @@ pub async fn list_webhooks(
         serde_json::json!({ "url": url, "events": events, "created_at": created })
     }).collect();
 
-    (StatusCode::OK, Json(serde_json::json!({ "webhooks": webhooks }))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "webhooks": webhooks })),
+    )
+        .into_response()
 }
 
 /// Fire a webhook event (called internally after object mutations).
-pub async fn fire_webhook(
-    state: &AppState,
-    bucket: &str,
-    key: &str,
-    event_type: &str,
-    size: i64,
-) {
+pub async fn fire_webhook(state: &AppState, bucket: &str, key: &str, event_type: &str, size: i64) {
     let rows = sqlx::query_as::<_, (String, String)>(
-        "SELECT url, secret FROM webhooks WHERE bucket = $1 AND events @> $2::jsonb"
+        "SELECT url, secret FROM webhooks WHERE bucket = $1 AND events @> $2::jsonb",
     )
     .bind(bucket)
     .bind(serde_json::json!([event_type]))
@@ -216,7 +234,8 @@ pub async fn fire_webhook(
 
             match client {
                 Ok(c) => {
-                    let res = c.post(&url_clone)
+                    let res = c
+                        .post(&url_clone)
                         .header("Content-Type", "application/json")
                         .header("X-Neurostore-Signature", &event.signature)
                         .body(event_json)
@@ -224,8 +243,12 @@ pub async fn fire_webhook(
                         .await;
 
                     match res {
-                        Ok(r) => tracing::debug!("Webhook fired to {} -> HTTP {}", url_clone, r.status()),
-                        Err(e) => tracing::warn!("Webhook delivery failed for {}: {}", url_clone, e),
+                        Ok(r) => {
+                            tracing::debug!("Webhook fired to {} -> HTTP {}", url_clone, r.status())
+                        }
+                        Err(e) => {
+                            tracing::warn!("Webhook delivery failed for {}: {}", url_clone, e)
+                        }
                     }
                 }
                 Err(e) => tracing::error!("Failed to build HTTP client for webhook: {}", e),

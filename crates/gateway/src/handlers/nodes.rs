@@ -1,10 +1,4 @@
-use axum::{
-    extract::State,
-    http::HeaderMap,
-    http::StatusCode,
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, http::HeaderMap, http::StatusCode, response::IntoResponse, Json};
 use chrono::Utc;
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
@@ -61,7 +55,9 @@ pub async fn register_provider_node(
         .and_then(|v| v.to_str().ok())
         .unwrap_or_default();
 
-    let secrets_match = provided_secret.as_bytes().ct_eq(state.node_shared_secret.as_bytes());
+    let secrets_match = provided_secret
+        .as_bytes()
+        .ct_eq(state.node_shared_secret.as_bytes());
     if provided_secret.is_empty() || !bool::from(secrets_match) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized node registration").into_response();
     }
@@ -73,7 +69,11 @@ pub async fn register_provider_node(
         return (StatusCode::BAD_REQUEST, "Invalid wallet_address").into_response();
     }
     if payload.capacity_gb <= 0 || payload.capacity_gb > 100_000 {
-        return (StatusCode::BAD_REQUEST, "capacity_gb must be between 1 and 100000").into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            "capacity_gb must be between 1 and 100000",
+        )
+            .into_response();
     }
     if !is_valid_declared_location(&payload.declared_location) {
         return (
@@ -96,7 +96,12 @@ pub async fn register_provider_node(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.split(',').next())
         .map(|v| v.trim().to_string())
-        .or_else(|| headers.get("x-real-ip").and_then(|v| v.to_str().ok()).map(|v| v.to_string()))
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|v| v.to_str().ok())
+                .map(|v| v.to_string())
+        })
         .unwrap_or_else(|| "unknown".to_string());
     if let Some(rtt) = payload.latency_ms {
         if !state.geo.validate_tether(country_code, rtt) {
@@ -115,7 +120,7 @@ pub async fn register_provider_node(
     }
 
     let wallet_duplicates: i64 = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM nodes WHERE wallet_address = $1 AND peer_id <> $2"
+        "SELECT COUNT(*) FROM nodes WHERE wallet_address = $1 AND peer_id <> $2",
     )
     .bind(&payload.wallet_address)
     .bind(&payload.peer_id)
@@ -123,25 +128,26 @@ pub async fn register_provider_node(
     .await
     .unwrap_or(0);
     let ip_duplicates: i64 = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM nodes WHERE ip_address = $1 AND peer_id <> $2"
+        "SELECT COUNT(*) FROM nodes WHERE ip_address = $1 AND peer_id <> $2",
     )
     .bind(&caller_ip)
     .bind(&payload.peer_id)
     .fetch_one(&state.db)
     .await
     .unwrap_or(0);
-    let fingerprint_duplicates: i64 = if let Some(fingerprint) = payload.device_fingerprint.as_deref() {
-        sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM nodes WHERE device_fingerprint = $1 AND peer_id <> $2"
-        )
-        .bind(fingerprint)
-        .bind(&payload.peer_id)
-        .fetch_one(&state.db)
-        .await
-        .unwrap_or(0)
-    } else {
-        0
-    };
+    let fingerprint_duplicates: i64 =
+        if let Some(fingerprint) = payload.device_fingerprint.as_deref() {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM nodes WHERE device_fingerprint = $1 AND peer_id <> $2",
+            )
+            .bind(fingerprint)
+            .bind(&payload.peer_id)
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or(0)
+        } else {
+            0
+        };
 
     let mut risk_score = 0i32;
     let mut risk_reasons = Vec::new();
@@ -183,10 +189,17 @@ pub async fn register_provider_node(
     if is_version_older_than(node_ver, MIN_NODE_VERSION) {
         admission_status = "rejected_deprecated";
         risk_score += 100;
-        risk_reasons.push(format!("Node version {} is deprecated. Required: {}", node_ver, MIN_NODE_VERSION));
+        risk_reasons.push(format!(
+            "Node version {} is deprecated. Required: {}",
+            node_ver, MIN_NODE_VERSION
+        ));
     }
 
-    let payout_hold_days = if admission_status == "admitted" { 7 } else { 21 };
+    let payout_hold_days = if admission_status == "admitted" {
+        7
+    } else {
+        21
+    };
     let payout_hold_until = Utc::now() + chrono::Duration::days(payout_hold_days);
 
     let res = sqlx::query(
@@ -259,15 +272,18 @@ pub async fn register_provider_node(
             );
             let required_stake = (payload.capacity_gb as u64) * 10;
 
-            (StatusCode::OK, Json(NodeRegisterResponse {
-                status: "Registered. Awaiting Collateral Stake.".to_string(),
-                assigned_role: "StorageProvider".to_string(),
-                min_stake_required: required_stake,
-                admission_status: admission_status.to_string(),
-                payout_hold_days,
-                risk_score,
-                risk_reasons,
-            }))
+            (
+                StatusCode::OK,
+                Json(NodeRegisterResponse {
+                    status: "Registered. Awaiting Collateral Stake.".to_string(),
+                    assigned_role: "StorageProvider".to_string(),
+                    min_stake_required: required_stake,
+                    admission_status: admission_status.to_string(),
+                    payout_hold_days,
+                    risk_score,
+                    risk_reasons,
+                }),
+            )
                 .into_response()
         }
         Err(e) => {
@@ -288,12 +304,16 @@ fn is_valid_peer_id(value: &str) -> bool {
 fn is_version_older_than(current: &str, required: &str) -> bool {
     let curr_parts: Vec<u32> = current.split('.').filter_map(|s| s.parse().ok()).collect();
     let req_parts: Vec<u32> = required.split('.').filter_map(|s| s.parse().ok()).collect();
-    
+
     for i in 0..std::cmp::max(curr_parts.len(), req_parts.len()) {
         let c = curr_parts.get(i).unwrap_or(&0);
         let r = req_parts.get(i).unwrap_or(&0);
-        if c < r { return true; }
-        if c > r { return false; }
+        if c < r {
+            return true;
+        }
+        if c > r {
+            return false;
+        }
     }
     false
 }
@@ -315,7 +335,10 @@ fn is_valid_declared_location(value: &str) -> bool {
         if region.len() < 2 || region.len() > 8 {
             return false;
         }
-        if !region.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()) {
+        if !region
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+        {
             return false;
         }
     }
@@ -361,7 +384,10 @@ pub async fn node_heartbeat(
     }
 
     if payload.node_id.is_empty() || payload.node_id.len() > 64 {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "invalid node_id" })))
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "invalid node_id" })),
+        )
             .into_response();
     }
 
@@ -370,7 +396,12 @@ pub async fn node_heartbeat(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.split(',').next())
         .map(|v| v.trim().to_string())
-        .or_else(|| headers.get("x-real-ip").and_then(|v| v.to_str().ok()).map(|v| v.to_string()))
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|v| v.to_str().ok())
+                .map(|v| v.to_string())
+        })
         .unwrap_or_else(|| "unknown".to_string());
 
     let used_gb = payload.used_gb.unwrap_or(0.0).max(0.0);
@@ -382,7 +413,10 @@ pub async fn node_heartbeat(
     let os = payload.os.as_deref().unwrap_or("Unknown");
     let status = payload.status.as_deref().unwrap_or("online");
     let cpu_usage_percent = payload.cpu_usage_percent.unwrap_or(0.0).clamp(0.0, 100.0);
-    let memory_usage_percent = payload.memory_usage_percent.unwrap_or(0.0).clamp(0.0, 100.0);
+    let memory_usage_percent = payload
+        .memory_usage_percent
+        .unwrap_or(0.0)
+        .clamp(0.0, 100.0);
 
     let payouts_locked = crate::handlers::admin::load_controls(&state)
         .await
@@ -406,13 +440,11 @@ pub async fn node_heartbeat(
     let persisted_total = load_persisted_total_earned(&state, &payload.node_id).await;
 
     if let Some(ingress_url) = payload.ingress_url.as_deref() {
-        let _ = sqlx::query(
-            "UPDATE node_registry SET ingress_url = $1 WHERE node_id = $2"
-        )
-        .bind(ingress_url)
-        .bind(&payload.node_id)
-        .execute(&state.db)
-        .await;
+        let _ = sqlx::query("UPDATE node_registry SET ingress_url = $1 WHERE node_id = $2")
+            .bind(ingress_url)
+            .bind(&payload.node_id)
+            .execute(&state.db)
+            .await;
     }
 
     let total_earned = cache_heartbeat(
@@ -441,14 +473,17 @@ pub async fn node_heartbeat(
     )
     .await;
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "status": "ack",
-        "earned_this_heartbeat_inr": format!("{:.4}", incremental_earnings),
-        "total_earned_inr": format!("{:.2}", total_earned),
-        "pending_shards": serde_json::Value::Null,
-        "payouts_locked": payouts_locked,
-        "storage_write_mode": "buffered",
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": "ack",
+            "earned_this_heartbeat_inr": format!("{:.4}", incremental_earnings),
+            "total_earned_inr": format!("{:.2}", total_earned),
+            "pending_shards": serde_json::Value::Null,
+            "payouts_locked": payouts_locked,
+            "storage_write_mode": "buffered",
+        })),
+    )
         .into_response()
 }
 
@@ -458,7 +493,9 @@ pub async fn get_admin_inventory(
 ) -> impl IntoResponse {
     // Basic Admin Check (Real prod would verify JWT role)
     let auth_header = headers.get("Authorization").and_then(|h| h.to_str().ok());
-    if auth_header.is_none() && crate::handlers::auth::get_cookie_value(&headers, "neuro_auth").is_none() {
+    if auth_header.is_none()
+        && crate::handlers::auth::get_cookie_value(&headers, "neuro_auth").is_none()
+    {
         return (StatusCode::UNAUTHORIZED, "Admin access required").into_response();
     }
 
@@ -476,10 +513,16 @@ pub async fn get_admin_inventory(
             let last_hb = n.9;
             let status = if let Some(hb) = last_hb {
                 let diff = Utc::now().signed_duration_since(hb).num_seconds();
-                if diff > 120 { "offline" }
-                else if diff > 60 { "stale" }
-                else { "online" }
-            } else { "offline" };
+                if diff > 120 {
+                    "offline"
+                } else if diff > 60 {
+                    "stale"
+                } else {
+                    "online"
+                }
+            } else {
+                "offline"
+            };
 
             serde_json::json!({
                 "node_id": n.0,
@@ -530,8 +573,8 @@ fn verify_node_build(
         ));
     }
 
-    let mut mac = <HmacSha256 as Mac>::new_from_slice(signing_secret.as_bytes())
-        .expect("valid hmac key");
+    let mut mac =
+        <HmacSha256 as Mac>::new_from_slice(signing_secret.as_bytes()).expect("valid hmac key");
     mac.update(node_id.as_bytes());
     mac.update(b":");
     mac.update(digest.as_bytes());
@@ -629,17 +672,20 @@ pub async fn network_stats(State(state): State<Arc<AppState>>) -> impl IntoRespo
         })
         .collect();
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "total_nodes": total_nodes,
-        "active_nodes": active_nodes,
-        "total_storage_gb": format!("{:.1}", total_storage_gb),
-        "used_storage_gb": format!("{:.3}", used_storage_gb),
-        "total_shards": total_shards,
-        "total_earnings_paid_inr": format!("{:.2}", total_earnings_inr),
-        "earning_rate_inr_per_gb_month": "0.42",
-        "top_nodes": top_nodes_json,
-        "recent_activity": recent_activity_json,
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "total_nodes": total_nodes,
+            "active_nodes": active_nodes,
+            "total_storage_gb": format!("{:.1}", total_storage_gb),
+            "used_storage_gb": format!("{:.3}", used_storage_gb),
+            "total_shards": total_shards,
+            "total_earnings_paid_inr": format!("{:.2}", total_earnings_inr),
+            "earning_rate_inr_per_gb_month": "0.42",
+            "top_nodes": top_nodes_json,
+            "recent_activity": recent_activity_json,
+        })),
+    )
         .into_response()
 }
 
@@ -648,7 +694,10 @@ pub async fn node_earnings(
     axum::extract::Path(node_id): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if node_id.is_empty() || node_id.len() > 64 {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "invalid node_id" })))
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "invalid node_id" })),
+        )
             .into_response();
     }
 
@@ -686,52 +735,66 @@ pub async fn node_earnings(
         })
         .collect();
 
-    let (status, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, cpu_usage_percent, memory_usage_percent, last_heartbeat_at, os, version) =
-        match (node, cached_entry) {
-            (Some(_node), Some(cache)) => (
-                cache.status,
-                cache.shard_count,
-                cache.used_gb,
-                cache.max_gb,
-                cache.persisted_total_earned_inr + cache.pending_earnings_inr,
-                cache.uptime_minutes,
-                cache.cpu_usage_percent,
-                cache.memory_usage_percent,
-                Some(cache.last_heartbeat_at),
-                cache.os,
-                cache.version,
-            ),
-            (Some(node), None) => (
-                node.1,
-                node.2,
-                node.3,
-                node.4,
-                node.5,
-                node.6,
-                node.10 as f64,
-                node.11 as f64,
-                node.7,
-                node.8.unwrap_or_else(|| "Unknown".to_string()),
-                node.9.unwrap_or_else(|| "1.0.0".to_string())
-            ),
-            (None, Some(cache)) => (
-                cache.status,
-                cache.shard_count,
-                cache.used_gb,
-                cache.max_gb,
-                cache.persisted_total_earned_inr + cache.pending_earnings_inr,
-                cache.uptime_minutes,
-                cache.cpu_usage_percent,
-                cache.memory_usage_percent,
-                Some(cache.last_heartbeat_at),
-                cache.os,
-                cache.version,
-            ),
-            (None, None) => {
-                return (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "node not found" })))
-                    .into_response();
-            }
-        };
+    let (
+        status,
+        shard_count,
+        used_gb,
+        max_gb,
+        total_earned_inr,
+        uptime_minutes,
+        cpu_usage_percent,
+        memory_usage_percent,
+        last_heartbeat_at,
+        os,
+        version,
+    ) = match (node, cached_entry) {
+        (Some(_node), Some(cache)) => (
+            cache.status,
+            cache.shard_count,
+            cache.used_gb,
+            cache.max_gb,
+            cache.persisted_total_earned_inr + cache.pending_earnings_inr,
+            cache.uptime_minutes,
+            cache.cpu_usage_percent,
+            cache.memory_usage_percent,
+            Some(cache.last_heartbeat_at),
+            cache.os,
+            cache.version,
+        ),
+        (Some(node), None) => (
+            node.1,
+            node.2,
+            node.3,
+            node.4,
+            node.5,
+            node.6,
+            node.10 as f64,
+            node.11 as f64,
+            node.7,
+            node.8.unwrap_or_else(|| "Unknown".to_string()),
+            node.9.unwrap_or_else(|| "1.0.0".to_string()),
+        ),
+        (None, Some(cache)) => (
+            cache.status,
+            cache.shard_count,
+            cache.used_gb,
+            cache.max_gb,
+            cache.persisted_total_earned_inr + cache.pending_earnings_inr,
+            cache.uptime_minutes,
+            cache.cpu_usage_percent,
+            cache.memory_usage_percent,
+            Some(cache.last_heartbeat_at),
+            cache.os,
+            cache.version,
+        ),
+        (None, None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "node not found" })),
+            )
+                .into_response();
+        }
+    };
 
     let mut display_status = status;
     if let Some(hb) = last_heartbeat_at {
@@ -757,7 +820,7 @@ pub async fn node_earnings(
     }
 
     let attestation = sqlx::query_as::<_, (String, Option<chrono::DateTime<chrono::Utc>>)>(
-        "SELECT admission_status, payout_hold_until FROM node_attestations WHERE peer_id = $1"
+        "SELECT admission_status, payout_hold_until FROM node_attestations WHERE peer_id = $1",
     )
     .bind(&node_id)
     .fetch_optional(&state.db)
@@ -780,27 +843,34 @@ pub async fn node_earnings(
     }
 
     let monthly_projection = if is_quarantined { 0.0 } else { used_gb * 0.42 };
-    let withdrawable_amount = if is_quarantined { 0.0 } else { total_earned_inr };
+    let withdrawable_amount = if is_quarantined {
+        0.0
+    } else {
+        total_earned_inr
+    };
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "node_id": node_id,
-        "status": display_status,
-        "os": os,
-        "version": version,
-        "last_heartbeat_at": last_heartbeat_at.map(|d| d.to_rfc3339()),
-        "shard_count": shard_count,
-        "used_gb": format!("{:.3}", used_gb),
-        "max_gb": format!("{:.1}", max_gb),
-        "total_earned_inr": format!("{:.2}", total_earned_inr),
-        "withdrawable_amount_inr": format!("{:.2}", withdrawable_amount),
-        "uptime_minutes": format!("{:.1}", uptime_minutes),
-        "cpu_usage_percent": format!("{:.1}", cpu_usage_percent),
-        "memory_usage_percent": format!("{:.1}", memory_usage_percent),
-        "monthly_projection_inr": format!("{:.2}", monthly_projection),
-        "payout_status": if is_quarantined { "HOLD" } else { "ACTIVE" },
-        "payout_hold_reason": hold_reason,
-        "recent_earnings": earnings_json,
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "node_id": node_id,
+            "status": display_status,
+            "os": os,
+            "version": version,
+            "last_heartbeat_at": last_heartbeat_at.map(|d| d.to_rfc3339()),
+            "shard_count": shard_count,
+            "used_gb": format!("{:.3}", used_gb),
+            "max_gb": format!("{:.1}", max_gb),
+            "total_earned_inr": format!("{:.2}", total_earned_inr),
+            "withdrawable_amount_inr": format!("{:.2}", withdrawable_amount),
+            "uptime_minutes": format!("{:.1}", uptime_minutes),
+            "cpu_usage_percent": format!("{:.1}", cpu_usage_percent),
+            "memory_usage_percent": format!("{:.1}", memory_usage_percent),
+            "monthly_projection_inr": format!("{:.2}", monthly_projection),
+            "payout_status": if is_quarantined { "HOLD" } else { "ACTIVE" },
+            "payout_hold_reason": hold_reason,
+            "recent_earnings": earnings_json,
+        })),
+    )
         .into_response()
 }
 
@@ -868,7 +938,11 @@ pub async fn heartbeat_flush_daemon(state: Arc<AppState>) {
 async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()> {
     let snapshot: Vec<crate::HeartbeatCacheEntry> = {
         let cache = state.heartbeat_buffer.read().await;
-        cache.values().filter(|entry| entry.dirty).cloned().collect()
+        cache
+            .values()
+            .filter(|entry| entry.dirty)
+            .cloned()
+            .collect()
     };
 
     for entry in snapshot {
@@ -930,8 +1004,10 @@ async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()
         let mut cache = state.heartbeat_buffer.write().await;
         if let Some(current) = cache.get_mut(&entry.node_id) {
             current.persisted_total_earned_inr += entry.pending_earnings_inr;
-            current.pending_earnings_inr = (current.pending_earnings_inr - entry.pending_earnings_inr).max(0.0);
-            current.dirty = current.pending_earnings_inr > 0.0 || current.last_heartbeat_at > entry.last_heartbeat_at;
+            current.pending_earnings_inr =
+                (current.pending_earnings_inr - entry.pending_earnings_inr).max(0.0);
+            current.dirty = current.pending_earnings_inr > 0.0
+                || current.last_heartbeat_at > entry.last_heartbeat_at;
         }
     }
 
@@ -952,7 +1028,7 @@ pub struct ReceiptPayload {
 #[derive(Deserialize)]
 pub struct PayoutClaimRequest {
     pub payload: ReceiptPayload,
-    pub signature: String, // Base64 ECDSA P-256 signature
+    pub signature: String,             // Base64 ECDSA P-256 signature
     pub public_key: serde_json::Value, // JWK
 }
 
@@ -962,30 +1038,48 @@ pub async fn claim_payout(
 ) -> impl IntoResponse {
     // 1. Freshness Check (prevent ancient delayed replays)
     let now = chrono::Utc::now().timestamp_millis();
-    if now - claim.payload.timestamp > 300_000 { // 5 minutes max age
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "receipt expired" }))).into_response();
+    if now - claim.payload.timestamp > 300_000 {
+        // 5 minutes max age
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "receipt expired" })),
+        )
+            .into_response();
     }
 
     // 2. Cryptographic Signature Verification (WebCrypto ECDSA P-256)
-    // In Rust, we use `p256` or `ring` to verify the JWT/ECDSA. 
-    // To streamline cross-compilation in this repo we use a deterministic dummy check 
+    // In Rust, we use `p256` or `ring` to verify the JWT/ECDSA.
+    // To streamline cross-compilation in this repo we use a deterministic dummy check
     // for the ECDSA math verification (in a production build we inject the ring verify() here).
     if claim.signature.is_empty() {
-        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "error": "missing cryptographic proof" }))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({ "error": "missing cryptographic proof" })),
+        )
+            .into_response();
     }
-    
+
     // In real prod: ecdsa::Signature::from_der(...) & VerifyingKey::verify(...)
 
     // 3. Replay Protection & Node Mapping Correctness
-    let receipt_hash = format!("{}:{}:{}", claim.payload.chunk_cid, claim.payload.timestamp, claim.payload.node_id);
-    
+    let receipt_hash = format!(
+        "{}:{}:{}",
+        claim.payload.chunk_cid, claim.payload.timestamp, claim.payload.node_id
+    );
+
     // Calculate payout
     // Example: 0.00042 INR per MB
     let payout_inr = (claim.payload.bytes_delivered as f64 / 1_048_576.0) * 0.00042;
 
     let mut tx = match state.db.begin().await {
         Ok(t) => t,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "db transaction failed" }))).into_response(),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "db transaction failed" })),
+            )
+                .into_response()
+        }
     };
 
     // Anti-replay constraints table check
@@ -1002,12 +1096,16 @@ pub async fn claim_payout(
 
     if replay_check.is_err() {
         // Receipt was already submitted and paid out
-        return (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "receipt already claimed or invalid node mapping" }))).into_response();
+        return (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({ "error": "receipt already claimed or invalid node mapping" })),
+        )
+            .into_response();
     }
 
     // Credit the Node
     let _ = sqlx::query(
-        "UPDATE node_registry SET total_earned_inr = total_earned_inr + $1 WHERE node_id = $2"
+        "UPDATE node_registry SET total_earned_inr = total_earned_inr + $1 WHERE node_id = $2",
     )
     .bind(payout_inr)
     .bind(&claim.payload.node_id)
@@ -1023,9 +1121,21 @@ pub async fn claim_payout(
     .await;
 
     if let Err(_) = tx.commit().await {
-         return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "payout commit failed" }))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": "payout commit failed" })),
+        )
+            .into_response();
     }
 
-    tracing::info!("Verified cryptograhpic receipt for {}, credited {:.6} INR", claim.payload.node_id, payout_inr);
-    (StatusCode::OK, Json(serde_json::json!({ "status": "payout_credited", "amount_inr": payout_inr }))).into_response()
+    tracing::info!(
+        "Verified cryptograhpic receipt for {}, credited {:.6} INR",
+        claim.payload.node_id,
+        payout_inr
+    );
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "status": "payout_credited", "amount_inr": payout_inr })),
+    )
+        .into_response()
 }

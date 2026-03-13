@@ -8,17 +8,14 @@ use axum::{
     Json,
 };
 use chrono::Utc;
+use futures::stream::{FuturesUnordered, StreamExt};
 use libp2p::PeerId;
 use rand::RngCore;
+use sha2::Digest;
 use tokio::time::{sleep, timeout};
 use tracing::{info, warn};
-use futures::stream::{FuturesUnordered, StreamExt};
-use sha2::Digest;
 
-use crate::{
-    p2p::SwarmRequest,
-    AppState,
-};
+use crate::{p2p::SwarmRequest, AppState};
 
 const PROOF_CHALLENGE_TTL_SECS: i64 = 90;
 const PROOF_BATCH_SIZE: i64 = 8;
@@ -65,7 +62,10 @@ impl ProofOfSpacetimeDaemon {
                 continue;
             }
 
-            info!("Proof daemon selected {} shard targets for verification", targets.len());
+            info!(
+                "Proof daemon selected {} shard targets for verification",
+                targets.len()
+            );
 
             let mut audit_futures = FuturesUnordered::new();
             for target in targets {
@@ -95,7 +95,12 @@ impl ProofOfSpacetimeDaemon {
                         .await;
 
                     if dispatch.is_err() {
-                        let _ = mark_challenge_failed(&state_clone, &challenge_id, "p2p dispatch failure").await;
+                        let _ = mark_challenge_failed(
+                            &state_clone,
+                            &challenge_id,
+                            "p2p dispatch failure",
+                        )
+                        .await;
                         return;
                     }
 
@@ -103,14 +108,24 @@ impl ProofOfSpacetimeDaemon {
                     let ack = match timeout(Duration::from_secs(12), rx).await {
                         Ok(Ok(ack)) => ack,
                         _ => {
-                            let _ = mark_challenge_failed(&state_clone, &challenge_id, "node timed out streaming data").await;
+                            let _ = mark_challenge_failed(
+                                &state_clone,
+                                &challenge_id,
+                                "node timed out streaming data",
+                            )
+                            .await;
                             return;
                         }
                     };
 
                     if ack.peer_id != target.peer_id {
-                         let _ = mark_challenge_failed(&state_clone, &challenge_id, "wrong peer returned data").await;
-                         return;
+                        let _ = mark_challenge_failed(
+                            &state_clone,
+                            &challenge_id,
+                            "wrong peer returned data",
+                        )
+                        .await;
+                        return;
                     }
 
                     if let Some(data) = ack.data {
@@ -130,9 +145,17 @@ impl ProofOfSpacetimeDaemon {
                             ack.timestamp_ms as i64,
                         )
                         .await;
-                        info!("Spot check PASSED for {} by {}", target.shard_cid, target.peer_id);
+                        info!(
+                            "Spot check PASSED for {} by {}",
+                            target.shard_cid, target.peer_id
+                        );
                     } else {
-                        let _ = mark_challenge_failed(&state_clone, &challenge_id, "node failed to produce file bytes").await;
+                        let _ = mark_challenge_failed(
+                            &state_clone,
+                            &challenge_id,
+                            "node failed to produce file bytes",
+                        )
+                        .await;
                     }
                 });
             }
@@ -195,7 +218,10 @@ fn validate_proof_token(headers: &HeaderMap, state: &AppState) -> Result<(), (St
         .unwrap_or_default();
 
     if proof_token.is_empty() || proof_token != state.proof_submit_token {
-        return Err((StatusCode::UNAUTHORIZED, "Unauthorized proof submission".to_string()));
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "Unauthorized proof submission".to_string(),
+        ));
     }
 
     Ok(())
@@ -207,7 +233,7 @@ async fn create_challenge_for_target(
 ) -> Result<(String, String, String), sqlx::Error> {
     let challenge_id = format!("ch-{}", random_hex(16));
     let challenge_hex = random_hex(32);
-    
+
     // ── NONCE CHAINING (REPLAY ATTACK PREVENTION) ──
     // We look up the response_hash of the LAST successful audit for this shard.
     // If it exists, we mix it into the new nonce. This ensures that:
@@ -220,7 +246,7 @@ async fn create_challenge_for_target(
         WHERE shard_cid = $1 AND peer_id = $2
         ORDER BY verified_at DESC 
         LIMIT 1
-        "#
+        "#,
     )
     .bind(&target.shard_cid)
     .bind(&target.peer_id)
@@ -231,7 +257,7 @@ async fn create_challenge_for_target(
         Some((last_hash,)) => format!("{}-{}", last_hash, random_hex(8)),
         None => random_hex(16), // Genesis challenge for this shard
     };
-    
+
     // Hash the chained entropy to produce the final 32-char hex nonce
     let mut hasher = sha2::Sha256::new();
     sha2::Digest::update(&mut hasher, chained_entropy.as_bytes());
@@ -262,7 +288,11 @@ async fn create_challenge_for_target(
     Ok((challenge_id, challenge_hex, nonce_hex))
 }
 
-async fn mark_challenge_failed(state: &AppState, challenge_id: &str, reason: &str) -> Result<(), sqlx::Error> {
+async fn mark_challenge_failed(
+    state: &AppState,
+    challenge_id: &str,
+    reason: &str,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
         UPDATE zk_proof_challenges
@@ -389,7 +419,11 @@ pub async fn issue_zk_challenge(
         }
         Err(e) => {
             warn!("Failed to issue challenge: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to issue challenge").into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to issue challenge",
+            )
+                .into_response()
         }
     }
 }
@@ -404,7 +438,9 @@ pub async fn verify_zk_proof(
     }
 
     let now_ms = Utc::now().timestamp_millis() as u64;
-    if payload.timestamp_ms > now_ms + 120_000 || now_ms.saturating_sub(payload.timestamp_ms) > 120_000 {
+    if payload.timestamp_ms > now_ms + 120_000
+        || now_ms.saturating_sub(payload.timestamp_ms) > 120_000
+    {
         return (StatusCode::BAD_REQUEST, "stale proof timestamp").into_response();
     }
 
@@ -481,9 +517,23 @@ pub async fn verify_zk_proof(
     // Now, we conceptually enforce a Zero-Knowledge Proof that verifies:
     // response_hash == ZkSnark(Public_Inputs: [challenge, nonce, shard_cid], Private_Input: Shard_Data)
     // Here we use a placeholder function for the actual Groth16/Plonk verifier.
-    if !verify_zk_snark_circuit(&payload.shard_cid, &payload.challenge_hex, &payload.nonce_hex, &payload.response_hash) {
-        let _ = mark_challenge_failed(&state, &payload.challenge_id, "ZK-SNARK Cryptographic Circuit Verification Failed").await;
-        return (StatusCode::BAD_REQUEST, "invalid ZK proof (pre-generation attack detected)").into_response();
+    if !verify_zk_snark_circuit(
+        &payload.shard_cid,
+        &payload.challenge_hex,
+        &payload.nonce_hex,
+        &payload.response_hash,
+    ) {
+        let _ = mark_challenge_failed(
+            &state,
+            &payload.challenge_id,
+            "ZK-SNARK Cryptographic Circuit Verification Failed",
+        )
+        .await;
+        return (
+            StatusCode::BAD_REQUEST,
+            "invalid ZK proof (pre-generation attack detected)",
+        )
+            .into_response();
     }
 
     let finalize = finalize_verified_challenge(
@@ -501,7 +551,11 @@ pub async fn verify_zk_proof(
         Ok(_) => (StatusCode::OK, "Proof verified").into_response(),
         Err(e) => {
             warn!("Failed to finalize proof: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "proof finalization failed").into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "proof finalization failed",
+            )
+                .into_response()
         }
     }
 }
@@ -517,7 +571,12 @@ pub async fn verify_zk_proof(
 ///
 /// For a complete ZK implementation, integrate arkworks or bellman
 /// with a proper circuit that proves data possession without revealing data.
-fn verify_zk_snark_circuit(shard_cid: &str, challenge_hex: &str, nonce_hex: &str, response_hash: &str) -> bool {
+fn verify_zk_snark_circuit(
+    shard_cid: &str,
+    challenge_hex: &str,
+    nonce_hex: &str,
+    response_hash: &str,
+) -> bool {
     // Validate response_hash is a valid hex-encoded SHA-256 digest (64 chars)
     if response_hash.len() != 64 {
         return false;
@@ -542,4 +601,3 @@ fn verify_zk_snark_circuit(shard_cid: &str, challenge_hex: &str, nonce_hex: &str
     let matches = expected.as_bytes().ct_eq(response_hash.as_bytes());
     bool::from(matches)
 }
-

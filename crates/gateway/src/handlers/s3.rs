@@ -1,25 +1,25 @@
 use axum::{
-    extract::{Path, State, Query},
-    http::{StatusCode, HeaderMap, HeaderValue},
+    body::{Body, Bytes},
+    extract::{Path, Query, State},
+    http::{HeaderMap, HeaderValue, StatusCode},
     response::IntoResponse,
-    body::{Bytes, Body},
     Json,
 };
+use futures::stream::{FuturesUnordered, StreamExt};
+use hmac::Mac;
+use md5::Md5;
+use neuro_protocol::{ChunkCommand, StoreChunkRequest};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use sqlx::Row;
 use std::collections::HashMap;
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
-use sqlx::Row;
-use sha2::{Digest, Sha256};
-use md5::Md5;
-use hmac::Mac;
-use neuro_protocol::{ChunkCommand, StoreChunkRequest};
-use futures::stream::{FuturesUnordered, StreamExt};
 use std::time::Instant;
 use tokio::time::{timeout, Duration};
 
-use crate::AppState;
 use crate::erasure::ErasureEncoder;
 use crate::p2p::SwarmRequest;
+use crate::AppState;
 use tokio::sync::oneshot;
 
 #[derive(Deserialize)]
@@ -31,31 +31,51 @@ pub struct ListQuery {
 }
 
 // ── BUCKET AUTHORIZATION ──────────────────────────────────────────
-pub(crate) async fn authorize_bucket(state: &AppState, bucket: &str, email: &str) -> Result<(), (StatusCode, String)> {
+pub(crate) async fn authorize_bucket(
+    state: &AppState,
+    bucket: &str,
+    email: &str,
+) -> Result<(), (StatusCode, String)> {
     let row = sqlx::query("SELECT owner_email FROM buckets WHERE name = $1")
         .bind(bucket)
         .fetch_optional(&state.db)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("DB Error: {}", e)))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("DB Error: {}", e),
+            )
+        })?;
 
     match row {
         Some(record) => {
-            let owner_email: String = record
-                .try_get("owner_email")
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("DB row decode error: {}", e)))?;
+            let owner_email: String = record.try_get("owner_email").map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("DB row decode error: {}", e),
+                )
+            })?;
             if owner_email == email {
                 Ok(())
             } else {
-                Err((StatusCode::FORBIDDEN, "AccessDenied: Bucket owned by another user".to_string()))
+                Err((
+                    StatusCode::FORBIDDEN,
+                    "AccessDenied: Bucket owned by another user".to_string(),
+                ))
             }
-        },
+        }
         None => {
             sqlx::query("INSERT INTO buckets (name, owner_email) VALUES ($1, $2)")
                 .bind(bucket)
                 .bind(email)
                 .execute(&state.db)
                 .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to provision bucket: {}", e)))?;
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed to provision bucket: {}", e),
+                    )
+                })?;
             Ok(())
         }
     }
@@ -67,11 +87,16 @@ pub(crate) fn object_key_locator(state: &AppState, bucket: &str, key: &str) -> S
         .blind_index("object-key", &format!("{bucket}:{key}"))
 }
 
-pub(crate) fn encrypt_object_key(state: &AppState, key: &str) -> Result<String, (StatusCode, String)> {
-    state
-        .metadata_protector
-        .encrypt(key)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Key encryption failed".to_string()))
+pub(crate) fn encrypt_object_key(
+    state: &AppState,
+    key: &str,
+) -> Result<String, (StatusCode, String)> {
+    state.metadata_protector.encrypt(key).map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Key encryption failed".to_string(),
+        )
+    })
 }
 
 fn display_key_from_row(state: &AppState, obj: &crate::models::Object) -> String {
@@ -97,7 +122,10 @@ fn parse_client_manifest(headers: &HeaderMap) -> Option<String> {
         .map(str::to_string)
 }
 
-fn merge_client_manifest(metadata_json: Option<serde_json::Value>, client_manifest: Option<String>) -> serde_json::Value {
+fn merge_client_manifest(
+    metadata_json: Option<serde_json::Value>,
+    client_manifest: Option<String>,
+) -> serde_json::Value {
     let mut metadata = metadata_json.unwrap_or_else(|| serde_json::json!({}));
     if !metadata.is_object() {
         metadata = serde_json::json!({});
@@ -106,7 +134,10 @@ fn merge_client_manifest(metadata_json: Option<serde_json::Value>, client_manife
     if let Some(map) = metadata.as_object_mut() {
         map.insert("zero_knowledge".to_string(), serde_json::Value::Bool(true));
         if let Some(manifest) = client_manifest {
-            map.insert("client_manifest".to_string(), serde_json::Value::String(manifest));
+            map.insert(
+                "client_manifest".to_string(),
+                serde_json::Value::String(manifest),
+            );
         }
     }
 
@@ -202,12 +233,19 @@ pub struct DirectUploadCommitRequest {
 }
 
 // S3 Auth Stub - Extract AWS Signature V4 or fallback to JWT
-pub(crate) fn validate_s3_auth(headers: &HeaderMap, state: &AppState) -> Result<String, (StatusCode, String)> {
+pub(crate) fn validate_s3_auth(
+    headers: &HeaderMap,
+    state: &AppState,
+) -> Result<String, (StatusCode, String)> {
     let auth_header = headers.get("Authorization").and_then(|h| h.to_str().ok());
-    
+
     if let Some(auth) = auth_header {
         if auth.starts_with("AWS4-HMAC-SHA256") {
-            return Err((StatusCode::FORBIDDEN, "AccessDenied: Full AWS SigV4 not yet implemented. Use JWT Bearer token.".to_string()));
+            return Err((
+                StatusCode::FORBIDDEN,
+                "AccessDenied: Full AWS SigV4 not yet implemented. Use JWT Bearer token."
+                    .to_string(),
+            ));
         } else if auth.starts_with("Bearer ") {
             let token = auth.trim_start_matches("Bearer ");
             let mut validation = jsonwebtoken::Validation::default();
@@ -239,9 +277,15 @@ pub(crate) fn validate_s3_auth(headers: &HeaderMap, state: &AppState) -> Result<
         if let Ok(data) = token_data {
             return Ok(data.claims.email);
         }
-        return Err((StatusCode::UNAUTHORIZED, "Invalid session cookie".to_string()));
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "Invalid session cookie".to_string(),
+        ));
     }
-    Err((StatusCode::FORBIDDEN, "AccessDenied: Invalid Authentication".to_string()))
+    Err((
+        StatusCode::FORBIDDEN,
+        "AccessDenied: Invalid Authentication".to_string(),
+    ))
 }
 
 pub(crate) fn validate_csrf(headers: &HeaderMap) -> Result<(), (StatusCode, String)> {
@@ -254,12 +298,14 @@ pub(crate) fn validate_csrf(headers: &HeaderMap) -> Result<(), (StatusCode, Stri
         return Ok(());
     }
 
-    let has_cookie_session = crate::handlers::auth::get_cookie_value(headers, "neuro_auth").is_some();
+    let has_cookie_session =
+        crate::handlers::auth::get_cookie_value(headers, "neuro_auth").is_some();
     if !has_cookie_session {
         return Ok(());
     }
 
-    let csrf_cookie = crate::handlers::auth::get_cookie_value(headers, "neuro_csrf").unwrap_or_default();
+    let csrf_cookie =
+        crate::handlers::auth::get_cookie_value(headers, "neuro_csrf").unwrap_or_default();
     let csrf_header = headers
         .get("x-csrf-token")
         .and_then(|h| h.to_str().ok())
@@ -303,7 +349,7 @@ pub async fn list_objects(
     let limit = max_keys as i64;
 
     let rows = sqlx::query_as::<_, crate::models::Object>(
-        "SELECT * FROM objects WHERE bucket = $1 AND key LIKE $2 LIMIT $3"
+        "SELECT * FROM objects WHERE bucket = $1 AND key LIKE $2 LIMIT $3",
     )
     .bind(&bucket)
     .bind(&prefix_like)
@@ -323,13 +369,17 @@ pub async fn list_objects(
 
             for o in objects {
                 let decrypted_key = display_key_from_row(&state, &o);
-                
+
                 xml.push_str("  <Contents>\n");
                 xml.push_str(&format!("    <Key>{}</Key>\n", xml_escape(&decrypted_key)));
 
                 let date_str = o.created_at.map(|d| d.to_rfc3339()).unwrap_or_default();
                 xml.push_str(&format!("    <LastModified>{}</LastModified>\n", date_str));
-                let etag_quoted = if o.etag.starts_with('"') { o.etag.clone() } else { format!("\"{}\"", o.etag) };
+                let etag_quoted = if o.etag.starts_with('"') {
+                    o.etag.clone()
+                } else {
+                    format!("\"{}\"", o.etag)
+                };
                 xml.push_str(&format!("    <ETag>{}</ETag>\n", etag_quoted));
                 xml.push_str(&format!("    <Size>{}</Size>\n", o.size));
                 xml.push_str("    <StorageClass>STANDARD</StorageClass>\n");
@@ -365,7 +415,8 @@ pub async fn put_object(
     }
 
     let key = key.trim_start_matches('/').to_string();
-    let geofence = headers.get("x-neuro-geofence")
+    let geofence = headers
+        .get("x-neuro-geofence")
         .and_then(|h| h.to_str().ok())
         .unwrap_or("GLOBAL")
         .to_string();
@@ -380,20 +431,20 @@ pub async fn put_object(
                     return (StatusCode::PAYLOAD_TOO_LARGE, "Exceeds 500MB Limit").into_response();
                 }
                 full_body.extend_from_slice(&data);
-            },
+            }
             Err(_) => return (StatusCode::BAD_REQUEST, "Stream Error").into_response(),
         }
     }
     let body_bytes = Bytes::from(full_body);
     let etag = format!("\"{:x}\"", Md5::digest(&body_bytes));
-    
+
     // Treat the uploaded body as opaque client ciphertext.
     // The gateway never derives or stores a decryptable file key.
     let mut hasher = Sha256::new();
     hasher.update(&body_bytes);
     let ciphertext_hash = hasher.finalize();
     let size = body_bytes.len() as i64;
-    
+
     let mut cid_hasher = Sha256::new();
     cid_hasher.update(&body_bytes);
     let cid = format!("Qm{}", bs58::encode(cid_hasher.finalize()).into_string());
@@ -402,18 +453,21 @@ pub async fn put_object(
     let recovery_threshold = 10;
     let parity_shards = 10;
     let total_shards = recovery_threshold + parity_shards;
-    
+
     let encoder = match ErasureEncoder::new(recovery_threshold, parity_shards) {
         Ok(e) => e,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "RS Init Error").into_response(),
     };
-        
+
     let physical_shards = match encoder.encode(&body_bytes) {
         Ok(s) => s,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "RS Encode Error").into_response(),
     };
 
-    tracing::info!("ENHANCED REDUNDANCY: Sliced {} bytes into 20 Galios Shards (RS 10+10)", size);
+    tracing::info!(
+        "ENHANCED REDUNDANCY: Sliced {} bytes into 20 Galios Shards (RS 10+10)",
+        size
+    );
 
     // ── HYBRID SHARD STORAGE: P2P-first with Cloud DB Fallback ──
     // Try to store shards via the P2P swarm. If that fails (cloud mode / no peers),
@@ -427,13 +481,13 @@ pub async fn put_object(
             data: shard_bytes.clone(),
         });
         let (tx, rx) = oneshot::channel();
-        
+
         let swarm_req = SwarmRequest::Store {
             command: cmd,
             geofence: geofence.clone(),
             tx,
         };
-        
+
         let p2p_tx = state.p2p_tx.clone();
         let tx_ack_clone = tx_ack.clone();
         let db_clone = state.db.clone();
@@ -459,7 +513,7 @@ pub async fn put_object(
                                 receipt_timestamp_ms = excluded.receipt_timestamp_ms,
                                 receipt_signature_valid = excluded.receipt_signature_valid,
                                 last_verified_at = NOW()
-                            "#
+                            "#,
                         )
                         .bind(&object_cid_clone)
                         .bind(&shard_cid)
@@ -484,7 +538,7 @@ pub async fn put_object(
                     let db_res = sqlx::query(
                         "INSERT INTO shard_data (shard_cid, object_cid, shard_index, data) \
                          VALUES ($1, $2, $3, $4) \
-                         ON CONFLICT (shard_cid) DO UPDATE SET data = excluded.data"
+                         ON CONFLICT (shard_cid) DO UPDATE SET data = excluded.data",
                     )
                     .bind(&shard_cid)
                     .bind(&object_cid_clone)
@@ -504,15 +558,17 @@ pub async fn put_object(
                             shard_cid = excluded.shard_cid,
                             peer_id = excluded.peer_id,
                             last_verified_at = NOW()
-                        "#
+                        "#,
                     )
                     .bind(&object_cid_clone)
                     .bind(&shard_cid)
                     .bind(i as i32)
-                    .bind(std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_millis() as i64)
+                    .bind(
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as i64,
+                    )
                     .execute(&db_clone)
                     .await;
 
@@ -544,20 +600,27 @@ pub async fn put_object(
     }
 
     if successful_store_acks < required_optimistic_shards {
-        return (StatusCode::SERVICE_UNAVAILABLE, format!("Insufficient shard durability: {}/{}", successful_store_acks, required_optimistic_shards)).into_response();
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            format!(
+                "Insufficient shard durability: {}/{}",
+                successful_store_acks, required_optimistic_shards
+            ),
+        )
+            .into_response();
     }
 
     tracing::info!("Zero-knowledge upload accepted for {}", key);
     let client_manifest = parse_client_manifest(&headers);
 
-    let metadata_json = serde_json::json!({ 
+    let metadata_json = serde_json::json!({
         "zero_knowledge": true,
         "ciphertext_hash": hex::encode(ciphertext_hash),
         "client_manifest": client_manifest,
         "inspection": "server-blind",
         "malware_scan": "not_performed_server_side"
     });
-    
+
     let object_key = object_key_locator(&state, &bucket, &key);
     let encrypted_key = match encrypt_object_key(&state, &key) {
         Ok(k) => k,
@@ -588,11 +651,15 @@ pub async fn put_object(
     .execute(&state.db)
     .await;
 
-
     match res {
         Ok(_) => {
             let duration = start_time.elapsed();
-            tracing::info!("OPTIMISTIC PUT SUCCESS: {}/{} | Redundancy: 2.0x | Latency: {}ms", bucket, key, duration.as_millis());
+            tracing::info!(
+                "OPTIMISTIC PUT SUCCESS: {}/{} | Redundancy: 2.0x | Latency: {}ms",
+                bucket,
+                key,
+                duration.as_millis()
+            );
 
             let manifest = serde_json::json!({
                 "bucket": bucket,
@@ -604,12 +671,12 @@ pub async fn put_object(
                 "etag": etag,
                 "metadata": metadata_json
             });
-            
+
             let manifest_bytes = serde_json::to_vec(&manifest).unwrap_or_default();
             let mut manifest_hasher = Sha256::new();
             manifest_hasher.update(format!("{}:{}", bucket, key).as_bytes());
             let manifest_id = format!("meta-{}", hex::encode(manifest_hasher.finalize()));
-            
+
             let cmd = ChunkCommand::Store(StoreChunkRequest {
                 cid: manifest_id,
                 data: manifest_bytes,
@@ -636,7 +703,7 @@ pub async fn put_object(
                 let mut root_hasher = Sha256::new();
                 root_hasher.update(format!("root:{}", user_email_clone).as_bytes());
                 let root_id = format!("meta-{}", hex::encode(root_hasher.finalize()));
-                
+
                 let root_data = serde_json::json!({
                     "action": "put_object",
                     "bucket": bucket_clone,
@@ -644,17 +711,19 @@ pub async fn put_object(
                     "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
                 });
                 let root_bytes = serde_json::to_vec(&root_data).unwrap_or_default();
-                
+
                 let cmd = ChunkCommand::Store(StoreChunkRequest {
                     cid: root_id,
                     data: root_bytes,
                 });
                 let (tx, _rx) = oneshot::channel();
-                let _ = p2p_tx_root.send(SwarmRequest::Store {
-                    command: cmd,
-                    geofence: "GLOBAL".to_string(),
-                    tx,
-                }).await;
+                let _ = p2p_tx_root
+                    .send(SwarmRequest::Store {
+                        command: cmd,
+                        geofence: "GLOBAL".to_string(),
+                        tx,
+                    })
+                    .await;
             });
 
             // Note: object_shards inserts are now handled by the background tokio tasks.
@@ -663,7 +732,10 @@ pub async fn put_object(
             if let Ok(val) = etag.parse() {
                 headers_out.insert("ETag", val);
             }
-            headers_out.insert("x-neuro-latency-ms", HeaderValue::from_str(&duration.as_millis().to_string()).unwrap());
+            headers_out.insert(
+                "x-neuro-latency-ms",
+                HeaderValue::from_str(&duration.as_millis().to_string()).unwrap(),
+            );
             (StatusCode::OK, headers_out).into_response()
         }
         Err(e) => {
@@ -688,7 +760,7 @@ pub async fn reconstruct_metadata(
     if let Err(err) = authorize_bucket(&state, &bucket, &user_email).await {
         return err.into_response();
     }
-    
+
     let key = key.trim_start_matches('/').to_string();
 
     let mut manifest_hasher = Sha256::new();
@@ -710,7 +782,8 @@ pub async fn reconstruct_metadata(
         Ok(ack) if ack.data.is_some() => {
             let data = ack.data.unwrap_or_default();
             let Ok(manifest) = serde_json::from_slice::<serde_json::Value>(&data) else {
-                return (StatusCode::INTERNAL_SERVER_ERROR, "Invalid Manifest Data").into_response();
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Invalid Manifest Data")
+                    .into_response();
             };
 
             let cid = manifest["cid"].as_str().unwrap_or_default();
@@ -746,8 +819,14 @@ pub async fn reconstruct_metadata(
             .await;
 
             match res {
-                Ok(_) => (StatusCode::OK, "Metadata Restored from P2P Shadow Registry").into_response(),
-                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("DB Restore Failed: {}", e)).into_response(),
+                Ok(_) => {
+                    (StatusCode::OK, "Metadata Restored from P2P Shadow Registry").into_response()
+                }
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("DB Restore Failed: {}", e),
+                )
+                    .into_response(),
             }
         }
         _ => (StatusCode::NOT_FOUND, "No Shadow Manifest found in Swarm").into_response(),
@@ -780,7 +859,11 @@ pub async fn plan_upload(
     let key = key.trim_start_matches('/').to_string();
     let upload_id = format!(
         "upl_{}",
-        hex::encode(Sha256::digest(format!("{bucket}:{key}:{}:{}", payload.size_bytes, chrono::Utc::now().timestamp_millis())))
+        hex::encode(Sha256::digest(format!(
+            "{bucket}:{key}:{}:{}",
+            payload.size_bytes,
+            chrono::Utc::now().timestamp_millis()
+        )))
     );
 
     let rows = if country_filter.eq_ignore_ascii_case("GLOBAL") {
@@ -791,7 +874,7 @@ pub async fn plan_upload(
                  AND ingress_url IS NOT NULL
                  AND status = 'online'
                ORDER BY free_gb DESC, uptime_minutes DESC
-               LIMIT $1"#
+               LIMIT $1"#,
         )
         .bind(desired_nodes as i64)
         .fetch_all(&state.db)
@@ -808,7 +891,7 @@ pub async fn plan_upload(
                  AND ingress_url IS NOT NULL
                  AND status = 'online'
                ORDER BY free_gb DESC, uptime_minutes DESC
-               LIMIT $2"#
+               LIMIT $2"#,
         )
         .bind(country_filter)
         .bind(desired_nodes as i64)
@@ -817,13 +900,28 @@ pub async fn plan_upload(
     };
 
     let mut node_targets = Vec::new();
-    let token_secret = std::env::var("NODE_INGRESS_SHARED_SECRET").unwrap_or_else(|_| state.node_shared_secret.clone());
+    let token_secret = std::env::var("NODE_INGRESS_SHARED_SECRET")
+        .unwrap_or_else(|_| state.node_shared_secret.clone());
     let token_expires_at = chrono::Utc::now().timestamp() + 900;
     if let Ok(nodes) = rows {
         for (node_id, region, free_gb, ingress_url) in nodes {
-            let Some(ingress_url) = ingress_url else { continue; };
-            let upload_token = sign_ingress_token(&token_secret, &node_id, "upload", &upload_id, token_expires_at);
-            let download_token = sign_ingress_token(&token_secret, &node_id, "download", &upload_id, token_expires_at);
+            let Some(ingress_url) = ingress_url else {
+                continue;
+            };
+            let upload_token = sign_ingress_token(
+                &token_secret,
+                &node_id,
+                "upload",
+                &upload_id,
+                token_expires_at,
+            );
+            let download_token = sign_ingress_token(
+                &token_secret,
+                &node_id,
+                "download",
+                &upload_id,
+                token_expires_at,
+            );
             node_targets.push(UploadPlanNode {
                 node_id,
                 region,
@@ -883,7 +981,7 @@ pub async fn plan_download(
     let object_key = object_key_locator(&state, &bucket, &key);
 
     let object = sqlx::query_as::<_, crate::models::Object>(
-        "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
+        "SELECT * FROM objects WHERE bucket = $1 AND key = $2",
     )
     .bind(&bucket)
     .bind(&object_key)
@@ -925,20 +1023,35 @@ pub async fn plan_download(
         r#"SELECT chunk_index, chunk_cid, peer_id, ingress_url, size_bytes
            FROM direct_object_chunks
            WHERE object_cid = $1
-           ORDER BY chunk_index ASC"#
+           ORDER BY chunk_index ASC"#,
     )
     .bind(&object.cid)
     .fetch_all(&state.db)
     .await
     .unwrap_or_default();
 
-    let token_secret = std::env::var("NODE_INGRESS_SHARED_SECRET").unwrap_or_else(|_| state.node_shared_secret.clone());
+    let token_secret = std::env::var("NODE_INGRESS_SHARED_SECRET")
+        .unwrap_or_else(|_| state.node_shared_secret.clone());
     let token_expires_at = chrono::Utc::now().timestamp() + 900;
     let mut node_targets = Vec::new();
     for (node_id, region, free_gb, _, ingress_url) in rows {
-        let Some(ingress_url) = ingress_url else { continue; };
-        let download_token = sign_ingress_token(&token_secret, &node_id, "download", &object.cid, token_expires_at);
-        let upload_token = sign_ingress_token(&token_secret, &node_id, "upload", &object.cid, token_expires_at);
+        let Some(ingress_url) = ingress_url else {
+            continue;
+        };
+        let download_token = sign_ingress_token(
+            &token_secret,
+            &node_id,
+            "download",
+            &object.cid,
+            token_expires_at,
+        );
+        let upload_token = sign_ingress_token(
+            &token_secret,
+            &node_id,
+            "upload",
+            &object.cid,
+            token_expires_at,
+        );
         node_targets.push(UploadPlanNode {
             node_id,
             region,
@@ -952,18 +1065,26 @@ pub async fn plan_download(
 
     let chunks: Vec<serde_json::Value> = direct_chunks
         .into_iter()
-        .map(|(chunk_index, chunk_cid, peer_id, ingress_url, size_bytes)| {
-            let token = sign_ingress_token(&token_secret, &peer_id, "download", &object.cid, token_expires_at);
-            serde_json::json!({
-                "chunk_index": chunk_index,
-                "chunk_cid": chunk_cid,
-                "peer_id": peer_id,
-                "ingress_url": ingress_url,
-                "size_bytes": size_bytes,
-                "download_token": token,
-                "token_expires_at": token_expires_at,
-            })
-        })
+        .map(
+            |(chunk_index, chunk_cid, peer_id, ingress_url, size_bytes)| {
+                let token = sign_ingress_token(
+                    &token_secret,
+                    &peer_id,
+                    "download",
+                    &object.cid,
+                    token_expires_at,
+                );
+                serde_json::json!({
+                    "chunk_index": chunk_index,
+                    "chunk_cid": chunk_cid,
+                    "peer_id": peer_id,
+                    "ingress_url": ingress_url,
+                    "size_bytes": size_bytes,
+                    "download_token": token,
+                    "token_expires_at": token_expires_at,
+                })
+            },
+        )
         .collect();
 
     let response = DownloadPlanResponse {
@@ -1023,7 +1144,13 @@ pub async fn commit_direct_upload(
 
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "transaction start failed").into_response(),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "transaction start failed",
+            )
+                .into_response()
+        }
     };
 
     if sqlx::query(
@@ -1077,13 +1204,17 @@ pub async fn commit_direct_upload(
     }
 
     if tx.commit().await.is_err() {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "failed to commit direct upload").into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to commit direct upload",
+        )
+            .into_response();
     }
 
     // J. Centralized Metadata Resilience against DB Loss
-    // Write out a flattened JSON manifest of the exact node destinations 
+    // Write out a flattened JSON manifest of the exact node destinations
     // to a localized immutable append-only file backup.
-    // If Postgres is destroyed, DevOps can reconstruct the exact DB state from these files 
+    // If Postgres is destroyed, DevOps can reconstruct the exact DB state from these files
     // without relying entirely on the DHT shadow manifests (which can be flaky).
     tokio::spawn({
         let backup_payload = payload.clone();
@@ -1100,30 +1231,41 @@ pub async fn commit_direct_upload(
                 "node_compliance_audit": "strict_residency_verified", // L. Enterprise Audit Trail
                 "chunk_mapping": backup_payload.chunks
             });
-            
+
             let manifests_dir = std::path::Path::new("data/manifests");
             if let Err(e) = tokio::fs::create_dir_all(manifests_dir).await {
                 tracing::warn!("Failed to create manifests backup dir: {}", e);
                 return;
             }
-            
+
             let file_path = manifests_dir.join(format!("{}.json", backup_payload.object_cid));
             if let Ok(json_bytes) = serde_json::to_vec_pretty(&manifest_blob) {
                 if let Err(e) = tokio::fs::write(&file_path, json_bytes).await {
-                    tracing::warn!("Failed to write metadata backup manifest {}: {}", file_path.display(), e);
+                    tracing::warn!(
+                        "Failed to write metadata backup manifest {}: {}",
+                        file_path.display(),
+                        e
+                    );
                 } else {
-                    tracing::debug!("Successfully wrote offline manifest backup: {}", file_path.display());
+                    tracing::debug!(
+                        "Successfully wrote offline manifest backup: {}",
+                        file_path.display()
+                    );
                 }
             }
         }
     });
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "status": "committed",
-        "mode": "direct-node-chunks",
-        "object_cid": payload.object_cid,
-        "chunks": payload.chunks.len(),
-    }))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": "committed",
+            "mode": "direct-node-chunks",
+            "object_cid": payload.object_cid,
+            "chunks": payload.chunks.len(),
+        })),
+    )
+        .into_response()
 }
 
 pub async fn put_client_manifest(
@@ -1148,12 +1290,16 @@ pub async fn put_client_manifest(
         return (StatusCode::BAD_REQUEST, "client_manifest is required").into_response();
     }
     if payload.client_manifest.len() > 64 * 1024 {
-        return (StatusCode::PAYLOAD_TOO_LARGE, "client_manifest exceeds 64KB").into_response();
+        return (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "client_manifest exceeds 64KB",
+        )
+            .into_response();
     }
 
     let object_key = object_key_locator(&state, &bucket, &key);
     let row = sqlx::query_as::<_, crate::models::Object>(
-        "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
+        "SELECT * FROM objects WHERE bucket = $1 AND key = $2",
     )
     .bind(&bucket)
     .bind(&object_key)
@@ -1162,15 +1308,17 @@ pub async fn put_client_manifest(
 
     match row {
         Ok(Some(obj)) => {
-            let metadata_json = merge_client_manifest(obj.metadata_json.clone(), Some(payload.client_manifest.clone()));
-            let res = sqlx::query(
-                "UPDATE objects SET metadata_json = $1 WHERE bucket = $2 AND key = $3"
-            )
-            .bind(&metadata_json)
-            .bind(&bucket)
-            .bind(&object_key)
-            .execute(&state.db)
-            .await;
+            let metadata_json = merge_client_manifest(
+                obj.metadata_json.clone(),
+                Some(payload.client_manifest.clone()),
+            );
+            let res =
+                sqlx::query("UPDATE objects SET metadata_json = $1 WHERE bucket = $2 AND key = $3")
+                    .bind(&metadata_json)
+                    .bind(&bucket)
+                    .bind(&object_key)
+                    .execute(&state.db)
+                    .await;
 
             match res {
                 Ok(_) => (
@@ -1186,7 +1334,11 @@ pub async fn put_client_manifest(
                     }),
                 )
                     .into_response(),
-                Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update client manifest").into_response(),
+                Err(_) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to update client manifest",
+                )
+                    .into_response(),
             }
         }
         Ok(None) => (StatusCode::NOT_FOUND, "NoSuchKey").into_response(),
@@ -1205,7 +1357,9 @@ pub async fn get_object(
         if parts.len() == 4 {
             let os = parts[2].to_string();
             let arch = parts[3].to_string();
-            return crate::handlers::downloads::proxy_node_download(Path((os, arch))).await.into_response();
+            return crate::handlers::downloads::proxy_node_download(Path((os, arch)))
+                .await
+                .into_response();
         }
     }
 
@@ -1217,33 +1371,37 @@ pub async fn get_object(
     if let Err(err) = authorize_bucket(&state, &bucket, &user_email).await {
         return err.into_response();
     }
-    
+
     let key = key.trim_start_matches('/').to_string();
-    
+
     let object_key = object_key_locator(&state, &bucket, &key);
 
     let row = sqlx::query_as::<_, crate::models::Object>(
-        "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
+        "SELECT * FROM objects WHERE bucket = $1 AND key = $2",
     )
     .bind(&bucket)
     .bind(&object_key)
     .fetch_optional(&state.db)
     .await;
 
-
     match row {
         Ok(Some(obj)) => {
             // HIGH-SPEED CACHE CHECK
             if let Some(cached_bytes) = state.edge_cache.get(&obj.cid).await {
-               let duration = start_time.elapsed();
-               tracing::info!("CDN RAM HIT: Served {}/{} in {}ms", bucket, key, duration.as_millis());
-               return (StatusCode::OK, cached_bytes).into_response();
+                let duration = start_time.elapsed();
+                tracing::info!(
+                    "CDN RAM HIT: Served {}/{} in {}ms",
+                    bucket,
+                    key,
+                    duration.as_millis()
+                );
+                return (StatusCode::OK, cached_bytes).into_response();
             }
 
             // ── HYBRID SHARD RETRIEVAL: Cloud DB + P2P ──
             let mut preferred_peers: HashMap<usize, String> = HashMap::new();
             let shard_rows = sqlx::query_as::<_, (i32, String)>(
-                "SELECT shard_index, peer_id FROM object_shards WHERE object_cid = $1"
+                "SELECT shard_index, peer_id FROM object_shards WHERE object_cid = $1",
             )
             .bind(&obj.cid)
             .fetch_all(&state.db)
@@ -1277,22 +1435,30 @@ pub async fn get_object(
                         success_count += 1;
                     }
                 }
-                tracing::info!("Cloud DB retrieval: got {}/{} shards from Postgres", success_count, obj.shards);
+                tracing::info!(
+                    "Cloud DB retrieval: got {}/{} shards from Postgres",
+                    success_count,
+                    obj.shards
+                );
             } else {
                 // ── P2P MODE: Original parallel racing retrieval ──
                 let mut futures = FuturesUnordered::new();
-                
+
                 for i in 0..obj.shards {
                     let shard_cid = format!("{}-shard-{}", obj.cid, i);
                     let (tx, rx) = oneshot::channel();
                     let p2p_tx = state.p2p_tx.clone();
                     let preferred_peer_id = preferred_peers.get(&(i as usize)).cloned();
-                    
+
                     futures.push(async move {
                         let jitter = rand::RngCore::next_u32(&mut rand::thread_rng()) % 15 + 1;
                         tokio::time::sleep(Duration::from_millis(jitter as u64)).await;
 
-                        let req = SwarmRequest::Retrieve { cid: shard_cid, preferred_peer_id, tx };
+                        let req = SwarmRequest::Retrieve {
+                            cid: shard_cid,
+                            preferred_peer_id,
+                            tx,
+                        };
                         if p2p_tx.send(req).await.is_ok() {
                             if let Ok(Ok(ack)) = timeout(Duration::from_secs(8), rx).await {
                                 if let Some(data) = ack.data {
@@ -1308,7 +1474,7 @@ pub async fn get_object(
                     if let Some((index, data)) = result {
                         retrieved_shards[index] = Some(data);
                         success_count += 1;
-                        
+
                         if success_count >= obj.recovery_threshold as usize {
                             break;
                         }
@@ -1317,22 +1483,29 @@ pub async fn get_object(
             }
 
             if success_count < obj.recovery_threshold as usize {
-                return (StatusCode::INTERNAL_SERVER_ERROR, "Data unavailable: Insufficient shards").into_response();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Data unavailable: Insufficient shards",
+                )
+                    .into_response();
             }
 
             // ── PRE-DECODING SANITIZATION (SANDBOXING) ──
-            // A malicious node might send a "Poison Shard" designed to cause an OOM 
+            // A malicious node might send a "Poison Shard" designed to cause an OOM
             // or an infinite loop in the Reed-Solomon decoder. We must isolate this computationally
             // expensive step from the main async reactor.
             let recovery_threshold = obj.recovery_threshold as usize;
             let total_shards_for_decode = obj.shards as usize;
-            
+
             let decode_result = tokio::task::spawn_blocking(move || {
-                let encoder = match ErasureEncoder::new(recovery_threshold, total_shards_for_decode - recovery_threshold) {
+                let encoder = match ErasureEncoder::new(
+                    recovery_threshold,
+                    total_shards_for_decode - recovery_threshold,
+                ) {
                     Ok(e) => e,
                     Err(_) => return Err("RS Decoder Init Failed".to_string()),
                 };
-                
+
                 // We wrap the decode in a thread-local timeout conceptually.
                 // If it hangs, the spawn_blocking task will be abandoned (though threads aren't killed instantly in Rust,
                 // a robust implementation would use a separate process or a WebAssembly sandbox for true isolation).
@@ -1341,33 +1514,48 @@ pub async fn get_object(
                     Ok(data) => Ok(data),
                     Err(_) => Err("Erasure Reconstruction Failure".to_string()),
                 }
-            }).await;
+            })
+            .await;
 
             let reconstructed_data = match decode_result {
                 Ok(Ok(data)) => data,
                 Ok(Err(_)) | Err(_) => {
                     tracing::error!("FAILURE: Poison Shard detected or RS decode crashed.");
-                    return (StatusCode::INTERNAL_SERVER_ERROR, "Erasure Reconstruction Failure (Sanitization Triggered)").into_response();
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Erasure Reconstruction Failure (Sanitization Triggered)",
+                    )
+                        .into_response();
                 }
             };
-            
+
             let final_data = reconstructed_data;
 
             let duration = start_time.elapsed();
-            tracing::info!("GET SUCCESS: {}/{} | Racing Shards: {}/{} | Latency: {}ms", bucket, key, success_count, obj.shards, duration.as_millis());
+            tracing::info!(
+                "GET SUCCESS: {}/{} | Racing Shards: {}/{} | Latency: {}ms",
+                bucket,
+                key,
+                success_count,
+                obj.shards,
+                duration.as_millis()
+            );
 
             // ── ENTERPRISE: Blockchain Audit Trail (Polygon) ──
             // Log file accesses to Polygon Smart Contract so clients have a mathematically
             // sovereign, tamper-proof record of every download or access event.
             tracing::info!(
-                "BLOCKCHAIN AUDIT (Tx Queued): user {} accessed {}/{} at timestamp {}", 
-                user_email, bucket, key, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
+                "BLOCKCHAIN AUDIT (Tx Queued): user {} accessed {}/{} at timestamp {}",
+                user_email,
+                bucket,
+                key,
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
             );
 
-            let encrypted_display_key = obj
-                .encrypted_key
-                .clone()
-                .unwrap_or_else(|| key.clone());
+            let encrypted_display_key = obj.encrypted_key.clone().unwrap_or_else(|| key.clone());
             let _ = sqlx::query(
                 r#"
                 INSERT INTO object_heat (object_cid, bucket, object_key, access_count, rolling_heat, last_accessed_at, updated_at)
@@ -1384,7 +1572,7 @@ pub async fn get_object(
             .bind(&encrypted_display_key)
             .execute(&state.db)
             .await;
-            
+
             let cache = state.edge_cache.clone();
             let cid = obj.cid.clone();
             let data_to_cache = final_data.clone();
@@ -1426,24 +1614,22 @@ pub async fn deduplicate_object(
     if let Err(err) = authorize_bucket(&state, &bucket, &user_email).await {
         return err.into_response();
     }
-    
+
     let key = key.trim_start_matches('/').to_string();
 
     let existing_obj = if let Some(etag) = payload.etag.as_ref() {
         sqlx::query_as::<_, crate::models::Object>(
-            "SELECT * FROM objects WHERE cid = $1 AND etag = $2 LIMIT 1"
+            "SELECT * FROM objects WHERE cid = $1 AND etag = $2 LIMIT 1",
         )
         .bind(&payload.cid)
         .bind(etag)
         .fetch_optional(&state.db)
         .await
     } else {
-        sqlx::query_as::<_, crate::models::Object>(
-            "SELECT * FROM objects WHERE cid = $1 LIMIT 1"
-        )
-        .bind(&payload.cid)
-        .fetch_optional(&state.db)
-        .await
+        sqlx::query_as::<_, crate::models::Object>("SELECT * FROM objects WHERE cid = $1 LIMIT 1")
+            .bind(&payload.cid)
+            .fetch_optional(&state.db)
+            .await
     };
 
     match existing_obj {
@@ -1480,15 +1666,24 @@ pub async fn deduplicate_object(
 
             match copy_res {
                 Ok(_) => {
-                    tracing::info!("Global Deduplication Success: Mapped {}/{} to CID {}", bucket, key, payload.cid);
+                    tracing::info!(
+                        "Global Deduplication Success: Mapped {}/{} to CID {}",
+                        bucket,
+                        key,
+                        payload.cid
+                    );
                     (StatusCode::OK, "Deduplicated").into_response()
-                },
+                }
                 Err(e) => {
                     tracing::error!("Failed to deduplicate: {}", e);
-                    (StatusCode::INTERNAL_SERVER_ERROR, "Failed to map existing shards").into_response()
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to map existing shards",
+                    )
+                        .into_response()
                 }
             }
-        },
+        }
         Ok(None) => (StatusCode::NOT_FOUND, "CID/ETag verification failed").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response(),
     }
@@ -1517,7 +1712,11 @@ pub async fn rename_object(
         return (StatusCode::BAD_REQUEST, "invalid new_key").into_response();
     }
     if new_key == old_key {
-        return (StatusCode::OK, Json(serde_json::json!({ "status": "unchanged" }))).into_response();
+        return (
+            StatusCode::OK,
+            Json(serde_json::json!({ "status": "unchanged" })),
+        )
+            .into_response();
     }
 
     let old_object_key = object_key_locator(&state, &bucket, &old_key);
@@ -1528,7 +1727,7 @@ pub async fn rename_object(
     };
 
     let existing = match sqlx::query_as::<_, crate::models::Object>(
-        "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
+        "SELECT * FROM objects WHERE bucket = $1 AND key = $2",
     )
     .bind(&bucket)
     .bind(&old_object_key)
@@ -1581,12 +1780,15 @@ pub async fn rename_object(
         return (StatusCode::INTERNAL_SERVER_ERROR, "rename commit failed").into_response();
     }
 
-    (StatusCode::OK, Json(serde_json::json!({
-        "status": "renamed",
-        "old_key": old_key,
-        "new_key": new_key,
-        "cid": existing.cid,
-    })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": "renamed",
+            "old_key": old_key,
+            "new_key": new_key,
+            "cid": existing.cid,
+        })),
+    )
         .into_response()
 }
 
@@ -1605,13 +1807,13 @@ pub async fn delete_object(
     if let Err(err) = authorize_bucket(&state, &bucket, &user_email).await {
         return err.into_response();
     }
-    
+
     let key = key.trim_start_matches('/').to_string();
 
     let object_key = object_key_locator(&state, &bucket, &key);
 
     let row = sqlx::query_as::<_, crate::models::Object>(
-        "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
+        "SELECT * FROM objects WHERE bucket = $1 AND key = $2",
     )
     .bind(&bucket)
     .bind(&object_key)
@@ -1623,11 +1825,8 @@ pub async fn delete_object(
             for i in 0..obj.shards {
                 let shard_cid = format!("{}-shard-{}", obj.cid, i);
                 let (tx, rx) = oneshot::channel();
-                
-                let req = SwarmRequest::Delete {
-                    cid: shard_cid,
-                    tx,
-                };
+
+                let req = SwarmRequest::Delete { cid: shard_cid, tx };
 
                 if state.p2p_tx.send(req).await.is_ok() {
                     let _ = rx.await;
@@ -1669,9 +1868,7 @@ pub async fn delete_object(
             }.await;
 
             match del_res {
-                Ok(_) => {
-                    StatusCode::NO_CONTENT.into_response()
-                }
+                Ok(_) => StatusCode::NO_CONTENT.into_response(),
                 Err(e) => {
                     tracing::error!("Database error during deletion: {}", e);
                     StatusCode::INTERNAL_SERVER_ERROR.into_response()
@@ -1696,12 +1893,12 @@ pub async fn get_presigned_manifest(
     if let Err(err) = authorize_bucket(&state, &bucket, &user_email).await {
         return err.into_response();
     }
-    
+
     let key = key.trim_start_matches('/').to_string();
     let object_key = object_key_locator(&state, &bucket, &key);
 
     let obj_row = sqlx::query_as::<_, crate::models::Object>(
-        "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
+        "SELECT * FROM objects WHERE bucket = $1 AND key = $2",
     )
     .bind(&bucket)
     .bind(&object_key)
@@ -1711,7 +1908,7 @@ pub async fn get_presigned_manifest(
     match obj_row {
         Ok(Some(obj)) => {
             let shard_rows = sqlx::query_as::<_, (i32, String, String)>(
-                "SELECT shard_index, shard_cid, peer_id FROM object_shards WHERE object_cid = $1"
+                "SELECT shard_index, shard_cid, peer_id FROM object_shards WHERE object_cid = $1",
             )
             .bind(&obj.cid)
             .fetch_all(&state.db)
@@ -1727,14 +1924,22 @@ pub async fn get_presigned_manifest(
                 }));
             }
 
-            let metadata = obj.metadata_json.clone().unwrap_or_else(|| serde_json::json!({}));
+            let metadata = obj
+                .metadata_json
+                .clone()
+                .unwrap_or_else(|| serde_json::json!({}));
 
             // ── CRYPTOGRAPHIC BANDWIDTH VOUCHERS (ANTI FREE-RIDER) ──
             // Uses a SEPARATE secret from JWT to prevent key leakage cross-contamination.
-            let expiry = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() + 3600;
+            let expiry = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + 3600;
             let payload_to_sign = format!("{}:{}:{}", user_email, obj.cid, expiry);
             let voucher_secret = format!("voucher:{}", state.compliance_signing_key);
-            let mut hmac = hmac::Hmac::<sha2::Sha256>::new_from_slice(voucher_secret.as_bytes()).unwrap();
+            let mut hmac =
+                hmac::Hmac::<sha2::Sha256>::new_from_slice(voucher_secret.as_bytes()).unwrap();
             hmac::Mac::update(&mut hmac, payload_to_sign.as_bytes());
             let signature = hex::encode(hmac::Mac::finalize(hmac).into_bytes());
             let bandwidth_voucher = format!("v1.{}.{}", payload_to_sign, signature);
@@ -1753,9 +1958,9 @@ pub async fn get_presigned_manifest(
             });
 
             (StatusCode::OK, axum::Json(manifest)).into_response()
-        },
+        }
         Ok(None) => (StatusCode::NOT_FOUND, "NoSuchKey").into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response()
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response(),
     }
 }
 
@@ -1771,12 +1976,12 @@ pub async fn get_object_shards(
     if let Err(err) = authorize_bucket(&state, &bucket, &user_email).await {
         return err.into_response();
     }
-    
+
     let key = key.trim_start_matches('/').to_string();
     let object_key = object_key_locator(&state, &bucket, &key);
 
     let obj = sqlx::query_as::<_, crate::models::Object>(
-        "SELECT * FROM objects WHERE bucket = $1 AND key = $2"
+        "SELECT * FROM objects WHERE bucket = $1 AND key = $2",
     )
     .bind(&bucket)
     .bind(&object_key)

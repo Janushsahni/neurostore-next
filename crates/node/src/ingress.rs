@@ -1,4 +1,8 @@
-use std::{net::SocketAddr, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    net::SocketAddr,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use anyhow::Context;
 use axum::{
@@ -28,7 +32,11 @@ pub async fn serve_ingress(
     secret: String,
     port: u16,
 ) -> anyhow::Result<()> {
-    let state = IngressState { store, peer_id, secret };
+    let state = IngressState {
+        store,
+        peer_id,
+        secret,
+    };
     let cors = CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
         .allow_methods([Method::GET, Method::PUT, Method::OPTIONS])
@@ -36,7 +44,10 @@ pub async fn serve_ingress(
 
     let app = Router::new()
         .route("/v1/shards/:cid", put(put_shard).get(get_shard))
-        .route("/healthz", get(|| async { Json(serde_json::json!({ "ok": true })) }))
+        .route(
+            "/healthz",
+            get(|| async { Json(serde_json::json!({ "ok": true })) }),
+        )
         .layer(cors)
         .with_state(state);
 
@@ -61,11 +72,15 @@ async fn put_shard(
         return (StatusCode::BAD_REQUEST, "empty shard").into_response();
     }
     match state.store.save_chunk(&cid, &body) {
-        Ok(true) => (StatusCode::OK, Json(serde_json::json!({
-            "stored": true,
-            "cid": cid,
-            "size_bytes": body.len(),
-        }))).into_response(),
+        Ok(true) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "stored": true,
+                "cid": cid,
+                "size_bytes": body.len(),
+            })),
+        )
+            .into_response(),
         Ok(false) => (StatusCode::INSUFFICIENT_STORAGE, "node storage full").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "failed to store shard").into_response(),
     }
@@ -86,7 +101,11 @@ async fn get_shard(
     }
 }
 
-fn verify_token(state: &IngressState, headers: &HeaderMap, op: &str) -> Result<(), (StatusCode, &'static str)> {
+fn verify_token(
+    state: &IngressState,
+    headers: &HeaderMap,
+    op: &str,
+) -> Result<(), (StatusCode, &'static str)> {
     let token = headers
         .get("x-neuro-token")
         .and_then(|v| v.to_str().ok())
@@ -100,7 +119,10 @@ fn verify_token(state: &IngressState, headers: &HeaderMap, op: &str) -> Result<(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<i64>().ok())
         .unwrap_or(0);
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
 
     if token.is_empty() || scope.is_empty() || exp <= now {
         return Err((StatusCode::UNAUTHORIZED, "invalid or expired ingress token"));
