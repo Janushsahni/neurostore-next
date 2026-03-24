@@ -8,7 +8,7 @@ import { API_BASE, DEMO_MODE } from "../lib/config";
 import { decryptEscrowPayload } from "../lib/crypto";
 import { DEMO_USER, DEMO_JWT, DEMO_CSRF } from "../lib/demoData";
 
-const WINDOWS_NODE_INSTALLER_URL = `${API_BASE}/api/downloads/node/windows/x86_64`;
+const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janusahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
 
 const GoogleIcon = () => (
     <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">

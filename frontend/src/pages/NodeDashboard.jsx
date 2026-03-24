@@ -3,7 +3,7 @@ import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi
 import { apiJson } from '../lib/apiClient';
 import { API_BASE } from '../lib/config';
 
-const WINDOWS_NODE_INSTALLER_URL = `${API_BASE}/api/downloads/node/windows/x86_64`;
+const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janusahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
 
 export const NodeDashboard = () => {
     const [stats, setStats] = useState(null);

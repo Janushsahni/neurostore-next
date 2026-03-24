@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Download as DownloadIcon, AlertTriangle, Terminal, Monitor, Apple } from 'lucide-react';
-import { API_BASE } from '../lib/config';
+
+const GITHUB_RELEASE_BASE = 'https://github.com/Janusahni/neurostore-next/releases/latest/download';
 
 export const Download = () => {
     const [activeOS, setActiveOS] = useState('windows');
 
-    const windowsMsiUrl = `${API_BASE}/api/downloads/node/windows/x86_64`;
-    const windowsZipUrl = `${API_BASE}/api/downloads/node/windows-portable/x86_64`;
-    const checksumsUrl = `${API_BASE}/api/downloads/node/checksums/latest`;
-    const macArmUrl = `${API_BASE}/api/downloads/node/macos/arm64`;
-    const macX64Url = `${API_BASE}/api/downloads/node/macos/x86_64`;
-    const linuxUrl = `${API_BASE}/api/downloads/node/linux/x86_64`;
+    const windowsMsiUrl = `${GITHUB_RELEASE_BASE}/neuro-node-windows-x86_64.msi`;
+    const windowsZipUrl = `${GITHUB_RELEASE_BASE}/neuro-node-windows-x86_64.zip`;
+    const checksumsUrl = `${GITHUB_RELEASE_BASE}/SHA256SUMS.txt`;
+    const macArmUrl = `${GITHUB_RELEASE_BASE}/neuro-node-macos-arm64.tar.gz`;
+    const macX64Url = `${GITHUB_RELEASE_BASE}/neuro-node-macos-x86_64.tar.gz`;
+    const linuxUrl = `${GITHUB_RELEASE_BASE}/neuro-node-linux-x86_64.tar.gz`;
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 p-8 max-w-4xl mx-auto py-12 animate-in fade-in">

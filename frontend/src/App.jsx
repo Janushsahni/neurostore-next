@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate } from "react-router-dom";
 import {
   ArrowRight, Cpu, Database, Globe, HardDrive, Lock, LogOut, Menu, Server,
@@ -24,7 +24,7 @@ import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } f
 import { apiJson } from "./lib/apiClient";
 import { API_BASE } from "./lib/config";
 
-const WINDOWS_NODE_INSTALLER_URL = `${API_BASE}/api/downloads/node/windows/x86_64`;
+const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janusahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
 
 
 const FeatureCard = ({ icon: Icon, title, description, badge, color = "text-primary" }) => (
