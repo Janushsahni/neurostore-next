@@ -3,10 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, Lock, RefreshCw, CheckCircle2, Download, AlertCircle, Eye, X, Image as ImageIcon, FolderPlus, Plus, Filter, Tag, Cpu, LayoutGrid, List, FileText, Image as ImgIcon, FileSpreadsheet, Play, MoreVertical, Activity, Shield, Trash2, Edit2, Share2 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { toast } from 'react-hot-toast';
-import { API_BASE } from '../lib/config';
+import { API_BASE, DEMO_MODE } from '../lib/config';
 import { getAuthToken } from '../lib/authStorage';
 import { decryptDownloadInWorker, encryptUploadInWorker, hashFileInWorker } from '../lib/cryptoWorkerClient';
 import { RecoverySetupModal } from '../components/RecoverySetupModal';
+import { demoApiRequest, demoAddFile } from '../lib/demoApi';
 
 export const DriveDashboard = () => {
     const navigate = useNavigate();
@@ -38,9 +39,14 @@ export const DriveDashboard = () => {
 
     const fetchFiles = async () => {
         try {
-            const response = await fetch(`${S3_GATEWAY_URL}/${BUCKET_NAME}`, {
-                headers: getAuthHeaders()
-            });
+            let response;
+            if (DEMO_MODE) {
+                response = await demoApiRequest('/user-drive');
+            } else {
+                response = await fetch(`${S3_GATEWAY_URL}/${BUCKET_NAME}`, {
+                    headers: getAuthHeaders()
+                });
+            }
             if (!response.ok) return;
             const xmlText = await response.text();
 
@@ -93,6 +99,25 @@ export const DriveDashboard = () => {
     }, []);
 
     const uploadSingleFile = async (file) => {
+        if (DEMO_MODE) {
+            // Simulated upload with realistic progress
+            const steps = [
+                { progress: 5, text: 'Planning node placement...', ms: 300 },
+                { progress: 12, text: 'Hashing and encrypting off UI thread...', ms: 400 },
+                { progress: 25, text: 'Erasure coding: generating 15 shards...', ms: 500 },
+                { progress: 45, text: 'Distributing shards to 15 nodes globally...', ms: 600 },
+                { progress: 65, text: 'Confirming shard receipts from nodes...', ms: 400 },
+                { progress: 80, text: 'Committing to distributed ledger...', ms: 350 },
+                { progress: 95, text: 'Verifying integrity hashes...', ms: 300 },
+                { progress: 100, text: 'Upload complete! File is encrypted & distributed.', ms: 200 },
+            ];
+            for (const step of steps) {
+                setUploadState({ progress: step.progress, text: step.text });
+                await new Promise(r => setTimeout(r, step.ms));
+            }
+            demoAddFile(file);
+            return;
+        }
         setUploadState({ progress: 5, text: `Planning node placement...` });
         let uploadPlan = null;
         try {
@@ -274,6 +299,35 @@ export const DriveDashboard = () => {
 
     const handleDownload = async (fileName, mode = 'download') => {
         try {
+            if (DEMO_MODE) {
+                setUploadState({ progress: 20, text: 'Locating shards across global mesh...' });
+                await new Promise(r => setTimeout(r, 400));
+                setUploadState({ progress: 50, text: 'Reassembling 10/15 erasure-coded shards...' });
+                await new Promise(r => setTimeout(r, 500));
+                setUploadState({ progress: 80, text: 'Decrypting with your private vault key...' });
+                await new Promise(r => setTimeout(r, 400));
+                setUploadState({ progress: 100, text: 'Decryption complete!' });
+                await new Promise(r => setTimeout(r, 300));
+                setUploadState({ progress: 0, text: '' });
+
+                const demoContent = `[NeuroStore Demo] This is a decrypted preview of: ${fileName}\n\nThis file was encrypted with AES-256-GCM, erasure-coded into 15 shards,\nand distributed across the global NeuroStore mesh.\n\nIn production, you would see the actual decrypted file content here.`;
+                const blob = new Blob([demoContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+
+                if (mode === 'preview') {
+                    setPreviewFile({ url, name: fileName, type: 'text/plain' });
+                } else {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    toast.success(`Downloaded "${fileName}"`, { icon: '📥' });
+                }
+                return;
+            }
             if (!vaultPassword) {
                 toast.error("Authentication required to decrypt this file.", { icon: '🔐' });
                 return;
@@ -406,6 +460,13 @@ export const DriveDashboard = () => {
     const handleDelete = async (fileName) => {
         if (!confirm(`Are you sure you want to cryptographically shred "${fileName}"? This action cannot be undone.`)) return;
 
+        if (DEMO_MODE) {
+            await demoApiRequest(`/user-drive/${encodeURIComponent(fileName)}`, { method: 'DELETE' });
+            toast.success('Asset shredded and deleted permanently', { icon: '🔥' });
+            fetchFiles();
+            return;
+        }
+
         try {
             const res = await fetch(`${S3_GATEWAY_URL}/${BUCKET_NAME}/${encodeKey(fileName)}`, {
                 method: 'DELETE',
@@ -433,14 +494,24 @@ export const DriveDashboard = () => {
         if (!newKey || newKey.trim() === fileName) return;
 
         try {
-            const res = await fetch(`${S3_GATEWAY_URL}/api/object/rename/${BUCKET_NAME}/${encodeKey(fileName)}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders(),
-                },
-                body: JSON.stringify({ new_key: newKey.trim() }),
-            });
+            let res;
+            if (DEMO_MODE) {
+                const { demoApiJson: demoJson } = await import('../lib/demoApi');
+                const result = await demoJson(`/api/object/rename/${BUCKET_NAME}/${encodeKey(fileName)}`, {
+                    method: 'POST',
+                    body: { new_key: newKey.trim() },
+                });
+                res = result.response;
+            } else {
+                res = await fetch(`${S3_GATEWAY_URL}/api/object/rename/${BUCKET_NAME}/${encodeKey(fileName)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders(),
+                    },
+                    body: JSON.stringify({ new_key: newKey.trim() }),
+                });
+            }
 
             if (!res.ok) {
                 const errorText = await res.text();

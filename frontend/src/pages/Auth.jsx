@@ -1,10 +1,12 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { HardDrive, Mail, Lock, User, ArrowRight, AlertCircle, RefreshCw, ShieldCheck } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { setAuthSession } from "../lib/authStorage";
 import { apiJson } from "../lib/apiClient";
-import { API_BASE } from "../lib/config";
+import { API_BASE, DEMO_MODE } from "../lib/config";
 import { decryptEscrowPayload } from "../lib/crypto";
+import { DEMO_USER, DEMO_JWT, DEMO_CSRF } from "../lib/demoData";
 
 const WINDOWS_NODE_INSTALLER_URL = `${API_BASE}/api/downloads/node/windows/x86_64`;
 
@@ -55,6 +57,13 @@ export const Login = ({ onAuth }) => {
     };
 
     const handleOAuth = (provider) => {
+        if (DEMO_MODE) {
+            setAuthSession(DEMO_USER, DEMO_CSRF, DEMO_JWT);
+            sessionStorage.setItem('neuro_vault_key', 'demo-vault-key');
+            toast.success(`Signed in with ${provider} (Demo)`);
+            onAuth(getTargetPath());
+            return;
+        }
         if (provider.toLowerCase() === "google") {
             window.location.href = `${API_BASE}/api/auth/google/login?intent=${intent}`;
         } else {
@@ -313,6 +322,14 @@ export const Register = ({ onAuth }) => {
     };
 
     const handleOAuth = (provider) => {
+        if (DEMO_MODE) {
+            const body = { name: name || DEMO_USER.name, email: email || DEMO_USER.email };
+            setAuthSession({ ...DEMO_USER, ...body }, DEMO_CSRF, DEMO_JWT);
+            sessionStorage.setItem('neuro_vault_key', 'demo-vault-key');
+            toast.success(`Account created with ${provider} (Demo)`);
+            onAuth(getTargetPath());
+            return;
+        }
         window.alert(`OAuth for ${provider} is pending backend configuration. Please use email log in for now.`);
     };
 

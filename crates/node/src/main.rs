@@ -1,4 +1,6 @@
-#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+// NOTE: windows_subsystem = "windows" was intentionally REMOVED so that
+// neuro-node.exe always shows in Task Manager and always has a visible console.
+// A storage node is a server process — operators need to see it running.
 mod ingress;
 mod p2p;
 mod store;
@@ -192,6 +194,23 @@ async fn run_foreground(args: Args) -> anyhow::Result<()> {
         println!("{}", keypair.public().to_peer_id());
         return Ok(());
     }
+
+    // ── STARTUP BANNER ──
+    println!();
+    println!("  ╔══════════════════════════════════════════════════════╗");
+    println!("  ║         N E U R O S T O R E   N O D E               ║");
+    println!("  ║         Decentralized Storage Mesh v{}         ║", env!("CARGO_PKG_VERSION"));
+    println!("  ╠══════════════════════════════════════════════════════╣");
+    println!("  ║  Status:   STARTING                                 ║");
+    println!("  ║  Listen:   {}  ", runtime.listen);
+    println!("  ║  Storage:  {}  ", runtime.storage_path);
+    println!("  ║  Max:      {} GB allocated  ", runtime.max_gb);
+    println!("  ║  Gateway:  {}  ", runtime.gateway_url.as_deref().unwrap_or("none"));
+    println!("  ╚══════════════════════════════════════════════════════╝");
+    println!();
+    println!("  Press Ctrl+C to stop the node gracefully.");
+    println!();
+
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     tokio::spawn(async move {
         let _ = tokio::signal::ctrl_c().await;
@@ -382,11 +401,22 @@ async fn run_node_with_shutdown(
                             );
                         }
                     } else {
-                        tracing::warn!("Heartbeat HTTP {}", resp.status());
+                        tracing::warn!(
+                            node_id = %heartbeat_node_id,
+                            status = %resp.status(),
+                            gateway = %gateway_url,
+                            "Heartbeat HTTP {} — gateway may be updating",
+                            resp.status()
+                        );
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("Heartbeat failed: {} (will retry in 45s)", e);
+                    tracing::warn!(
+                        node_id = %heartbeat_node_id,
+                        gateway = %gateway_url,
+                        "⚠️  Heartbeat failed: {} (will retry in 45s — node continues storing shards)",
+                        e
+                    );
                 }
             }
         }
@@ -887,6 +917,7 @@ async fn ensure_gateway_registration(runtime: &RuntimeConfig, peer_id: &str) {
 
     let Some(node_secret) = runtime.node_secret.clone() else {
         tracing::warn!("Skipping gateway auto-registration: node onboarding secret is missing");
+        info!("Node will run in standalone mode. Heartbeats and earnings require gateway registration.");
         return;
     };
 
@@ -902,44 +933,70 @@ async fn ensure_gateway_registration(runtime: &RuntimeConfig, peer_id: &str) {
     });
 
     let client = reqwest::Client::new();
-    match client
-        .post(format!("{gateway_url}/api/node/register"))
-        .header("x-node-secret", node_secret)
-        .json(&payload)
-        .timeout(std::time::Duration::from_secs(15))
-        .send()
-        .await
-    {
-        Ok(resp) if resp.status().is_success() => {
-            let state = RegistrationState {
-                peer_id: peer_id.to_string(),
-                gateway_url: gateway_url.clone(),
-                registered_at: chrono::Utc::now().to_rfc3339(),
-            };
-            if let Err(err) = save_registration_state(&runtime.storage_path, &state) {
-                tracing::warn!("Registered node but failed to save registration state: {err:#}");
+    let max_attempts = 3;
+
+    for attempt in 1..=max_attempts {
+        info!(
+            peer_id = %peer_id,
+            gateway = %gateway_url,
+            attempt = attempt,
+            "Registering node with gateway (attempt {}/{})",
+            attempt, max_attempts
+        );
+
+        match client
+            .post(format!("{gateway_url}/api/node/register"))
+            .header("x-node-secret", node_secret.clone())
+            .json(&payload)
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() => {
+                let state = RegistrationState {
+                    peer_id: peer_id.to_string(),
+                    gateway_url: gateway_url.clone(),
+                    registered_at: chrono::Utc::now().to_rfc3339(),
+                };
+                if let Err(err) = save_registration_state(&runtime.storage_path, &state) {
+                    tracing::warn!("Registered node but failed to save registration state: {err:#}");
+                }
+                info!(peer_id = %peer_id, gateway = %gateway_url, "✅ Gateway node registration succeeded");
+                return;
             }
-            info!(peer_id = %peer_id, gateway = %gateway_url, "Gateway node registration succeeded");
+            Ok(resp) => {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                tracing::warn!(
+                    peer_id = %peer_id,
+                    gateway = %gateway_url,
+                    status = %status,
+                    body = %body,
+                    "Gateway registration returned HTTP {} (attempt {}/{})",
+                    status, attempt, max_attempts
+                );
+            }
+            Err(err) => {
+                tracing::warn!(
+                    peer_id = %peer_id,
+                    gateway = %gateway_url,
+                    "Gateway registration failed: {} (attempt {}/{})",
+                    err, attempt, max_attempts
+                );
+            }
         }
-        Ok(resp) => {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            tracing::warn!(
-                peer_id = %peer_id,
-                gateway = %gateway_url,
-                status = %status,
-                body = %body,
-                "Gateway node registration failed"
-            );
-        }
-        Err(err) => {
-            tracing::warn!(
-                peer_id = %peer_id,
-                gateway = %gateway_url,
-                "Gateway node registration request failed: {err}"
-            );
+
+        if attempt < max_attempts {
+            info!("Retrying gateway registration in 10 seconds...");
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         }
     }
+
+    tracing::warn!(
+        "Gateway registration failed after {} attempts. Node will continue running in offline mode.",
+        max_attempts
+    );
+    info!("The node is still accepting P2P connections and storing shards. Heartbeats will retry automatically.");
 }
 
 #[cfg(windows)]

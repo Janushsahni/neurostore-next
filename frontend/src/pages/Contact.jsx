@@ -1,8 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { HardDrive, Mail, MapPin, Send, MessageSquare } from "lucide-react";
+import { HardDrive, Mail, MapPin, Send, MessageSquare, CheckCircle2 } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 export const Contact = () => {
+    const [submitted, setSubmitted] = useState(false);
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        setSubmitted(true);
+        toast.success("Message sent! Our team will respond within 24 hours.", { icon: '✉️', duration: 4000 });
+        setTimeout(() => setSubmitted(false), 3000);
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800 pt-24 pb-12 relative overflow-hidden">
             <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-emerald-100/40 to-transparent pointer-events-none"></div>
@@ -61,7 +71,7 @@ export const Contact = () => {
 
                     {/* Right: Contact Form */}
                     <div className="md:col-span-3 glass-card bg-white p-8 md:p-10 rounded-3xl shadow-lg border border-slate-200">
-                        <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); alert("Thanks for reaching out! Our team will contact you soon."); }}>
+                        <form className="space-y-6" onSubmit={handleSubmit}>
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold text-slate-700">First Name</label>
@@ -94,8 +104,8 @@ export const Contact = () => {
                                 <textarea rows="4" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-medium resize-none" placeholder="How can we help you?" required></textarea>
                             </div>
 
-                            <button type="submit" className="w-full btn-primary py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-base shadow-lg hover:shadow-xl transition-all">
-                                Send Message <Send size={18} />
+                            <button type="submit" disabled={submitted} className={`w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-base shadow-lg hover:shadow-xl transition-all ${submitted ? 'bg-emerald-600 text-white' : 'btn-primary'}`}>
+                                {submitted ? (<><CheckCircle2 size={18} /> Message Sent!</>) : (<>Send Message <Send size={18} /></>)}
                             </button>
                         </form>
                     </div>
