@@ -39,7 +39,7 @@ jobs:
             -JsonOut "dist\node-build-info.json"
 
       - name: Build Windows binaries
-        run: cargo build -p neuro-node -p neuro-uploader --release
+        run: cargo build -p neuronode --release
 
       - name: Resolve MSI version
         shell: pwsh
@@ -61,7 +61,6 @@ jobs:
           New-Item -ItemType Directory -Path $bundleRoot | Out-Null
 
           Copy-Item "target\release\neuro-node.exe" "$bundleRoot\neuro-node.exe"
-          Copy-Item "target\release\neuro-uploader.exe" "$bundleRoot\neuro-uploader.exe"
           Copy-Item "dist\node-build-info.json" "$bundleRoot\build-info.json"
           Copy-Item "deploy\windows\install-node-gui.ps1" "$bundleRoot\install-node-gui.ps1"
           Copy-Item "deploy\windows\install-service.ps1" "$bundleRoot\install-service.ps1"
@@ -123,13 +122,6 @@ jobs:
             /td sha256 `
             "dist\neuro-node-windows-x86_64\neuro-node.exe"
 
-          & $signtool sign `
-            /f "${env:WINDOWS_CODESIGN_PFX_PATH}" `
-            /p "${{ secrets.WINDOWS_CODESIGN_PASSWORD }}" `
-            /fd sha256 `
-            /tr http://timestamp.digicert.com `
-            /td sha256 `
-            "dist\neuro-node-windows-x86_64\neuro-uploader.exe"
 
       - name: Install WiX toolset
         shell: pwsh

@@ -52,7 +52,7 @@ jobs:
             -JsonOut "dist/${{ matrix.bundle_name }}.build.json"
 
       - name: Build neuro-node binary
-        run: cargo build --release -p neuro-node --target ${{ matrix.target }}
+        run: cargo build --release -p neuronode --target ${{ matrix.target }}
 
       - name: Rename binary for macOS/Linux
         if: matrix.os != 'windows-latest'
