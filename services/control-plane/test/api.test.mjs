@@ -9,6 +9,10 @@ let app, server, state, baseUrl;
 
 before(async () => {
     process.env.PORT = "0"; // random port
+    process.env.NODE_SHARED_SECRET = "test_node_secret_123456789012345678901234567890";
+    process.env.MACAROON_SECRET = "test_macaroon_secret_123456789012345678901234567890";
+    process.env.JWT_SECRET = "test_jwt_secret_123456789012345678901234567890";
+    process.env.DATABASE_URL = process.env.DATABASE_URL || "postgres://neurostore:changeme@localhost:5432/neurostore";
     const mod = await import("../server.mjs");
     app = mod.app;
     server = mod.server;

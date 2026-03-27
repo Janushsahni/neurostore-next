@@ -2973,6 +2973,7 @@ dependencies = [
  "dotenvy",
  "futures",
  "hex",
+ "hkdf",
  "hmac",
  "jsonwebtoken",
  "libp2p",
@@ -2996,6 +2997,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "urlencoding",
+ "uuid",
  "zeroize",
 ]
 

@@ -63,10 +63,3 @@ windows-service = "0.7"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
-
-[profile.release]
-opt-level = "z"  # Optimize for size
-lto = true       # Link Time Optimization (Removes dead code)
-strip = true     # Strip symbols from binary
-codegen-units = 1 # Maximize size reduction
-panic = "abort"  # Remove panic unwinding overhead

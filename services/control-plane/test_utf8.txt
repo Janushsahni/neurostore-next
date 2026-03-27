@@ -1,0 +1,207 @@
+﻿
+> @neurostore/control-plane@0.1.0 test
+> node --test test/*.test.mjs
+
+[dotenv@17.3.1] injecting env (2) from .env -- tip: ≡ƒöÉ encrypt with Dotenvx: https://dotenvx.com
+Γû╢ Health
+  [31mΓ£û GET /readyz returns ok[39m
+[31mΓ£û Health [90m(0.5128ms)[39m[39m
+Γû╢ Projects
+  [31mΓ£û POST /v1/projects creates a project[39m
+  [31mΓ£û GET /v1/projects/:id returns the project[39m
+  [31mΓ£û GET /v1/projects/:id returns 404 for missing[39m
+  [31mΓ£û rejects invalid tier[39m
+[31mΓ£û Projects [90m(0.1194ms)[39m[39m
+Γû╢ Macaroons
+  [31mΓ£û POST /v1/tokens/macaroon issues a token[39m
+  [31mΓ£û rejects missing project_id[39m
+[31mΓ£û Macaroons [90m(0.0407ms)[39m[39m
+Γû╢ SigV4 Keys
+  [31mΓ£û generates and revokes keys[39m
+[31mΓ£û SigV4 Keys [90m(0.0271ms)[39m[39m
+Γû╢ Node Registry
+  [31mΓ£û registers a node and receives heartbeat[39m
+  [31mΓ£û GET /v1/nodes lists all nodes[39m
+  [31mΓ£û heartbeat rejects unregistered node[39m
+[31mΓ£û Node Registry [90m(0.0266ms)[39m[39m
+Γû╢ Placement
+  [31mΓ£û recommends placement for shards[39m
+[31mΓ£û Placement [90m(0.0513ms)[39m[39m
+Γû╢ Billing & Usage
+  [31mΓ£û ingests usage and returns summary[39m
+[31mΓ£û Billing & Usage [90m(0.0253ms)[39m[39m
+Γû╢ Pricing & Payouts
+  [31mΓ£û GET /v1/pricing/quote returns quote[39m
+  [31mΓ£û GET /v1/payouts/preview returns payout preview[39m
+[31mΓ£û Pricing & Payouts [90m(0.0279ms)[39m[39m
+Γû╢ Dashboard
+  [31mΓ£û GET /v1/dashboard/summary returns summary[39m
+[31mΓ£û Dashboard [90m(0.0348ms)[39m[39m
+[31mΓ£û S:\neurostore-next\neurostore-next\services\control-plane\test\api.test.mjs [90m(0.1724ms)[39m[39m
+[34mΓä╣ tests 17[39m
+[34mΓä╣ suites 9[39m
+[34mΓä╣ pass 0[39m
+[34mΓä╣ fail 1[39m
+[34mΓä╣ cancelled 16[39m
+[34mΓä╣ skipped 0[39m
+[34mΓä╣ todo 0[39m
+[34mΓä╣ duration_ms 272.8988[39m
+
+[31mΓ£û failing tests:[39m
+
+test at test\api.test.mjs:31:5
+[31mΓ£û GET /readyz returns ok[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:30:1
+[31mΓ£û Health [90m(0.5128ms)[39m[39m
+  Error: NODE_SHARED_SECRET environment variable is required
+      at file:///S:/neurostore-next/neurostore-next/services/control-plane/server.mjs:34:11
+      at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+      at async TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:12:17)
+      at async TestHook.run (node:internal/test_runner/test:1110:7)
+
+test at test\api.test.mjs:42:5
+[31mΓ£û POST /v1/projects creates a project[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:54:5
+[31mΓ£û GET /v1/projects/:id returns the project[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:60:5
+[31mΓ£û GET /v1/projects/:id returns 404 for missing[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:65:5
+[31mΓ£û rejects invalid tier[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:39:1
+[31mΓ£û Projects [90m(0.1194ms)[39m[39m
+  Error: NODE_SHARED_SECRET environment variable is required
+      at file:///S:/neurostore-next/neurostore-next/services/control-plane/server.mjs:34:11
+      at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+      at async TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:12:17)
+      at async TestHook.run (node:internal/test_runner/test:1110:7)
+
+test at test\api.test.mjs:80:5
+[31mΓ£û POST /v1/tokens/macaroon issues a token[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:87:5
+[31mΓ£û rejects missing project_id[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:71:1
+[31mΓ£û Macaroons [90m(0.0407ms)[39m[39m
+  Error: NODE_SHARED_SECRET environment variable is required
+      at file:///S:/neurostore-next/neurostore-next/services/control-plane/server.mjs:34:11
+      at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+      at async TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:12:17)
+      at async TestHook.run (node:internal/test_runner/test:1110:7)
+
+test at test\api.test.mjs:101:5
+[31mΓ£û generates and revokes keys[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:93:1
+[31mΓ£û SigV4 Keys [90m(0.0271ms)[39m[39m
+  Error: NODE_SHARED_SECRET environment variable is required
+      at file:///S:/neurostore-next/neurostore-next/services/control-plane/server.mjs:34:11
+      at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+      at async TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:12:17)
+      at async TestHook.run (node:internal/test_runner/test:1110:7)
+
+test at test\api.test.mjs:113:5
+[31mΓ£û registers a node and receives heartbeat[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:127:5
+[31mΓ£û GET /v1/nodes lists all nodes[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:133:5
+[31mΓ£û heartbeat rejects unregistered node[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:112:1
+[31mΓ£û Node Registry [90m(0.0266ms)[39m[39m
+  Error: NODE_SHARED_SECRET environment variable is required
+      at file:///S:/neurostore-next/neurostore-next/services/control-plane/server.mjs:34:11
+      at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+      at async TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:12:17)
+      at async TestHook.run (node:internal/test_runner/test:1110:7)
+
+test at test\api.test.mjs:152:5
+[31mΓ£û recommends placement for shards[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:139:1
+[31mΓ£û Placement [90m(0.0513ms)[39m[39m
+  Error: NODE_SHARED_SECRET environment variable is required
+      at file:///S:/neurostore-next/neurostore-next/services/control-plane/server.mjs:34:11
+      at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+      at async TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:12:17)
+      at async TestHook.run (node:internal/test_runner/test:1110:7)
+
+test at test\api.test.mjs:172:5
+[31mΓ£û ingests usage and returns summary[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:164:1
+[31mΓ£û Billing & Usage [90m(0.0253ms)[39m[39m
+  Error: NODE_SHARED_SECRET environment variable is required
+      at file:///S:/neurostore-next/neurostore-next/services/control-plane/server.mjs:34:11
+      at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+      at async TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:12:17)
+      at async TestHook.run (node:internal/test_runner/test:1110:7)
+
+test at test\api.test.mjs:184:5
+[31mΓ£û GET /v1/pricing/quote returns quote[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:190:5
+[31mΓ£û GET /v1/payouts/preview returns payout preview[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:183:1
+[31mΓ£û Pricing & Payouts [90m(0.0279ms)[39m[39m
+  Error: NODE_SHARED_SECRET environment variable is required
+      at file:///S:/neurostore-next/neurostore-next/services/control-plane/server.mjs:34:11
+      at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+      at async TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:12:17)
+      at async TestHook.run (node:internal/test_runner/test:1110:7)
+
+test at test\api.test.mjs:198:5
+[31mΓ£û GET /v1/dashboard/summary returns summary[39m
+  'test did not finish before its parent and was cancelled'
+
+test at test\api.test.mjs:197:1
+[31mΓ£û Dashboard [90m(0.0348ms)[39m[39m
+  Error: NODE_SHARED_SECRET environment variable is required
+      at file:///S:/neurostore-next/neurostore-next/services/control-plane/server.mjs:34:11
+      at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+      at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+      at async TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:12:17)
+      at async TestHook.run (node:internal/test_runner/test:1110:7)
+
+test at test\api.test.mjs:20:1
+[31mΓ£û S:\neurostore-next\neurostore-next\services\control-plane\test\api.test.mjs [90m(0.1724ms)[39m[39m
+  TypeError: Cannot read properties of undefined (reading 'close')
+      at TestContext.<anonymous> (file:///S:/neurostore-next/neurostore-next/services/control-plane/test/api.test.mjs:20:22)
+      at TestHook.runInAsyncScope (node:async_hooks:214:14)
+      at TestHook.run (node:internal/test_runner/test:1103:25)
+      at TestHook.run (node:internal/test_runner/test:1424:18)
+      at TestHook.run (node:internal/util:589:20)
+      at Test.runHook (node:internal/test_runner/test:1021:20)
+      at after (node:internal/test_runner/test:1061:20)
+      at Test.run (node:internal/test_runner/test:1129:13)
