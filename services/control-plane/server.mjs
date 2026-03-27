@@ -534,6 +534,134 @@ app.post("/v1/auth/mfa/verify", requireUserSession, requireCsrf, async (req, res
     }
 });
 
+// ── Production Hardening Endpoints ────────────────────────────
+
+// Password change with current password re-verification
+app.post("/v1/auth/change-password", requireUserSession, requireCsrf, async (req, res) => {
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) {
+        return res.status(400).json({ error: "current_password and new_password required" });
+    }
+    if (new_password.length < 8 || new_password.length > 128) {
+        return res.status(400).json({ error: "New password must be 8-128 characters" });
+    }
+
+    // Re-verify current password
+    const user = req.user;
+    const currentHash = hashPassword(current_password, user.salt);
+    const legacyHash = hashPasswordLegacy(current_password, user.salt);
+    if (currentHash !== user.password_hash && legacyHash !== user.password_hash) {
+        await logAudit("PASSWORD_CHANGE_FAILED", user.username, user.username);
+        return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    // Hash new password with fresh salt
+    const newSalt = crypto.randomBytes(32).toString("hex");
+    const newHash = hashPassword(new_password, newSalt);
+
+    await pool.query(
+        "UPDATE cp_users SET password_hash = $1, salt = $2 WHERE username = $3",
+        [newHash, newSalt, user.username]
+    );
+
+    // Invalidate all existing sessions for this user (force re-login everywhere)
+    await pool.query("DELETE FROM cp_sessions WHERE username = $1", [user.username]);
+
+    await logAudit("PASSWORD_CHANGED", user.username, user.username);
+    clearSessionCookies(res);
+    res.json({ success: true, message: "Password changed. Please log in again." });
+});
+
+// API key rotation — issue new macaroon, invalidate old one
+app.post("/v1/tokens/rotate", requireUserSession, requireCsrf, async (req, res) => {
+    const { project_id } = req.body;
+    if (!project_id) return res.status(400).json({ error: "project_id required" });
+
+    const project = await pool.query("SELECT * FROM cp_projects WHERE id = $1", [project_id]);
+    if (project.rows.length === 0) return res.status(404).json({ error: "Project not found" });
+
+    // Generate new macaroon token
+    const newMacaroonId = randomUUID();
+    const rawToken = `${newMacaroonId}:${project_id}`;
+    const newToken = crypto.createHmac("sha256", MACAROON_SECRET).update(rawToken).digest("hex");
+    const expiresAt = Date.now() + 365 * 24 * 60 * 60 * 1000;
+
+    // Invalidate all old tokens for this project
+    await pool.query("DELETE FROM cp_macaroons WHERE project_id = $1", [project_id]);
+
+    // Insert new token
+    await pool.query(
+        "INSERT INTO cp_macaroons (id, project_id, token, expires_at) VALUES ($1, $2, $3, to_timestamp($4 / 1000.0))",
+        [newMacaroonId, project_id, newToken, expiresAt]
+    );
+
+    await logAudit("TOKEN_ROTATED", req.user.username, project_id);
+    res.status(201).json({
+        token: newToken,
+        expires_at: expiresAt,
+        message: "Old tokens invalidated. Use this new token for all future requests."
+    });
+});
+
+// Node deregistration with graceful shard migration trigger
+app.post("/v1/nodes/deregister", requireNodeSecret, async (req, res) => {
+    const { peer_id, reason } = req.body;
+    if (!peer_id) return res.status(400).json({ error: "peer_id required" });
+
+    // Mark node as deregistering (prevents new shard assignments)
+    await pool.query(
+        "UPDATE cp_nodes SET status = 'deregistering' WHERE peer_id = $1",
+        [peer_id]
+    );
+
+    // Get count of shards that need migration
+    const shardCount = await pool.query(
+        "SELECT COUNT(*) as count FROM object_shards WHERE peer_id = $1",
+        [peer_id]
+    );
+    const pendingMigrations = parseInt(shardCount.rows[0]?.count || "0", 10);
+
+    // Log the deregistration event
+    await pool.query(
+        `INSERT INTO cp_audit_log (action, actor, target, details, ts)
+         VALUES ('NODE_DEREGISTERED', $1, $1, $2, NOW())`,
+        [peer_id, JSON.stringify({ reason: reason || "voluntary", pending_migrations: pendingMigrations })]
+    );
+
+    // Close WebSocket connection if active
+    const ws = state.wsClients.get(peer_id);
+    if (ws) {
+        ws.send(JSON.stringify({ type: "deregistered", reason: reason || "voluntary" }));
+        ws.close(1000, "Node deregistered");
+        state.wsClients.delete(peer_id);
+    }
+
+    res.json({
+        success: true,
+        peer_id,
+        status: "deregistering",
+        pending_shard_migrations: pendingMigrations,
+        message: pendingMigrations > 0
+            ? `Node marked for deregistration. ${pendingMigrations} shards will be migrated by the repair daemon.`
+            : "Node deregistered. No shards to migrate."
+    });
+});
+
+// ── Session Cleanup Daemon ────────────────────────────────────
+// Purge expired sessions every 5 minutes to prevent DB bloat
+setInterval(async () => {
+    try {
+        const result = await pool.query(
+            "DELETE FROM cp_sessions WHERE expires_at < NOW()"
+        );
+        if (result.rowCount > 0) {
+            console.log(`[session-cleanup] Purged ${result.rowCount} expired sessions`);
+        }
+    } catch (e) {
+        console.error("[session-cleanup] Error:", e.message);
+    }
+}, 5 * 60 * 1000); // 5 minutes
+
 app.get("/v1/objects", requireUserSession, async (req, res) => {
     res.json({ objects: req.user.objects });
 });

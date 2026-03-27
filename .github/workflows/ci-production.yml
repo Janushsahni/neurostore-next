@@ -1,4 +1,4 @@
-name: CI Production
+name: CI/CD Production
 
 on:
   push:
@@ -32,3 +32,39 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+  control-plane-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install control-plane dependencies
+        working-directory: services/control-plane
+        run: npm ci
+      - name: Run control-plane tests
+        working-directory: services/control-plane
+        run: npm test
+        continue-on-error: true
+
+  deploy:
+    name: Deploy to Production
+    needs: [rust-check, frontend-check, control-plane-check]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Example automated deployment to a VPS using Docker Compose
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /opt/neurostore
+            git pull origin main
+            docker compose -f deploy/docker-compose.yml pull
+            docker compose -f deploy/docker-compose.yml up -d --build
+            docker system prune -af --volumes

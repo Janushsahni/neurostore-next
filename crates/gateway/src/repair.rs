@@ -43,7 +43,7 @@ impl RepairDaemon {
         // "Recursive Manifest Pinning" (Shadow Objects)
         // Prevents "Metadata Decapitation." If the central Postgres DB is destroyed,
         // the Swarm still holds the encrypted metadata map of every object.
-        // We periodically ensure these "meta-cids" are healthy in the swarm.
+        // We periodically verify these "meta-cids" exist in the swarm and re-store if missing.
 
         let recent_objects = sqlx::query_as::<_, DegradedObject>(
             r#"
@@ -66,16 +66,80 @@ impl RepairDaemon {
                     );
                     let manifest_id = format!("meta-{}", hex::encode(manifest_hasher.finalize()));
 
-                    // In a full implementation, we would `Retrieve` the manifest_id from the P2P swarm.
-                    // If it's missing, we regenerate the JSON from Postgres and `Store` it again.
-                    // This ensures the Swarm is a self-contained, self-describing filesystem.
+                    // Attempt to retrieve the shadow manifest from the P2P swarm
+                    let (tx, rx) = tokio::sync::oneshot::channel();
+                    let _ = self
+                        .state
+                        .p2p_tx
+                        .send(crate::p2p::SwarmRequest::Retrieve {
+                            cid: manifest_id.clone(),
+                            preferred_peer_id: None,
+                            tx,
+                        })
+                        .await;
 
-                    tracing::debug!(
-                        "Verified Shadow Object (Metadata Pin) exists for {}/{} -> CID: {}",
-                        obj.bucket,
-                        obj.key,
-                        manifest_id
-                    );
+                    let manifest_exists = match tokio::time::timeout(
+                        tokio::time::Duration::from_secs(5),
+                        rx,
+                    )
+                    .await
+                    {
+                        Ok(Ok(ack)) => ack.data.is_some(),
+                        _ => false,
+                    };
+
+                    if !manifest_exists {
+                        // Re-generate the manifest JSON from Postgres and store it in the swarm
+                        let manifest_json = serde_json::json!({
+                            "bucket": obj.bucket,
+                            "key": obj.key,
+                            "cid": obj.cid,
+                            "shards": obj.shards,
+                            "recovery_threshold": obj.recovery_threshold,
+                            "pinned_at": chrono::Utc::now().to_rfc3339(),
+                        });
+
+                        let manifest_bytes = serde_json::to_vec(&manifest_json).unwrap_or_default();
+                        let (store_tx, store_rx) = tokio::sync::oneshot::channel();
+                        let cmd = neuro_protocol::ChunkCommand::Store(
+                            neuro_protocol::StoreChunkRequest {
+                                cid: manifest_id.clone(),
+                                data: manifest_bytes,
+                            },
+                        );
+
+                        let _ = self
+                            .state
+                            .p2p_tx
+                            .send(crate::p2p::SwarmRequest::Store {
+                                command: cmd,
+                                geofence: "ANY".to_string(),
+                                tx: store_tx,
+                            })
+                            .await;
+
+                        match tokio::time::timeout(tokio::time::Duration::from_secs(10), store_rx)
+                            .await
+                        {
+                            Ok(Ok(ack)) if ack.stored => {
+                                info!(
+                                    "Shadow Object RE-PINNED for {}/{} -> CID: {} on peer {}",
+                                    obj.bucket, obj.key, manifest_id, ack.peer_id
+                                );
+                            }
+                            _ => {
+                                warn!(
+                                    "Failed to re-pin Shadow Object for {}/{} -> CID: {}",
+                                    obj.bucket, obj.key, manifest_id
+                                );
+                            }
+                        }
+                    } else {
+                        tracing::debug!(
+                            "Shadow Object verified for {}/{} -> CID: {}",
+                            obj.bucket, obj.key, manifest_id
+                        );
+                    }
                 }
             }
             Err(e) => {
@@ -90,9 +154,9 @@ impl RepairDaemon {
     async fn thundering_herd_caching_sweep(&self) {
         // "Thundering Herd" Swarm Caching
         // Identifies objects with high recent read activity ("Heat Score")
-        // and dynamically replicates their shards from 20 up to 100 nodes.
-        // This spreads the retrieval load across a massive subset of the mesh,
-        // preventing localized DDoS attacks on smaller Data Centers.
+        // and dynamically replicates their shards to additional nodes.
+        // This spreads the retrieval load across the mesh, preventing
+        // localized DDoS attacks on smaller Data Centers.
 
         let hot_objects_res = sqlx::query_as::<_, DegradedObject>(
             r#"
@@ -108,25 +172,88 @@ impl RepairDaemon {
         match hot_objects_res {
             Ok(objects) => {
                 for obj in objects {
-                    warn!("THUNDERING HERD DETECTED: Object {}/{} is viral. Scaling Swarm Caching from {} to 100 shards.", obj.bucket, obj.key, obj.shards);
+                    let target_shards = 100i32;
+                    let additional_needed = target_shards - obj.shards;
+                    if additional_needed <= 0 {
+                        continue;
+                    }
 
-                    // In production, this would trigger the LibP2P Kademlia engine to
-                    // clone the existing shards and distribute them to 80 additional peers.
-                    let update_res = sqlx::query(
-                        "UPDATE objects SET shards = 100, metadata_json = jsonb_set(metadata_json::jsonb, '{heat_score}', '0'::jsonb) WHERE bucket = $1 AND key = $2"
+                    warn!("THUNDERING HERD DETECTED: Object {}/{} is viral. Scaling from {} to {} shards.",
+                        obj.bucket, obj.key, obj.shards, target_shards);
+
+                    // Retrieve existing shards to replicate
+                    let existing_shards = sqlx::query_as::<_, (String, Vec<u8>)>(
+                        "SELECT chunk_cid, '' as data FROM object_shards WHERE object_cid = $1 LIMIT 5"
                     )
+                    .bind(&obj.cid)
+                    .fetch_all(&self.state.db)
+                    .await
+                    .unwrap_or_default();
+
+                    let mut distributed_count = 0i32;
+
+                    for (chunk_cid, _) in &existing_shards {
+                        // Retrieve the actual shard data from whichever peer has it
+                        let (rtx, rrx) = tokio::sync::oneshot::channel();
+                        let _ = self.state.p2p_tx
+                            .send(crate::p2p::SwarmRequest::Retrieve {
+                                cid: chunk_cid.clone(),
+                                preferred_peer_id: None,
+                                tx: rtx,
+                            })
+                            .await;
+
+                        let shard_data = match tokio::time::timeout(
+                            tokio::time::Duration::from_secs(10), rrx
+                        ).await {
+                            Ok(Ok(ack)) if ack.data.is_some() => ack.data.unwrap(),
+                            _ => continue,
+                        };
+
+                        // Distribute copies to additional peers (up to 5 replicas per existing shard)
+                        let replicas_per_shard = (additional_needed / existing_shards.len() as i32).max(1).min(5);
+                        for _ in 0..replicas_per_shard {
+                            let (stx, srx) = tokio::sync::oneshot::channel();
+                            let cmd = neuro_protocol::ChunkCommand::Store(
+                                neuro_protocol::StoreChunkRequest {
+                                    cid: chunk_cid.clone(),
+                                    data: shard_data.clone(),
+                                },
+                            );
+                            let _ = self.state.p2p_tx
+                                .send(crate::p2p::SwarmRequest::Store {
+                                    command: cmd,
+                                    geofence: "ANY".to_string(),
+                                    tx: stx,
+                                })
+                                .await;
+
+                            if let Ok(Ok(ack)) = tokio::time::timeout(
+                                tokio::time::Duration::from_secs(10), srx
+                            ).await {
+                                if ack.stored {
+                                    distributed_count += 1;
+                                }
+                            }
+                        }
+                    }
+
+                    // Update DB with actual distribution count and reset heat score
+                    let new_shard_count = obj.shards + distributed_count;
+                    let _ = sqlx::query(
+                        "UPDATE objects SET shards = $1, metadata_json = jsonb_set(COALESCE(metadata_json::jsonb, '{}'::jsonb), '{heat_score}', '0'::jsonb) WHERE bucket = $2 AND key = $3"
+                    )
+                    .bind(new_shard_count)
                     .bind(&obj.bucket)
                     .bind(&obj.key)
                     .execute(&self.state.db)
                     .await;
 
-                    if update_res.is_ok() {
-                        info!("Swarm Caching Active: Viral object {}/{} successfully distributed across 100 physical nodes.", obj.bucket, obj.key);
-                    }
+                    info!("Swarm Caching Complete: {}/{} scaled to {} shards ({} new replicas distributed).",
+                        obj.bucket, obj.key, new_shard_count, distributed_count);
                 }
             }
             Err(e) => {
-                // If the heat_score field doesn't exist yet, we just log debug rather than error
                 tracing::debug!("Swarm caching sweep skipped or no hot objects found: {}", e);
             }
         }
@@ -135,10 +262,8 @@ impl RepairDaemon {
     async fn proactive_migration_sweep(&self) {
         // Predictive AI: "Pre-emptive Self-Healing"
         // Find peers with high churn_probability (> 0.8) and proactively replicate
-        // any shards hosted on them to stable nodes.
+        // any shards hosted on them to stable nodes BEFORE the node goes offline.
 
-        // Simulating the retrieval of nodes flagged by Sentinel
-        // In a full implementation, Sentinel outputs are written back to a `node_reputation` table
         let high_churn_peers_res = sqlx::query(
             "SELECT peer_id FROM nodes WHERE uptime_percentage < 95.0 AND bandwidth_capacity_mbps < 5 LIMIT 5"
         )
@@ -151,18 +276,89 @@ impl RepairDaemon {
                     let peer_id: String = match peer.try_get("peer_id") {
                         Ok(v) => v,
                         Err(e) => {
-                            error!(
-                                "Failed to decode peer_id in proactive migration sweep: {}",
-                                e
-                            );
+                            error!("Failed to decode peer_id in proactive migration: {}", e);
                             continue;
                         }
                     };
-                    warn!("PREDICTIVE AI TRIGGER: Node {} exhibits 80%+ churn probability. Initiating proactive migration (0ms recovery time).", peer_id);
 
-                    // The daemon would scan for objects associated with this peer and re-encode/distribute them.
-                    // For now, we simulate the completion of the migration.
-                    info!("Proactive migration complete for Node {}. Shards safely moved before node failure.", peer_id);
+                    warn!("PREDICTIVE AI: Node {} flagged for proactive migration.", peer_id);
+
+                    // Find all shards hosted on this high-churn peer
+                    let shards_on_peer = sqlx::query_as::<_, (String, String, i32)>(
+                        "SELECT object_cid, chunk_cid, chunk_index FROM object_shards WHERE peer_id = $1 LIMIT 50"
+                    )
+                    .bind(&peer_id)
+                    .fetch_all(&self.state.db)
+                    .await
+                    .unwrap_or_default();
+
+                    if shards_on_peer.is_empty() {
+                        info!("Node {} has no shards to migrate.", peer_id);
+                        continue;
+                    }
+
+                    let mut migrated = 0u32;
+
+                    for (object_cid, chunk_cid, chunk_index) in &shards_on_peer {
+                        // 1. Retrieve the shard from the churn-risk peer
+                        let (rtx, rrx) = tokio::sync::oneshot::channel();
+                        let _ = self.state.p2p_tx
+                            .send(crate::p2p::SwarmRequest::Retrieve {
+                                cid: chunk_cid.clone(),
+                                preferred_peer_id: Some(peer_id.clone()),
+                                tx: rtx,
+                            })
+                            .await;
+
+                        let shard_data = match tokio::time::timeout(
+                            tokio::time::Duration::from_secs(10), rrx
+                        ).await {
+                            Ok(Ok(ack)) if ack.data.is_some() => ack.data.unwrap(),
+                            _ => {
+                                warn!("Failed to retrieve shard {} from churn-risk node {}", chunk_cid, peer_id);
+                                continue;
+                            }
+                        };
+
+                        // 2. Re-store on a different (stable) peer
+                        let (stx, srx) = tokio::sync::oneshot::channel();
+                        let cmd = neuro_protocol::ChunkCommand::Store(
+                            neuro_protocol::StoreChunkRequest {
+                                cid: chunk_cid.clone(),
+                                data: shard_data,
+                            },
+                        );
+                        let _ = self.state.p2p_tx
+                            .send(crate::p2p::SwarmRequest::Store {
+                                command: cmd,
+                                geofence: "ANY".to_string(),
+                                tx: stx,
+                            })
+                            .await;
+
+                        match tokio::time::timeout(tokio::time::Duration::from_secs(15), srx).await {
+                            Ok(Ok(ack)) if ack.stored => {
+                                // 3. Update DB: point the shard record to the new peer
+                                let _ = sqlx::query(
+                                    "UPDATE object_shards SET peer_id = $1 WHERE object_cid = $2 AND chunk_index = $3 AND peer_id = $4"
+                                )
+                                .bind(&ack.peer_id)
+                                .bind(object_cid)
+                                .bind(chunk_index)
+                                .bind(&peer_id)
+                                .execute(&self.state.db)
+                                .await;
+
+                                migrated += 1;
+                            }
+                            _ => {
+                                warn!("Failed to migrate shard {} to stable peer", chunk_cid);
+                            }
+                        }
+                    }
+
+                    info!("Proactive migration complete for Node {}: {}/{} shards moved to stable peers.",
+                        peer_id, migrated, shards_on_peer.len());
                 }
             }
             Err(e) => error!("Failed to fetch high-churn peers: {}", e),

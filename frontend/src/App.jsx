@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Component } from "react";
 import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate } from "react-router-dom";
 import {
   ArrowRight, Cpu, Database, Globe, HardDrive, Lock, LogOut, Menu, Server,
@@ -69,6 +69,83 @@ const ProtectedRoute = ({ isAuthenticated, children }) => {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return children;
 };
+
+// ═══════ ERROR BOUNDARY ═══════
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("[ErrorBoundary] Caught:", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
+          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200 p-8 text-center">
+            <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-500 mx-auto mb-6">
+              <ShieldCheck size={32} />
+            </div>
+            <h2 className="text-2xl font-display font-extrabold text-slate-900 mb-3">Something went wrong</h2>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+              An unexpected error occurred. Your data is safe — this is a UI rendering issue.
+            </p>
+            <p className="text-xs text-slate-400 bg-slate-50 rounded-lg p-3 mb-6 font-mono break-all text-left">
+              {this.state.error?.message || "Unknown error"}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { this.setState({ hasError: false, error: null }); }}
+                className="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-all shadow-md"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => { window.location.href = "/"; }}
+                className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm hover:bg-slate-200 transition-all"
+              >
+                Go Home
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ═══════ SKELETON LOADER ═══════
+export const SkeletonLoader = ({ rows = 3, className = "" }) => (
+  <div className={`space-y-4 ${className}`}>
+    {Array.from({ length: rows }).map((_, i) => (
+      <div key={i} className="animate-pulse space-y-3">
+        <div className="h-4 bg-slate-200 rounded-lg w-3/4" />
+        <div className="h-3 bg-slate-100 rounded-lg w-1/2" />
+      </div>
+    ))}
+  </div>
+);
+
+export const CardSkeleton = ({ count = 3 }) => (
+  <div className="grid gap-4 md:grid-cols-3">
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={i} className="animate-pulse bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+        <div className="h-10 w-10 bg-slate-200 rounded-xl mb-4" />
+        <div className="h-5 bg-slate-200 rounded-lg w-2/3 mb-3" />
+        <div className="h-3 bg-slate-100 rounded-lg w-full mb-2" />
+        <div className="h-3 bg-slate-100 rounded-lg w-4/5" />
+      </div>
+    ))}
+  </div>
+);
 
 const AuthRedirectRoute = ({ isAuthenticated, component: Component, onAuth }) => {
   if (isAuthenticated) {
@@ -380,9 +457,11 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <BrowserRouter>
-    <AppContent />
-  </BrowserRouter>
+  <ErrorBoundary>
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  </ErrorBoundary>
 );
 
 export default App;

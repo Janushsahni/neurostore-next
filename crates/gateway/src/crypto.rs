@@ -3,20 +3,23 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use base64::{engine::general_purpose, Engine as _};
+use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
 type HmacSha256 = Hmac<Sha256>;
 
-/// AES-256-GCM metadata encryption layer.
+/// AES-256-GCM metadata encryption layer with HKDF-derived keys.
 ///
-/// Encrypts/decrypts sensitive metadata (object keys, bucket names, etc.)
-/// using AES-256-GCM with a 256-bit key derived from the METADATA_SECRET
-/// environment variable.
+/// Uses HKDF (RFC 5869) to derive two independent 256-bit keys from the
+/// master secret:
+///   1. **Encryption key** — for AES-256-GCM encrypt/decrypt
+///   2. **Index key** — for HMAC-SHA256 blind indexing
 ///
-/// Each encryption operation uses a unique random 12-byte nonce prepended
-/// to the ciphertext, ensuring no two encryptions produce the same output.
+/// This separation ensures that compromising a blind index cannot reveal
+/// the encryption key, and vice versa. Each encryption operation uses a
+/// unique random 12-byte nonce prepended to the ciphertext.
 pub struct MetadataProtector {
     cipher: Aes256Gcm,
     index_key: [u8; 32],
@@ -24,17 +27,26 @@ pub struct MetadataProtector {
 
 impl MetadataProtector {
     pub fn new(master_secret: &str) -> Self {
-        let mut hasher = Sha256::new();
-        hasher.update(master_secret.as_bytes());
-        let mut key = hasher.finalize();
+        // HKDF-Extract: derive a pseudorandom key from the master secret
+        let hk = Hkdf::<Sha256>::new(
+            Some(b"neurostore-metadata-v1"), // salt for domain separation
+            master_secret.as_bytes(),
+        );
 
-        let cipher = Aes256Gcm::new_from_slice(&key).expect("Invalid key length");
+        // HKDF-Expand: derive the AES-256 encryption key
+        let mut enc_key = [0u8; 32];
+        hk.expand(b"neurostore-encryption-key", &mut enc_key)
+            .expect("HKDF expand failed for encryption key");
 
-        // SECURITY: Wipe the intermediate key from RAM immediately after use
-        key.zeroize();
+        let cipher = Aes256Gcm::new_from_slice(&enc_key).expect("Invalid key length");
 
+        // SECURITY: Wipe the encryption key material from stack immediately
+        enc_key.zeroize();
+
+        // HKDF-Expand: derive a SEPARATE key for blind indexing
         let mut index_key = [0u8; 32];
-        index_key.copy_from_slice(&key);
+        hk.expand(b"neurostore-blind-index-key", &mut index_key)
+            .expect("HKDF expand failed for index key");
 
         Self { cipher, index_key }
     }

@@ -289,6 +289,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .fallback_service(ServeDir::new("public"))
         .layer(cors)
+        .layer(from_fn(request_id_middleware))
         .layer(from_fn(security_headers))
         .layer(from_fn(emergency_controls))
         .layer(from_fn(rate_limit))
@@ -392,6 +393,49 @@ async fn security_headers(request: Request, next: Next) -> Response {
         "content-security-policy",
         HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"),
     );
+    response
+}
+
+/// Request ID middleware: assigns a unique UUID to every request for E2E tracing.
+/// The ID is propagated in the `x-request-id` response header and logged.
+async fn request_id_middleware(request: Request, next: Next) -> Response {
+    let request_id = uuid::Uuid::new_v4().to_string();
+    let method = request.method().to_string();
+    let path = request.uri().path().to_string();
+
+    tracing::info!(
+        request_id = %request_id,
+        method = %method,
+        path = %path,
+        "Incoming request"
+    );
+
+    let start = std::time::Instant::now();
+    let mut response = next.run(request).await;
+    let elapsed = start.elapsed();
+
+    // Attach request ID to response for client-side correlation
+    if let Ok(v) = HeaderValue::from_str(&request_id) {
+        response.headers_mut().insert("x-request-id", v);
+    }
+
+    // Egress tracking: log response body size for billing
+    let status = response.status().as_u16();
+    let content_length = response
+        .headers()
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+
+    tracing::info!(
+        request_id = %request_id,
+        status = status,
+        elapsed_ms = elapsed.as_millis() as u64,
+        egress_bytes = content_length,
+        "Request completed"
+    );
+
     response
 }
 
