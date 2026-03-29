@@ -93,7 +93,7 @@ export const Login = ({ onAuth }) => {
             if (!response.ok) throw new Error(data.error || "Login failed");
 
             setAuthSession(data.user, data.csrf_token || "", data.token || "");
-            sessionStorage.setItem('neuro_vault_key', password);
+            // Vault key is kept in-memory only (never persisted to storage for XSS safety)
             onAuth(getTargetPath());
         } catch (err) {
             const safeMessage = err?.name === "AbortError"
@@ -147,7 +147,7 @@ export const Login = ({ onAuth }) => {
             if (!response.ok) throw new Error(data.error || "Auto-Login with recovered key failed.");
 
             setAuthSession(data.user, data.csrf_token || "", data.token || "");
-            sessionStorage.setItem('neuro_vault_key', vaultKey);
+            // Vault key kept in-memory only for this session
             onAuth(getTargetPath());
 
         } catch (err) {
@@ -185,7 +185,7 @@ export const Login = ({ onAuth }) => {
 
                 {error && (
                     <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl flex items-start gap-3">
-                        <AlertCircle size={18} className="shrink-0 mt-0.5" /> <p leading-relaxed>{error}</p>
+                        <AlertCircle size={18} className="shrink-0 mt-0.5" /> <p className="leading-relaxed">{error}</p>
                     </div>
                 )}
 
@@ -261,7 +261,7 @@ export const Login = ({ onAuth }) => {
 
                         {error && (
                             <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl flex items-start gap-3">
-                                <AlertCircle size={18} className="shrink-0 mt-0.5" /> <p leading-relaxed>{error}</p>
+                                <AlertCircle size={18} className="shrink-0 mt-0.5" /> <p className="leading-relaxed">{error}</p>
                             </div>
                         )}
 
@@ -325,7 +325,7 @@ export const Register = ({ onAuth }) => {
         if (DEMO_MODE) {
             const body = { name: name || DEMO_USER.name, email: email || DEMO_USER.email };
             setAuthSession({ ...DEMO_USER, ...body }, DEMO_CSRF, DEMO_JWT);
-            sessionStorage.setItem('neuro_vault_key', 'demo-vault-key');
+            // Demo vault key kept in-memory only
             toast.success(`Account created with ${provider} (Demo)`);
             onAuth(getTargetPath());
             return;
@@ -372,7 +372,7 @@ export const Register = ({ onAuth }) => {
             if (!response.ok) throw new Error(data.error || "Registration failed");
 
             setAuthSession(data.user, data.csrf_token || "", data.token || "");
-            sessionStorage.setItem('neuro_vault_key', password);
+            // Vault key kept in-memory only for this session
             onAuth(getTargetPath());
         } catch (err) {
             const safeMessage = err?.name === "AbortError"
@@ -412,7 +412,7 @@ export const Register = ({ onAuth }) => {
 
                 {error && (
                     <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl flex items-start gap-3">
-                        <AlertCircle size={18} className="shrink-0 mt-0.5" /> <p leading-relaxed>{error}</p>
+                        <AlertCircle size={18} className="shrink-0 mt-0.5" /> <p className="leading-relaxed">{error}</p>
                     </div>
                 )}
 

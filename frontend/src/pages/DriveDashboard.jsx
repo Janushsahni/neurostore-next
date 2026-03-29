@@ -16,7 +16,8 @@ export const DriveDashboard = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadState, setUploadState] = useState({ progress: 0, text: '' });
     const [storageUsed, setStorageUsed] = useState(0);
-    const vaultPassword = sessionStorage.getItem('neuro_vault_key') || getAuthToken() || "default-fallback-key";
+    // Vault key: derive from JWT auth token (never from cleartext sessionStorage)
+    const vaultPassword = getAuthToken() || "default-fallback-key";
     const [previewFile, setPreviewFile] = useState(null);
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
     const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +30,16 @@ export const DriveDashboard = () => {
     const S3_GATEWAY_URL = API_BASE;
     const encodeKey = (name) => encodeURIComponent(name);
     const DIRECT_CHUNK_BYTES = 8 * 1024 * 1024;
+
+    // Payout receipt signing (stub — production will use WebCrypto ECDSA)
+    const signPayoutReceipt = async (payload) => {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(JSON.stringify(payload));
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return { ...payload, signature, algo: 'sha256-stub' };
+    };
 
     const getAuthHeaders = () => {
         const token = getAuthToken();
@@ -541,7 +552,7 @@ export const DriveDashboard = () => {
     };
 
     return (
-        <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-white text-slate-800 font-sans">
+        <div className="flex h-[calc(100vh-80px)] md:h-[calc(100vh-80px)] h-[calc(100dvh-80px-64px)] overflow-hidden bg-white text-slate-800 font-sans relative">
             <RecoverySetupModal />
             {/* ═══════ LEFT SIDEBAR ═══════ */}
             <aside className="w-64 border-r border-slate-200 bg-slate-50 p-4 flex flex-col hidden md:flex shrink-0 z-10">
@@ -553,7 +564,7 @@ export const DriveDashboard = () => {
                         Upload Data
                     </button>
                     {/* Dropdown Menu logic here. We can just show standard inputs for now */}
-                    <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all opacity-0 translate-y-[-10px] group-hover:translate-y-0">
+                    <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all group-hover:translate-y-0 -translate-y-2">
                         <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm font-medium text-slate-700">
                             <FileIcon size={16} className="text-slate-400" /> Upload Files
                         </button>
@@ -805,6 +816,44 @@ export const DriveDashboard = () => {
                     </div>
                 </div>
             )}
+
+            {/* ═══════ MOBILE FLOATING ACTION BUTTON ═══════ */}
+            <div className="fixed bottom-20 right-5 z-40 flex flex-col gap-3 md:hidden">
+                {/* Mobile Search Toggle */}
+                <button
+                    onClick={() => {
+                        const el = document.getElementById('mobile-search-bar');
+                        if (el) el.classList.toggle('hidden');
+                    }}
+                    className="w-12 h-12 bg-white border border-slate-200 text-slate-600 rounded-2xl shadow-lg flex items-center justify-center hover:bg-slate-50 active:scale-95 transition-all"
+                    aria-label="Search"
+                >
+                    <Search size={20} />
+                </button>
+                {/* Mobile Upload FAB */}
+                <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-14 h-14 bg-emerald-500 text-white rounded-2xl shadow-xl shadow-emerald-500/30 flex items-center justify-center hover:bg-emerald-600 active:scale-95 transition-all"
+                    aria-label="Upload File"
+                >
+                    <UploadCloud size={24} />
+                </button>
+            </div>
+
+            {/* Mobile Search Bar (toggleable) */}
+            <div id="mobile-search-bar" className="hidden fixed top-20 inset-x-4 z-40 md:hidden">
+                <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Search files..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-2xl py-3 pl-11 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 placeholder-slate-400 shadow-xl"
+                        autoFocus
+                    />
+                </div>
+            </div>
         </div>
     );
 };

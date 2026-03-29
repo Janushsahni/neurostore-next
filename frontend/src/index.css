@@ -21,6 +21,13 @@
 @layer base {
   * {
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   html,
@@ -37,10 +44,31 @@
     /* Slate 50 for background */
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overscroll-behavior-y: contain;
   }
 
   a {
     text-decoration: none;
+  }
+
+  /* Mobile-first: ensure minimum tap targets (Apple HIG: 44px) */
+  button,
+  a,
+  [role="button"],
+  input[type="submit"],
+  input[type="button"] {
+    touch-action: manipulation;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Exception for inline text links and icon buttons that explicitly set size */
+  nav a,
+  .text-sm a,
+  .text-xs a,
+  footer a {
+    min-height: auto;
+    min-width: auto;
   }
 }
 
@@ -101,6 +129,15 @@
 @utility btn-ghost-hover {
   background: rgba(241, 245, 249, 0.8);
   color: #0f172a;
+}
+
+/* Safe Area Padding (for notched phones like iPhone X+) */
+@utility safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* 3D Button Components */

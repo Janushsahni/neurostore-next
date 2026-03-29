@@ -30,7 +30,7 @@ const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janusahni/neurostore-next
 const FeatureCard = ({ icon: Icon, title, description, badge, color = "text-primary" }) => (
   <article className="glass-card interactive-card p-6 md:p-8 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all duration-300">
     <div className="mb-4 flex items-center gap-3">
-      <div className={`hero - glow inline - flex rounded - xl bg - primary / 15 p - 3 ${color} `}>
+      <div className={`hero-glow inline-flex rounded-xl bg-primary/15 p-3 ${color}`}>
         <Icon size={20} />
       </div>
       {badge && <span className="rounded-full border border-primary/35 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">{badge}</span>}
@@ -44,7 +44,7 @@ const StatCard = ({ label, value, accent, icon: Icon }) => (
   <div className="glass-card p-4 md:p-5 flex items-center gap-3">
     {Icon && <Icon className={accent + " shrink-0"} size={20} />}
     <div>
-      <p className={`text - 2xl md: text - 3xl font - display font - extrabold ${accent} `}>{value}</p>
+      <p className={`text-2xl md:text-3xl font-display font-extrabold ${accent}`}>{value}</p>
       <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted">{label}</p>
     </div>
   </div>
@@ -422,8 +422,11 @@ const AppContent = () => {
 
   if (!sessionChecked) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#070b14] text-slate-200">
-        <div className="glass-card px-6 py-5 text-sm">Loading secure session...</div>
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600">
+        <div className="glass-card px-6 py-5 text-sm font-medium flex items-center gap-3">
+          <svg className="animate-spin h-4 w-4 text-emerald-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+          Loading secure session...
+        </div>
       </div>
     );
   }
@@ -452,6 +455,28 @@ const AppContent = () => {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+
+      {/* ═══════ MOBILE BOTTOM NAVIGATION ═══════ */}
+      <nav className="fixed bottom-0 inset-x-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-200 md:hidden safe-area-bottom">
+        <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
+          <Link to="/" className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-emerald-600 transition-colors min-w-[60px] py-1">
+            <HardDrive size={20} />
+            <span className="text-[10px] font-bold">Home</span>
+          </Link>
+          <Link to="/dashboard/drive" className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-emerald-600 transition-colors min-w-[60px] py-1">
+            <Database size={20} />
+            <span className="text-[10px] font-bold">Drive</span>
+          </Link>
+          <Link to="/dashboard/node" className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-emerald-600 transition-colors min-w-[60px] py-1">
+            <Server size={20} />
+            <span className="text-[10px] font-bold">Node</span>
+          </Link>
+          <Link to="/pricing" className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-emerald-600 transition-colors min-w-[60px] py-1">
+            <Zap size={20} />
+            <span className="text-[10px] font-bold">Plans</span>
+          </Link>
+        </div>
+      </nav>
     </div>
   );
 };

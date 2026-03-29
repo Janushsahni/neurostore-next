@@ -1,5 +1,5 @@
 import { API_BASE, DEMO_MODE } from "./config";
-import { clearAuthSession, getAuthToken } from "./authStorage";
+import { clearAuthSession, getAuthToken, getCsrfToken } from "./authStorage";
 import { demoApiJson, demoApiRequest } from "./demoApi";
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -41,7 +41,7 @@ export async function apiRequest(path, options = {}) {
     }
 
     const timeout = withTimeout(timeoutMs, options.signal);
-    try {
+    const attemptFetch = async () => {
         const response = await fetch(url, {
             method,
             headers,
@@ -54,6 +54,25 @@ export async function apiRequest(path, options = {}) {
 
         if (response.status === 401) {
             clearAuthSession();
+        }
+
+        return response;
+    };
+
+    try {
+        // Attach CSRF token to all mutating requests
+        const csrfToken = getCsrfToken();
+        if (csrfToken && ["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
+            headers.set("X-CSRF-Token", csrfToken);
+        }
+
+        let response = await attemptFetch();
+
+        // Retry once on transient 503 (service temporarily unavailable)
+        if (response.status === 503 && !options._retried) {
+            await new Promise(r => setTimeout(r, 1000));
+            options._retried = true;
+            response = await attemptFetch();
         }
 
         return response;

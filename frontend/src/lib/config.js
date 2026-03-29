@@ -2,7 +2,7 @@
 //  DEMO_MODE — When true, all API calls return mock data.
 //  Set to false when backend is online.
 // ═══════════════════════════════════════════════════════════════
-export const DEMO_MODE = true;
+export const DEMO_MODE = (import.meta.env.VITE_DEMO_MODE ?? "true") !== "false";
 
 export const getApiBase = () => {
     let url = import.meta.env.VITE_API_URL || "";
