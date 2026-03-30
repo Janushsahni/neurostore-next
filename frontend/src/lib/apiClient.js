@@ -1,6 +1,5 @@
-import { API_BASE, DEMO_MODE } from "./config";
+import { buildApiUrl } from "./config";
 import { clearAuthSession, getAuthToken, getCsrfToken } from "./authStorage";
-import { demoApiJson, demoApiRequest } from "./demoApi";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 
@@ -20,11 +19,10 @@ function withTimeout(timeoutMs, externalSignal) {
 }
 
 export async function apiRequest(path, options = {}) {
-    if (DEMO_MODE) return demoApiRequest(path, options);
     const method = (options.method || "GET").toUpperCase();
     const headers = new Headers(options.headers || {});
     const timeoutMs = Number(options.timeoutMs || DEFAULT_TIMEOUT_MS);
-    const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+    const url = buildApiUrl(path);
 
     // Attach JWT Bearer token for all requests (cross-domain safe)
     const jwt = getAuthToken();
@@ -52,7 +50,7 @@ export async function apiRequest(path, options = {}) {
             cache: "no-store",
         });
 
-        if (response.status === 401) {
+        if (response.status === 401 && path !== "/auth/session") {
             clearAuthSession();
         }
 
@@ -82,7 +80,6 @@ export async function apiRequest(path, options = {}) {
 }
 
 export async function apiJson(path, options = {}) {
-    if (DEMO_MODE) return demoApiJson(path, options);
     const response = await apiRequest(path, options);
     const contentType = response.headers.get("content-type") || "";
 

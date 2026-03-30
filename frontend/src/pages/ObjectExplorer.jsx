@@ -23,7 +23,7 @@ export const ObjectExplorer = () => {
                 } else {
                     setError(result?.error || "Failed to retrieve shard map");
                 }
-            } catch (err) {
+            } catch {
                 setError("Network error: Could not reach the Gateway Technical Proof API");
             } finally {
                 setLoading(false);
@@ -121,7 +121,7 @@ export const ObjectExplorer = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-900">
-                                        {data.shards.map((shard, i) => (
+                                        {data.shards.map((shard) => (
                                             <tr key={shard.index} className="hover:bg-white/[0.02] transition-colors group">
                                                 <td className="p-6 font-mono text-xs text-emerald-400/80">
                                                     #{shard.index.toString().padStart(2, '0')} - {shard.cid.slice(0, 8)}

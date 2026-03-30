@@ -1,0 +1,179 @@
+# ═══════════════════════════════════════════════════════════════
+# NeuroStore Sandbox — 3-Node Investor Demo
+# Usage: docker compose -f deploy/docker-compose.sandbox.yml up --build
+# ═══════════════════════════════════════════════════════════════
+
+x-logging:
+  &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "2"
+
+x-node-base: &node-base
+  build:
+    context: ../
+    dockerfile: deploy/Dockerfile.node
+  env_file:
+    - .env.sandbox
+  depends_on:
+    neurostore-control-plane:
+      condition: service_healthy
+  restart: unless-stopped
+  logging: *default-logging
+
+services:
+  # ── Database ──────────────────────────────────────────────────
+  neurostore-db:
+    image: postgres:16-alpine
+    container_name: sandbox-postgres
+    command: postgres -c max_connections=200 -c shared_buffers=128MB
+    environment:
+      POSTGRES_USER: neurostore
+      POSTGRES_PASSWORD: sandbox_demo_2026
+      POSTGRES_DB: neurostore
+    volumes:
+      - sandbox-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neurostore -d neurostore"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Redis Cache ───────────────────────────────────────────────
+  neurostore-redis:
+    image: redis:7-alpine
+    container_name: sandbox-redis
+    command: redis-server --appendonly yes --requirepass sandbox_redis_2026
+    volumes:
+      - sandbox-redis-data:/data
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "sandbox_redis_2026", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Control Plane (Node.js Business Logic) ────────────────────
+  neurostore-control-plane:
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile.services
+    container_name: sandbox-control-plane
+    env_file:
+      - .env.sandbox
+    ports:
+      - "8080:8080"
+    depends_on:
+      neurostore-db:
+        condition: service_healthy
+      neurostore-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/readyz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ── Rust Gateway (S3-compatible API + LibP2P) ─────────────────
+  neurostore-gateway:
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile.gateway
+    container_name: sandbox-gateway
+    env_file:
+      - .env.sandbox
+    ports:
+      - "9009:9009"
+      - "9010:9010"
+    depends_on:
+      neurostore-db:
+        condition: service_healthy
+      neurostore-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9009/readyz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ── Storage Node 1 (Mumbai Region Simulated) ──────────────────
+  neurostore-node-1:
+    <<: *node-base
+    container_name: sandbox-node-mumbai
+    environment:
+      NODE_ID: "node-mumbai-01"
+      NODE_REGION: "ap-south-1"
+      NODE_LABEL: "Mumbai-IN"
+      NODE_PORT: "9001"
+      STORAGE_PATH: "/data/shards"
+      GATEWAY_URL: "http://neurostore-gateway:9009"
+      CONTROL_PLANE_URL: "http://neurostore-control-plane:8080"
+    ports:
+      - "9001:9000"
+    volumes:
+      - sandbox-node-1-data:/data/shards
+
+  # ── Storage Node 2 (Bangalore Region Simulated) ───────────────
+  neurostore-node-2:
+    <<: *node-base
+    container_name: sandbox-node-bangalore
+    environment:
+      NODE_ID: "node-bangalore-02"
+      NODE_REGION: "ap-south-1"
+      NODE_LABEL: "Bangalore-IN"
+      NODE_PORT: "9002"
+      STORAGE_PATH: "/data/shards"
+      GATEWAY_URL: "http://neurostore-gateway:9009"
+      CONTROL_PLANE_URL: "http://neurostore-control-plane:8080"
+    ports:
+      - "9002:9000"
+    volumes:
+      - sandbox-node-2-data:/data/shards
+
+  # ── Storage Node 3 (Delhi Region Simulated) ───────────────────
+  neurostore-node-3:
+    <<: *node-base
+    container_name: sandbox-node-delhi
+    environment:
+      NODE_ID: "node-delhi-03"
+      NODE_REGION: "ap-south-1"
+      NODE_LABEL: "Delhi-IN"
+      NODE_PORT: "9003"
+      STORAGE_PATH: "/data/shards"
+      GATEWAY_URL: "http://neurostore-gateway:9009"
+      CONTROL_PLANE_URL: "http://neurostore-control-plane:8080"
+    ports:
+      - "9003:9000"
+    volumes:
+      - sandbox-node-3-data:/data/shards
+
+  # ── Frontend Dashboard ────────────────────────────────────────
+  neurostore-web:
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile.sandbox-web
+    container_name: sandbox-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      neurostore-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  sandbox-db-data:
+  sandbox-redis-data:
+  sandbox-node-1-data:
+  sandbox-node-2-data:
+  sandbox-node-3-data:

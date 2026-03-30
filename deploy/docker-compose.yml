@@ -31,7 +31,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD:-changeme_redis_2026}\" ping | grep PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -95,6 +95,8 @@ services:
     build:
       context: ../
       dockerfile: deploy/Dockerfile.web
+      args:
+        VITE_DEMO_MODE: "false"
     container_name: neurostore-react-dashboard
     ports:
       - "80:80" 

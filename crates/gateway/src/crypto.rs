@@ -5,7 +5,7 @@ use aes_gcm::{
 use base64::{engine::general_purpose, Engine as _};
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use zeroize::Zeroize;
 
 type HmacSha256 = Hmac<Sha256>;

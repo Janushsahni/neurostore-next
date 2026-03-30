@@ -1,10 +1,8 @@
 import React, { useState, useEffect, Component } from "react";
 import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate } from "react-router-dom";
 import {
-  ArrowRight, Cpu, Database, Globe, HardDrive, Lock, LogOut, Menu, Server,
-  ShieldCheck, Sparkles, X, Zap, BarChart3, FileSearch, Brain, Shield,
-  IndianRupee, Building2, Users, ChevronRight, CheckCircle2, Clock, Eye,
-  Cloud, Fingerprint, FileText, TrendingUp, Award
+  ArrowRight, Database, Globe, HardDrive, LogOut, Menu, Server,
+  ShieldCheck, Sparkles, X, Zap, Cloud
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 
@@ -22,47 +20,19 @@ import { ObjectExplorer } from "./pages/ObjectExplorer";
 import AdminNodes from "./pages/AdminNodes";
 import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
-import { API_BASE } from "./lib/config";
-
-const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janusahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
 
 
-const FeatureCard = ({ icon: Icon, title, description, badge, color = "text-primary" }) => (
+const FeatureCard = ({ icon, title, description, badge, color = "text-primary" }) => (
   <article className="glass-card interactive-card p-6 md:p-8 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all duration-300">
     <div className="mb-4 flex items-center gap-3">
       <div className={`hero-glow inline-flex rounded-xl bg-primary/15 p-3 ${color}`}>
-        <Icon size={20} />
+        {React.createElement(icon, { size: 20 })}
       </div>
       {badge && <span className="rounded-full border border-primary/35 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">{badge}</span>}
     </div>
     <h3 className="mb-2 text-xl font-bold">{title}</h3>
     <p className="text-sm text-muted leading-relaxed">{description}</p>
   </article>
-);
-
-const StatCard = ({ label, value, accent, icon: Icon }) => (
-  <div className="glass-card p-4 md:p-5 flex items-center gap-3">
-    {Icon && <Icon className={accent + " shrink-0"} size={20} />}
-    <div>
-      <p className={`text-2xl md:text-3xl font-display font-extrabold ${accent}`}>{value}</p>
-      <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted">{label}</p>
-    </div>
-  </div>
-);
-
-const TestimonialCard = ({ name, role, company, text }) => (
-  <div className="glass-card p-6 hover:-translate-y-0.5 transition-all duration-300">
-    <p className="text-sm text-gray-300 leading-relaxed mb-4 italic">"{text}"</p>
-    <div className="flex items-center gap-3">
-      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-emerald-500 flex items-center justify-center text-[#041013] font-bold text-sm">
-        {name[0]}
-      </div>
-      <div>
-        <p className="text-sm font-semibold">{name}</p>
-        <p className="text-[11px] text-muted">{role}, {company}</p>
-      </div>
-    </div>
-  </div>
 );
 
 const ProtectedRoute = ({ isAuthenticated, children }) => {
@@ -147,13 +117,13 @@ export const CardSkeleton = ({ count = 3 }) => (
   </div>
 );
 
-const AuthRedirectRoute = ({ isAuthenticated, component: Component, onAuth }) => {
+const AuthRedirectRoute = ({ isAuthenticated, component, onAuth }) => {
   if (isAuthenticated) {
     const params = new URLSearchParams(window.location.search);
     if (params.get('intent') === 'node') return <Navigate to="/dashboard/node" replace />;
     return <Navigate to="/dashboard/drive" replace />;
   }
-  return <Component onAuth={onAuth} />;
+  return React.createElement(component, { onAuth });
 };
 
 // ═══════ LANDING PAGE ═══════
@@ -413,7 +383,11 @@ const AppContent = () => {
 
   const handleLogin = (targetPath) => { setIsAuthenticated(true); navigate(typeof targetPath === "string" ? targetPath : "/dashboard/drive"); };
   const handleLogout = async () => {
-    try { await apiJson("/auth/logout", { method: "POST", timeoutMs: 9000 }); } catch { }
+    try {
+      await apiJson("/auth/logout", { method: "POST", timeoutMs: 9000 });
+    } catch (error) {
+      console.warn("Logout request failed, clearing session locally.", error);
+    }
     clearAuthSession();
     setIsAuthenticated(false);
     toast.success("Logged out");

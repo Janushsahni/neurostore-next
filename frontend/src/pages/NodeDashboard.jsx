@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins } from 'lucide-react';
 import { apiJson } from '../lib/apiClient';
-import { API_BASE } from '../lib/config';
 
 const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janusahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
 
@@ -13,25 +12,14 @@ export const NodeDashboard = () => {
     const [lookupLoading, setLookupLoading] = useState(false);
     const [lookupError, setLookupError] = useState('');
 
-    // Try to read Node ID from localStorage (set by the installer)
-    useEffect(() => {
-        const queryNodeId = new URLSearchParams(window.location.search).get('node_id');
-        if (queryNodeId) {
-            setNodeId(queryNodeId);
-            localStorage.setItem('neuro_node_id', queryNodeId);
-            lookupNode(queryNodeId);
-            return;
-        }
-        const savedNodeId = localStorage.getItem('neuro_node_id');
-        if (savedNodeId) {
-            setNodeId(savedNodeId);
-            lookupNode(savedNodeId);
-        }
-    }, []);
-
     const fetchStats = async () => {
         try {
-            const { response, data } = await apiJson('/api/nodes/stats', { method: 'GET', timeoutMs: 10000 });
+            let { response, data } = await apiJson('/api/nodes/stats', { method: 'GET', timeoutMs: 10000 });
+            if (!response.ok) {
+                const fallback = await apiJson('/nodes/stats', { method: 'GET', timeoutMs: 10000 });
+                response = fallback.response;
+                data = fallback.data;
+            }
             if (response.ok) setStats(data);
         } catch (err) {
             console.error("Failed to fetch network stats", err);
@@ -40,13 +28,18 @@ export const NodeDashboard = () => {
         }
     };
 
-    const lookupNode = async (id) => {
+    const lookupNode = useCallback(async (id) => {
         const searchId = id || nodeId;
         if (!searchId.trim()) return;
         setLookupLoading(true);
         setLookupError('');
         try {
-            const { response, data } = await apiJson(`/api/node/${encodeURIComponent(searchId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
+            let { response, data } = await apiJson(`/api/node/${encodeURIComponent(searchId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
+            if (!response.ok) {
+                const fallback = await apiJson(`/node/${encodeURIComponent(searchId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
+                response = fallback.response;
+                data = fallback.data;
+            }
             if (response.ok) {
                 setNodeData(data);
                 localStorage.setItem('neuro_node_id', searchId.trim());
@@ -60,7 +53,27 @@ export const NodeDashboard = () => {
         } finally {
             setLookupLoading(false);
         }
-    };
+    }, [nodeId]);
+
+    // Try to read Node ID from localStorage (set by the installer)
+    useEffect(() => {
+        const bootstrapNode = async () => {
+            const queryNodeId = new URLSearchParams(window.location.search).get('node_id');
+            if (queryNodeId) {
+                setNodeId(queryNodeId);
+                localStorage.setItem('neuro_node_id', queryNodeId);
+                await lookupNode(queryNodeId);
+                return;
+            }
+            const savedNodeId = localStorage.getItem('neuro_node_id');
+            if (savedNodeId) {
+                setNodeId(savedNodeId);
+                await lookupNode(savedNodeId);
+            }
+        };
+
+        bootstrapNode();
+    }, [lookupNode]);
 
     useEffect(() => {
         fetchStats();
@@ -351,10 +364,10 @@ export const NodeDashboard = () => {
 };
 
 // ── Reusable Stat Card ──
-const StatCard = ({ icon: Icon, label, value, accent }) => (
+const StatCard = ({ icon, label, value, accent }) => (
     <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200 flex flex-col items-start hover:-translate-y-1 transition-transform">
         <div className={`p-2.5 rounded-lg mb-3 ${accent}`}>
-            <Icon size={20} />
+            {React.createElement(icon, { size: 20 })}
         </div>
         <p className={`text-2xl font-display font-extrabold tracking-tight text-slate-800 mb-1`}>{value}</p>
         <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">{label}</span>

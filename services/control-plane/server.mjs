@@ -8,6 +8,7 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
+import compression from "compression";
 import crypto from "node:crypto";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
@@ -330,6 +331,7 @@ const PRICING = {
 
 // ── Express App ────────────────────────────────────────────────
 const app = express();
+app.use(compression());
 app.disable("x-powered-by");
 // SECURITY (#29): Only trust proxy headers when ENVIRONMENT=production (behind nginx/LB)
 // In development, don't trust proxy headers to prevent IP spoofing

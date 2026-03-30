@@ -2,10 +2,10 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { HardDrive, ShieldCheck, Database, Server, Cpu, Globe, ArrowRight, Zap, Combine } from "lucide-react";
 
-const FeatureCore = ({ icon: Icon, title, description }) => (
+const FeatureCore = ({ icon, title, description }) => (
     <div className="glass-card bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
         <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
-            <Icon size={28} />
+            {React.createElement(icon, { size: 28 })}
         </div>
         <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
         <p className="text-slate-500 font-medium leading-relaxed">{description}</p>

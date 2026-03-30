@@ -1,0 +1,28 @@
+# Build stage — Frontend with DEMO_MODE disabled for live sandbox
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+
+# Disable demo mode so it hits the real sandbox backend
+ENV VITE_DEMO_MODE=false
+ENV VITE_API_URL=http://localhost:9009
+
+RUN npm run build
+
+# Production stage — Serve via Nginx
+FROM nginx:alpine
+
+# Custom nginx config for SPA routing
+RUN echo 'server { \
+    listen 80; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    location / { try_files $uri $uri/ /index.html; } \
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ { expires 1y; add_header Cache-Control "public, immutable"; } \
+}' > /etc/nginx/conf.d/default.conf
+
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

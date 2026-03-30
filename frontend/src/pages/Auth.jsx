@@ -2,11 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { HardDrive, Mail, Lock, User, ArrowRight, AlertCircle, RefreshCw, ShieldCheck } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { setAuthSession } from "../lib/authStorage";
+import { setAuthSession, setSelectedPlan } from "../lib/authStorage";
 import { apiJson } from "../lib/apiClient";
-import { API_BASE, DEMO_MODE } from "../lib/config";
+import { buildApiUrl } from "../lib/config";
 import { decryptEscrowPayload } from "../lib/crypto";
-import { DEMO_USER, DEMO_JWT, DEMO_CSRF } from "../lib/demoData";
 
 const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janusahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
 
@@ -29,23 +28,24 @@ const MicrosoftIcon = () => (
     <svg viewBox="0 0 23 23" width="18" height="18" fill="none"><path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z" fill="#00a4ef" /></svg>
 );
 
-const OAuthButton = ({ icon: Icon, label, onClick }) => (
+const OAuthButton = ({ icon, label, onClick }) => (
     <button
         type="button"
         onClick={onClick}
         className="w-full bg-white border border-slate-200 hover:border-slate-300 rounded-xl py-3 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-sm"
     >
-        <Icon /> {label}
+        {React.createElement(icon)} {label}
     </button>
 );
 
 export const Login = ({ onAuth }) => {
     const [searchParams] = useSearchParams();
     const intent = searchParams.get("intent") || "user";
-    const [email, setEmail] = useState("");
+    const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [providerNotice, setProviderNotice] = useState("");
 
     // Recovery State
     const [showRecovery, setShowRecovery] = useState(false);
@@ -57,17 +57,10 @@ export const Login = ({ onAuth }) => {
     };
 
     const handleOAuth = (provider) => {
-        if (DEMO_MODE) {
-            setAuthSession(DEMO_USER, DEMO_CSRF, DEMO_JWT);
-            sessionStorage.setItem('neuro_vault_key', 'demo-vault-key');
-            toast.success(`Signed in with ${provider} (Demo)`);
-            onAuth(getTargetPath());
-            return;
-        }
         if (provider.toLowerCase() === "google") {
-            window.location.href = `${API_BASE}/api/auth/google/login?intent=${intent}`;
+            window.location.href = buildApiUrl(`/api/auth/google/login?intent=${encodeURIComponent(intent)}`);
         } else {
-            window.alert(`OAuth for ${provider} is pending backend configuration. Please use Google or Email.`);
+            setProviderNotice(`${provider} sign-in is not enabled in this environment yet. Use Google or email for now.`);
         }
     };
 
@@ -76,17 +69,17 @@ export const Login = ({ onAuth }) => {
         setError(null);
         setIsLoading(true);
 
-        const normalizedEmail = email.trim().toLowerCase();
-        if (!normalizedEmail || !password) {
-            setError("Email and password are required.");
+        const normalizedUsername = username.trim();
+        if (!normalizedUsername || !password) {
+            setError("Username and password are required.");
             setIsLoading(false);
             return;
         }
 
         try {
-            const { response, data } = await apiJson("/auth/login", {
+            const { response, data } = await apiJson("/v1/auth/login", {
                 method: "POST",
-                body: { email: normalizedEmail, password },
+                body: { username: normalizedUsername, password },
                 timeoutMs: 12000,
             });
 
@@ -111,19 +104,22 @@ export const Login = ({ onAuth }) => {
         setError(null);
         setIsLoading(true);
 
-        const normalizedEmail = email.trim().toLowerCase();
-        if (!normalizedEmail || !recoveryPhrase) {
-            setError("Email and Recovery Kit Phrase are required.");
+        const normalizedUsername = username.trim();
+        if (!normalizedUsername || !recoveryPhrase) {
+            setError("Username and Recovery Kit Phrase are required.");
             setIsLoading(false);
             return;
         }
 
         try {
             // 1. Fetch encrypted payload from public endpoint
-            const res = await fetch(`${API_BASE}/api/auth/recovery-kit/${encodeURIComponent(normalizedEmail)}`);
+            const res = await fetch(buildApiUrl(`/api/auth/recovery-kit?username=${encodeURIComponent(normalizedUsername)}`), {
+                method: "GET",
+                credentials: "include",
+            });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data.error || "Recovery kit not found for this email. Contact support.");
+                throw new Error(data.error || "Recovery kit not found for this username. Contact support.");
             }
             const { wrapped_vault_key } = await res.json();
 
@@ -131,16 +127,16 @@ export const Login = ({ onAuth }) => {
             let vaultKey;
             try {
                 vaultKey = await decryptEscrowPayload(wrapped_vault_key, recoveryPhrase);
-            } catch (decErr) {
+            } catch {
                 throw new Error("Invalid Recovery Phrase. Decryption failed.");
             }
 
             if (!vaultKey) throw new Error("Vault Key reconstruction failed.");
 
             // 3. We successfully reconstructed their password. Issue a login natively!
-            const { response, data } = await apiJson("/auth/login", {
+            const { response, data } = await apiJson("/v1/auth/login", {
                 method: "POST",
-                body: { email: normalizedEmail, password: vaultKey },
+                body: { username: normalizedUsername, password: vaultKey },
                 timeoutMs: 12000,
             });
 
@@ -188,6 +184,11 @@ export const Login = ({ onAuth }) => {
                         <AlertCircle size={18} className="shrink-0 mt-0.5" /> <p className="leading-relaxed">{error}</p>
                     </div>
                 )}
+                {providerNotice && (
+                    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium rounded-xl">
+                        {providerNotice}
+                    </div>
+                )}
 
                 <div className="space-y-3 mb-8">
                     <OAuthButton icon={GoogleIcon} label="Continue with Google" onClick={() => handleOAuth("Google")} />
@@ -202,16 +203,16 @@ export const Login = ({ onAuth }) => {
 
                 <form className="space-y-4" onSubmit={handleSubmit}>
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Email Address</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Username</label>
                         <div className="relative">
-                            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
-                                placeholder="you@example.com"
-                                autoComplete="email"
+                                placeholder="jane_doe"
+                                autoComplete="username"
                                 required
                             />
                         </div>
@@ -267,13 +268,13 @@ export const Login = ({ onAuth }) => {
 
                         <form onSubmit={handleRecoverySubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5">Email Address</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">Username</label>
                                 <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 transition-all shadow-inner"
-                                    placeholder="you@example.com"
+                                    placeholder="jane_doe"
                                     required
                                 />
                             </div>
@@ -310,11 +311,12 @@ export const Login = ({ onAuth }) => {
 export const Register = ({ onAuth }) => {
     const [searchParams] = useSearchParams();
     const intent = searchParams.get("intent") || "user";
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
+    const selectedPlan = searchParams.get("plan") || (intent === "node" ? "node" : "pro");
+    const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [providerNotice, setProviderNotice] = useState("");
 
     const getTargetPath = () => {
         if (intent === "node") return "/dashboard/node";
@@ -322,15 +324,7 @@ export const Register = ({ onAuth }) => {
     };
 
     const handleOAuth = (provider) => {
-        if (DEMO_MODE) {
-            const body = { name: name || DEMO_USER.name, email: email || DEMO_USER.email };
-            setAuthSession({ ...DEMO_USER, ...body }, DEMO_CSRF, DEMO_JWT);
-            // Demo vault key kept in-memory only
-            toast.success(`Account created with ${provider} (Demo)`);
-            onAuth(getTargetPath());
-            return;
-        }
-        window.alert(`OAuth for ${provider} is pending backend configuration. Please use email log in for now.`);
+        setProviderNotice(`${provider} sign-up is not enabled in this environment yet. Use email sign up for now.`);
     };
 
     const handleSubmit = async (e) => {
@@ -338,10 +332,9 @@ export const Register = ({ onAuth }) => {
         setError(null);
         setIsLoading(true);
 
-        const cleanName = name.trim();
-        const normalizedEmail = email.trim().toLowerCase();
+        const normalizedUsername = username.trim();
 
-        if (!cleanName || !normalizedEmail || !password) {
+        if (!normalizedUsername || !password) {
             setError("All fields are required.");
             setIsLoading(false);
             return;
@@ -363,15 +356,16 @@ export const Register = ({ onAuth }) => {
         }
 
         try {
-            const { response, data } = await apiJson("/auth/register", {
+            const { response, data } = await apiJson("/v1/auth/register", {
                 method: "POST",
-                body: { name: cleanName, email: normalizedEmail, password },
+                body: { username: normalizedUsername, password },
                 timeoutMs: 12000,
             });
 
             if (!response.ok) throw new Error(data.error || "Registration failed");
 
             setAuthSession(data.user, data.csrf_token || "", data.token || "");
+            setSelectedPlan(selectedPlan);
             // Vault key kept in-memory only for this session
             onAuth(getTargetPath());
         } catch (err) {
@@ -415,6 +409,11 @@ export const Register = ({ onAuth }) => {
                         <AlertCircle size={18} className="shrink-0 mt-0.5" /> <p className="leading-relaxed">{error}</p>
                     </div>
                 )}
+                {providerNotice && (
+                    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium rounded-xl">
+                        {providerNotice}
+                    </div>
+                )}
 
                 <div className="space-y-3 mb-8">
                     <OAuthButton icon={GoogleIcon} label="Sign up with Google" onClick={() => handleOAuth("Google")} />
@@ -427,33 +426,18 @@ export const Register = ({ onAuth }) => {
                 </div>
 
                 <form className="space-y-4" onSubmit={handleSubmit}>
+
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Full Name</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Username</label>
                         <div className="relative">
                             <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input
                                 type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
-                                placeholder="Jane Doe"
-                                autoComplete="name"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Email Address</label>
-                        <div className="relative">
-                            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
-                                placeholder="you@example.com"
-                                autoComplete="email"
+                                placeholder="jane_doe"
+                                autoComplete="username"
                                 required
                             />
                         </div>
@@ -485,7 +469,7 @@ export const Register = ({ onAuth }) => {
                 </form>
 
                 <p className="text-center text-sm text-muted mt-6">
-                    Already have an account? <Link to="/login" className="text-primary hover:underline">Sign in</Link>
+                    Already have an account? <Link to={`/login?intent=${intent}`} className="text-primary hover:underline">Sign in</Link>
                 </p>
             </div>
         </div>

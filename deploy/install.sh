@@ -53,22 +53,32 @@ cd neurostore-next || echo "Executing from current directory"
 
 # 3. Generating Cryptographic Secrets
 echo -e "${GREEN}[3/5] Generating Military-Grade Cryptographic Secrets...${NC}"
-cp deploy/.env.example deploy/.env
+cp .env.example deploy/.env
 
 # Generate secure random strings for the production environment
 DB_PASS=$(openssl rand -hex 16)
+REDIS_PASS=$(openssl rand -hex 16)
 JWT_SECRET=$(openssl rand -base64 32)
 NODE_SECRET=$(openssl rand -hex 24)
-MASTER_KEY=$(openssl rand -hex 32)
+METADATA_SECRET=$(openssl rand -hex 32)
+COMPLIANCE_KEY=$(openssl rand -hex 32)
+MACAROON_SECRET=$(openssl rand -hex 32)
 PROOF_TOKEN=$(openssl rand -hex 16)
 
 # Inject secrets into the .env file
 sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${DB_PASS}/" deploy/.env
-sed -i "s/DATABASE_URL=.*/DATABASE_URL=postgres:\/\/neurostore:${DB_PASS}@neurostore-db:5432\/neurostore/" deploy/.env
+sed -i "s/DATABASE_URL=.*/DATABASE_URL=postgres:\/\/neuro_admin:${DB_PASS}@neurostore-db:5432\/neurostore_production/" deploy/.env
+sed -i "s/REDIS_PASSWORD=.*/REDIS_PASSWORD=${REDIS_PASS}/" deploy/.env
+sed -i "s#REDIS_URL=.*#REDIS_URL=redis://:${REDIS_PASS}@neurostore-redis:6379#" deploy/.env
+sed -i "s/METADATA_SECRET=.*/METADATA_SECRET=${METADATA_SECRET}/" deploy/.env
 sed -i "s/JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" deploy/.env
+sed -i "s/COMPLIANCE_SIGNING_KEY=.*/COMPLIANCE_SIGNING_KEY=${COMPLIANCE_KEY}/" deploy/.env
+sed -i "s/MACAROON_SECRET=.*/MACAROON_SECRET=${MACAROON_SECRET}/" deploy/.env
 sed -i "s/NODE_SHARED_SECRET=.*/NODE_SHARED_SECRET=${NODE_SECRET}/" deploy/.env
-sed -i "s/MASTER_ENCRYPTION_KEY=.*/MASTER_ENCRYPTION_KEY=${MASTER_KEY}/" deploy/.env
 sed -i "s/PROOF_SUBMIT_TOKEN=.*/PROOF_SUBMIT_TOKEN=${PROOF_TOKEN}/" deploy/.env
+sed -i "s/ENVIRONMENT=.*/ENVIRONMENT=production/" deploy/.env
+sed -i "s/COOKIE_SECURE=.*/COOKIE_SECURE=true/" deploy/.env
+sed -i "s/TRUST_PROXY_HEADERS=.*/TRUST_PROXY_HEADERS=true/" deploy/.env
 
 echo "✅ Environment variables and Quantum-Resistant keys generated."
 
@@ -105,7 +115,8 @@ echo -e "Your Sovereign Cloud Gateway is now running on your server."
 echo -e ""
 echo -e "${YELLOW}🔑 SAVE THESE SECRETS IN A PASSWORD MANAGER (NEVER SHARE THEM):${NC}"
 echo -e "   Database Password: ${DB_PASS}"
-echo -e "   Master Encryption Key (PQE Layer): ${MASTER_KEY}"
+echo -e "   Redis Password: ${REDIS_PASS}"
+echo -e "   Metadata Secret: ${METADATA_SECRET}"
 echo -e "   Node Onboarding Secret: ${NODE_SECRET}"
 echo -e ""
 echo -e "🌐 ${GREEN}Endpoints:${NC}"

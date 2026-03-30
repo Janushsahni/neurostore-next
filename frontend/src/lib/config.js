@@ -1,30 +1,37 @@
-// ═══════════════════════════════════════════════════════════════
-//  DEMO_MODE — When true, all API calls return mock data.
-//  Set to false when backend is online.
-// ═══════════════════════════════════════════════════════════════
-export const DEMO_MODE = (import.meta.env.VITE_DEMO_MODE ?? "true") !== "false";
+function trimTrailingSlash(value) {
+    return value.replace(/\/+$/, "");
+}
 
-export const getApiBase = () => {
-    let url = import.meta.env.VITE_API_URL || "";
+export const DEMO_MODE = false;
 
-    if (!url) {
-        return "https://neurostore-backend-production.up.railway.app";
+export function getApiBase() {
+    const raw = (import.meta.env.VITE_API_URL || "").trim();
+
+    if (!raw && typeof window !== "undefined") {
+        const { protocol, hostname } = window.location;
+        const apiPort = import.meta.env.VITE_API_PORT || "9009";
+        return `${protocol}//${hostname || "localhost"}:${apiPort}`;
     }
 
-    url = url.replace(/\/$/, "");
-
-    if (!url.startsWith('http')) {
-        const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
-        const protocol = (isLocal) ? 'http://' : 'https://';
-        url = `${protocol}${url}`;
-    }
-
-    try {
-        const parsed = new URL(url);
-        return parsed.origin;
-    } catch {
+    if (!raw) {
         return "http://localhost:9009";
     }
-};
+
+    const normalized = trimTrailingSlash(raw);
+    const withProtocol = /^https?:\/\//i.test(normalized)
+        ? normalized
+        : `${/localhost|127\.0\.0\.1/i.test(normalized) ? "http" : "https"}://${normalized}`;
+
+    try {
+        return trimTrailingSlash(new URL(withProtocol).origin);
+    } catch {
+        return "";
+    }
+}
 
 export const API_BASE = getApiBase();
+
+export function buildApiUrl(path) {
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return API_BASE ? `${API_BASE}${normalizedPath}` : normalizedPath;
+}
