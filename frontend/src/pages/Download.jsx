@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Download as DownloadIcon, AlertTriangle, Terminal, Monitor, Apple } from 'lucide-react';
 
-const GITHUB_RELEASE_BASE = 'https://github.com/Janusahni/neurostore-next/releases/latest/download';
+const GITHUB_RELEASE_BASE = 'https://github.com/Janushsahni/neurostore-next/releases/latest/download';
 
 export const Download = () => {
     const [activeOS, setActiveOS] = useState('windows');
