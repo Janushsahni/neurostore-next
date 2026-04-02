@@ -405,10 +405,12 @@ async fn run_node_with_shutdown(
             let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
             hasher.update(whoami::hostname().as_bytes());
             let fingerprint = format!("FP-{:x}", hasher.finalize());
-            let mac_address = match mac_address::get_mac_address() {
-                Ok(Some(ma)) => ma.to_string(),
-                _ => fingerprint.clone(),
-            };
+            let mac_address = std::env::var("SANDBOX_MAC").unwrap_or_else(|_| {
+                match mac_address::get_mac_address() {
+                    Ok(Some(ma)) => ma.to_string(),
+                    _ => fingerprint.clone(),
+                }
+            });
 
             let heartbeat = serde_json::json!({
                 "node_id": heartbeat_node_id,
@@ -433,13 +435,16 @@ async fn run_node_with_shutdown(
                 "build_signature": build_signature(),
             });
 
-            match client
+            let mut req = client
                 .post(format!("{}/api/node/heartbeat", gateway_url))
                 .json(&heartbeat)
-                .timeout(std::time::Duration::from_secs(10))
-                .send()
-                .await
-            {
+                .timeout(std::time::Duration::from_secs(10));
+            
+            if let Ok(ip) = std::env::var("SANDBOX_IP") {
+                req = req.header("x-forwarded-for", ip);
+            }
+
+            match req.send().await {
                 Ok(resp) => {
                     if resp.status().is_success() {
                         if let Ok(body) = resp.json::<serde_json::Value>().await {
@@ -1005,13 +1010,17 @@ async fn ensure_gateway_registration(runtime: &RuntimeConfig, peer_id: &str) {
             attempt, max_attempts
         );
 
-        match client
+        let mut req = client
             .post(format!("{gateway_url}/api/nodes/register"))
             .header("x-node-secret", node_secret.clone())
             .json(&payload)
-            .timeout(std::time::Duration::from_secs(15))
-            .send()
-            .await
+            .timeout(std::time::Duration::from_secs(15));
+            
+        if let Ok(ip) = std::env::var("SANDBOX_IP") {
+            req = req.header("x-forwarded-for", ip);
+        }
+
+        match req.send().await
         {
             Ok(resp) if resp.status().is_success() => {
                 let state = RegistrationState {

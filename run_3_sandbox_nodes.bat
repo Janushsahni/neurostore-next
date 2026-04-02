@@ -40,13 +40,13 @@ echo.
 set "RUST_LOG=info,neuro_node=info"
 set "NODE_INGRESS_SHARED_SECRET=sandbox_node_secret_key"
 
-start "NeuroStore Node 1 (Mumbai)" cmd /c "title NeuroStore Node 1 (Mumbai) ^& color 0A ^& set RUST_LOG=!RUST_LOG! ^& set NODE_INGRESS_SHARED_SECRET=!NODE_INGRESS_SHARED_SECRET! ^& !NODE_EXE! --setup-config-path demo_swarm\node1\setup.json --listen /ip4/0.0.0.0/tcp/9201 ^& pause"
+start "NeuroStore Node 1 (Mumbai)" cmd /c "title NeuroStore Node 1 (Mumbai) ^& color 0A ^& set RUST_LOG=!RUST_LOG! ^& set NODE_INGRESS_SHARED_SECRET=!NODE_INGRESS_SHARED_SECRET! ^& set SANDBOX_IP=192.168.10.101 ^& set SANDBOX_MAC=02:00:00:00:00:01 ^& !NODE_EXE! --setup-config-path demo_swarm\node1\setup.json --listen /ip4/0.0.0.0/tcp/9201 ^& pause"
 
 timeout /t 1 /nobreak >nul
-start "NeuroStore Node 2 (Delhi)" cmd /c "title NeuroStore Node 2 (Delhi) ^& color 0B ^& set RUST_LOG=!RUST_LOG! ^& set NODE_INGRESS_SHARED_SECRET=!NODE_INGRESS_SHARED_SECRET! ^& !NODE_EXE! --setup-config-path demo_swarm\node2\setup.json --listen /ip4/0.0.0.0/tcp/9202 ^& pause"
+start "NeuroStore Node 2 (Delhi)" cmd /c "title NeuroStore Node 2 (Delhi) ^& color 0B ^& set RUST_LOG=!RUST_LOG! ^& set NODE_INGRESS_SHARED_SECRET=!NODE_INGRESS_SHARED_SECRET! ^& set SANDBOX_IP=192.168.10.102 ^& set SANDBOX_MAC=02:00:00:00:00:02 ^& !NODE_EXE! --setup-config-path demo_swarm\node2\setup.json --listen /ip4/0.0.0.0/tcp/9202 ^& pause"
 
 timeout /t 1 /nobreak >nul
-start "NeuroStore Node 3 (Bangalore)" cmd /c "title NeuroStore Node 3 (Bangalore) ^& color 0D ^& set RUST_LOG=!RUST_LOG! ^& set NODE_INGRESS_SHARED_SECRET=!NODE_INGRESS_SHARED_SECRET! ^& !NODE_EXE! --setup-config-path demo_swarm\node3\setup.json --listen /ip4/0.0.0.0/tcp/9203 ^& pause"
+start "NeuroStore Node 3 (Bangalore)" cmd /c "title NeuroStore Node 3 (Bangalore) ^& color 0D ^& set RUST_LOG=!RUST_LOG! ^& set NODE_INGRESS_SHARED_SECRET=!NODE_INGRESS_SHARED_SECRET! ^& set SANDBOX_IP=192.168.10.103 ^& set SANDBOX_MAC=02:00:00:00:00:03 ^& !NODE_EXE! --setup-config-path demo_swarm\node3\setup.json --listen /ip4/0.0.0.0/tcp/9203 ^& pause"
 
 echo =========================================================
 echo   SANDBOX SWARM IS ONLINE!
