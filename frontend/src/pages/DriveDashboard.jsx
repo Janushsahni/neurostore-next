@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, Lock, RefreshCw, CheckCircle2, Download, AlertCircle, Eye, X, Image as ImageIcon, FolderPlus, Plus, Filter, Tag, Cpu, LayoutGrid, List, FileText, Image as ImgIcon, FileSpreadsheet, Play, MoreVertical, Activity, Shield, Trash2, Edit2, Share2 } from 'lucide-react';
+import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, RefreshCw, Download, X, FolderPlus, Plus, Cpu, LayoutGrid, List, FileText, Image as ImgIcon, FileSpreadsheet, Play, Trash2, Edit2, Share2 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { toast } from 'react-hot-toast';
 import { API_BASE } from '../lib/config';
-import { getAuthToken } from '../lib/authStorage';
+import { getAuthToken, getSelectedPlan } from '../lib/authStorage';
 import { decryptDownloadInWorker, encryptUploadInWorker, hashFileInWorker } from '../lib/cryptoWorkerClient';
 import { RecoverySetupModal } from '../components/RecoverySetupModal';
 
@@ -482,7 +482,7 @@ export const DriveDashboard = () => {
     };
 
     return (
-        <div className="flex h-[calc(100vh-80px)] md:h-[calc(100vh-80px)] h-[calc(100dvh-80px-64px)] overflow-hidden bg-white text-slate-800 font-sans relative">
+        <div className="flex h-[calc(100dvh-80px-64px)] md:h-[calc(100vh-80px)] overflow-hidden bg-white text-slate-800 font-sans relative">
             <RecoverySetupModal />
             {/* ═══════ LEFT SIDEBAR ═══════ */}
             <aside className="w-64 border-r border-slate-200 bg-slate-50 p-4 flex flex-col hidden md:flex shrink-0 z-10">
@@ -504,7 +504,7 @@ export const DriveDashboard = () => {
                     </div>
                     {/* Hidden Native Inputs */}
                     <input type="file" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                    <input type="file" multiple webkitdirectory="true" readOnly directory="true" ref={folderInputRef} onChange={handleFileUpload} className="hidden" />
+                    <input type="file" multiple webkitdirectory="true" ref={folderInputRef} onChange={handleFileUpload} className="hidden" />
                 </div>
 
                 <nav className="flex-1 space-y-1">
@@ -528,10 +528,10 @@ export const DriveDashboard = () => {
                     <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2">
                         <div
                             className="h-full bg-emerald-500 rounded-full transition-all duration-1000"
-                            style={{ width: `${Math.max((storageUsed / (localStorage.getItem('neuro_plan') === 'pro' ? 1000 : 100)) * 100, 2)}%` }}
+                            style={{ width: `${Math.max((storageUsed / (getSelectedPlan() === 'pro' ? 1000 : 100)) * 100, 2)}%` }}
                         ></div>
                     </div>
-                    <p className="text-xs text-slate-500 font-medium">{storageUsed} GB used of {localStorage.getItem('neuro_plan') === 'pro' ? '1000 GB' : '100 GB'}</p>
+                    <p className="text-xs text-slate-500 font-medium">{storageUsed} GB used of {getSelectedPlan() === 'pro' ? '1000 GB' : '100 GB'}</p>
                     <button onClick={() => window.location.href = '/pricing'} className="mt-3 w-full py-2 bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-200 rounded-lg text-xs font-bold transition-all shadow-sm">
                         Upgrade Storage
                     </button>

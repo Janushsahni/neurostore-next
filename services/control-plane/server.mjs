@@ -329,6 +329,9 @@ const PRICING = {
     enterprise: { storage_per_gb: 0.011, egress_per_gb: 0.008, max_storage_gb: Infinity, max_egress_gb: Infinity },
 };
 
+// ── CORS Allowed Origins ───────────────────────────────────────
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:3000").split(",").map(s => s.trim()).filter(Boolean);
+
 // ── Express App ────────────────────────────────────────────────
 const app = express();
 app.use(compression());
@@ -341,6 +344,22 @@ if (IS_PRODUCTION) {
     app.set("trust proxy", false);
 }
 app.use(express.json({ limit: "16mb" }));
+
+// ── CORS Middleware ────────────────────────────────────────────
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && ALLOWED_ORIGINS.includes(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Requested-With");
+        res.setHeader("Access-Control-Expose-Headers", "Content-Type, X-Request-Id");
+        res.setHeader("Access-Control-Max-Age", "86400");
+    }
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+});
+
 app.use(rateLimit);
 app.use((req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");

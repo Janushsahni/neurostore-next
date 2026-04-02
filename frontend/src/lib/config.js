@@ -2,7 +2,7 @@ function trimTrailingSlash(value) {
     return value.replace(/\/+$/, "");
 }
 
-export const DEMO_MODE = false;
+
 
 export function getApiBase() {
     const raw = (import.meta.env.VITE_API_URL || "").trim();

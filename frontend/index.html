@@ -15,7 +15,7 @@
 
   <!-- Browser-side hardening: enforce headers at CDN/reverse-proxy as well -->
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https: wss: http://localhost:* ws://localhost:*;">
+    content="default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://vercel.live https://*.vercelanalytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://*.up.railway.app https://*.vercel.app https://fonts.googleapis.com https://fonts.gstatic.com https: wss: http://localhost:* ws://localhost:*;">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="X-Frame-Options" content="DENY">
   <meta name="referrer" content="strict-origin-when-cross-origin">

@@ -3,11 +3,11 @@ import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Download, RefreshCw,
 import { apiJson } from "../lib/apiClient";
 
 const ComplianceItem = ({ passed, label, detail }) => (
-    <div className={`flex items-start gap-3 p-4 rounded-lg border ${passed ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-amber-500/20 bg-amber-500/5'}`}>
-        {passed ? <CheckCircle2 className="text-emerald-400 mt-0.5 shrink-0" size={20} /> : <AlertTriangle className="text-amber-400 mt-0.5 shrink-0" size={20} />}
+    <div className={`flex items-start gap-3 p-4 rounded-xl border ${passed ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+        {passed ? <CheckCircle2 className="text-emerald-500 mt-0.5 shrink-0" size={20} /> : <AlertTriangle className="text-amber-500 mt-0.5 shrink-0" size={20} />}
         <div>
-            <p className={`font-semibold text-sm ${passed ? 'text-emerald-300' : 'text-amber-300'}`}>{label}</p>
-            <p className="text-xs text-muted mt-0.5">{detail}</p>
+            <p className={`font-bold text-sm ${passed ? 'text-emerald-700' : 'text-amber-700'}`}>{label}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{detail}</p>
         </div>
     </div>
 );
@@ -21,14 +21,14 @@ const ScoreRing = ({ score }) => {
     return (
         <div className="relative inline-flex items-center justify-center">
             <svg width="140" height="140" className="-rotate-90">
-                <circle cx="70" cy="70" r={radius} stroke="rgba(255,255,255,0.08)" strokeWidth="8" fill="none" />
+                <circle cx="70" cy="70" r={radius} stroke="rgba(0,0,0,0.06)" strokeWidth="8" fill="none" />
                 <circle cx="70" cy="70" r={radius} stroke={color} strokeWidth="8" fill="none"
                     strokeDasharray={circumference} strokeDashoffset={offset}
                     strokeLinecap="round" className="transition-all duration-1000 ease-out" />
             </svg>
             <div className="absolute flex flex-col items-center">
                 <span className="text-3xl font-display font-extrabold" style={{ color }}>{score}</span>
-                <span className="text-[10px] uppercase tracking-wider text-muted">/100</span>
+                <span className="text-[10px] uppercase tracking-wider text-slate-400">/100</span>
             </div>
         </div>
     );
@@ -139,8 +139,8 @@ export const ComplianceDashboard = () => {
                         <ShieldCheck size={22} />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-display font-bold">DPDP Compliance Dashboard</h1>
-                        <p className="text-xs text-muted">Digital Personal Data Protection Act, 2023 — Compliance Monitor</p>
+                        <h1 className="text-2xl font-display font-bold text-slate-800">DPDP Compliance Dashboard</h1>
+                        <p className="text-xs text-slate-500">Digital Personal Data Protection Act, 2023 — Compliance Monitor</p>
                     </div>
                 </div>
 
@@ -148,11 +148,11 @@ export const ComplianceDashboard = () => {
                 <div className="glass-card p-5 mt-6">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                         <div className="flex-1 w-full">
-                            <label className="block text-xs font-semibold text-gray-400 mb-1.5">Select Bucket</label>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Select Bucket</label>
                             <select
                                 value={selectedBucket}
                                 onChange={(e) => { setSelectedBucket(e.target.value); setReport(null); }}
-                                className="w-full bg-background/50 border border-border rounded-lg py-2.5 px-4 text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 px-4 text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                                 disabled={loadingBuckets}
                             >
                                 {loadingBuckets && <option>Loading buckets...</option>}
@@ -172,7 +172,7 @@ export const ComplianceDashboard = () => {
                 </div>
 
                 {error && (
-                    <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 text-red-300 text-sm rounded-lg flex items-center gap-2">
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl flex items-center gap-2 font-medium">
                         <XCircle size={16} /> {error}
                     </div>
                 )}
@@ -183,16 +183,16 @@ export const ComplianceDashboard = () => {
                         {/* Score Card */}
                         <div className="glass-card p-6 flex flex-col items-center text-center">
                             <ScoreRing score={score} />
-                            <p className={`mt-4 text-lg font-bold ${score >= 80 ? 'text-emerald-300' : score >= 50 ? 'text-amber-300' : 'text-red-300'}`}>
+                            <p className={`mt-4 text-lg font-bold ${score >= 80 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
                                 {score >= 80 ? "✅ COMPLIANT" : score >= 50 ? "⚠️ PARTIAL" : "❌ NON-COMPLIANT"}
                             </p>
-                            <p className="text-xs text-muted mt-1">
+                            <p className="text-xs text-slate-500 mt-1">
                                 Jurisdiction: {report.region_enforced} | Bucket: {report.bucket}
                             </p>
-                            <p className="text-[10px] text-muted mt-3">
+                            <p className="text-[10px] text-slate-400 mt-3">
                                 Audited: {new Date(report.timestamp).toLocaleString()}
                             </p>
-                            <p className="text-[10px] text-muted mt-1 font-mono break-all">
+                            <p className="text-[10px] text-slate-400 mt-1 font-mono break-all">
                                 Sig: {report.cryptographic_signature?.slice(0, 20)}...
                             </p>
                         </div>
@@ -211,18 +211,18 @@ export const ComplianceDashboard = () => {
                     <div className="mt-8 grid gap-4 md:grid-cols-3">
                         <div className="glass-card p-5">
                             <Globe className="text-primary mb-3" size={24} />
-                            <h3 className="font-bold text-sm mb-1">Data Residency</h3>
-                            <p className="text-xs text-muted">Verify all data shards are stored within the declared jurisdiction (India by default).</p>
+                            <h3 className="font-bold text-sm mb-1 text-slate-800">Data Residency</h3>
+                            <p className="text-xs text-slate-500">Verify all data shards are stored within the declared jurisdiction (India by default).</p>
                         </div>
                         <div className="glass-card p-5">
                             <Lock className="text-emerald-300 mb-3" size={24} />
-                            <h3 className="font-bold text-sm mb-1">Encryption Audit</h3>
-                            <p className="text-xs text-muted">Check AES-256-GCM encryption at rest and TLS 1.3 in transit compliance.</p>
+                            <h3 className="font-bold text-sm mb-1 text-slate-800">Encryption Audit</h3>
+                            <p className="text-xs text-slate-500">Check AES-256-GCM encryption at rest and TLS 1.3 in transit compliance.</p>
                         </div>
                         <div className="glass-card p-5">
                             <Trash2 className="text-amber-300 mb-3" size={24} />
-                            <h3 className="font-bold text-sm mb-1">Right to Erasure</h3>
-                            <p className="text-xs text-muted">Verify cryptographic shredding ensures deleted data is mathematically irrecoverable.</p>
+                            <h3 className="font-bold text-sm mb-1 text-slate-800">Right to Erasure</h3>
+                            <p className="text-xs text-slate-500">Verify cryptographic shredding ensures deleted data is mathematically irrecoverable.</p>
                         </div>
                     </div>
                 )}
@@ -233,8 +233,8 @@ export const ComplianceDashboard = () => {
                         <div className="flex items-center gap-3">
                             <FileText className="text-primary" size={20} />
                             <div>
-                                <p className="text-sm font-semibold">Export Compliance Report</p>
-                                <p className="text-xs text-muted">Download a signed PDF report for your compliance records</p>
+                                <p className="text-sm font-bold text-slate-800">Export Compliance Report</p>
+                                <p className="text-xs text-slate-500">Download a signed PDF report for your compliance records</p>
                             </div>
                         </div>
                         <button
@@ -248,7 +248,7 @@ export const ComplianceDashboard = () => {
                                 a.click();
                                 URL.revokeObjectURL(url);
                             }}
-                            className="btn-ghost px-4 py-2 text-sm font-semibold flex items-center gap-2 hover:border-primary/40 hover:text-white transition"
+                            className="btn-ghost px-4 py-2 text-sm font-bold flex items-center gap-2 hover:border-emerald-300 hover:text-emerald-700 transition border border-slate-200"
                         >
                             <Download size={16} /> Export JSON
                         </button>

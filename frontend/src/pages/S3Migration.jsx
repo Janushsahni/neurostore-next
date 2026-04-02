@@ -89,7 +89,7 @@ export const S3Migration = () => {
                                     value={accessKey}
                                     onChange={e => setAccessKey(e.target.value)}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-slate-800 font-medium placeholder:text-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white transition-colors"
-                                    placeholder="AKIAIOSFODNN7EXAMPLE"
+                                    placeholder="Your AWS Access Key ID"
                                 />
                             </div>
                             <div className="space-y-2">
@@ -100,7 +100,7 @@ export const S3Migration = () => {
                                     value={secretKey}
                                     onChange={e => setSecretKey(e.target.value)}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-slate-800 font-medium placeholder:text-slate-400 focus:outline-none focus:border-orange-400 focus:bg-white transition-colors"
-                                    placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                                    placeholder="Your AWS Secret Access Key"
                                 />
                             </div>
                         </div>
