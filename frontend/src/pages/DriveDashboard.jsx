@@ -292,6 +292,9 @@ export const DriveDashboard = () => {
                 return;
             }
 
+            setIsUploading(true);
+            setUploadState({ progress: 0, text: `Locating ${fileName} shards...` });
+
             let encryptedBlob;
 
             // 1. Attempt Direct-to-Node P2P Fetch
@@ -408,6 +411,9 @@ export const DriveDashboard = () => {
         } catch (err) {
             console.error("Decryption failed", err);
             toast.error("Decryption Failed! Invalid Vault Key or corrupted shards.", { icon: '🚨' });
+        } finally {
+            setIsUploading(false);
+            setUploadState(null);
         }
     };
 
@@ -617,7 +623,7 @@ export const DriveDashboard = () => {
                                                 <p className="text-xs text-slate-400 font-medium mt-1">{file.size}</p>
                                             </div>
 
-                                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white/90 backdrop-blur-sm p-1 rounded-lg border border-slate-200 shadow-sm">
+                                            <div className="absolute w-max top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-wrap justify-end max-w-[calc(100%-1rem)] gap-1 bg-white/90 backdrop-blur-sm p-1 rounded-lg border border-slate-200 shadow-sm">
                                                 <button onClick={(e) => { e.stopPropagation(); navigate(`/explorer/${BUCKET_NAME}/${file.name}`); }} className="p-1.5 text-slate-500 hover:text-primary hover:bg-emerald-50 rounded-md transition-colors" title="Technical Proof">
                                                     <Cpu size={14} />
                                                 </button>
