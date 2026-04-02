@@ -45,7 +45,7 @@ export const ComplianceDashboard = () => {
     useEffect(() => {
         const fetchBuckets = async () => {
             try {
-                const { response, data } = await apiJson("/s3/buckets", { method: "GET", timeoutMs: 10000 });
+                const { response, data } = await apiJson("/api/buckets", { method: "GET", timeoutMs: 10000 });
                 if (response.ok && data?.buckets) {
                     setBuckets(data.buckets.map(b => b.name || b));
                     if (data.buckets.length > 0) setSelectedBucket(data.buckets[0]?.name || data.buckets[0]);
@@ -61,7 +61,7 @@ export const ComplianceDashboard = () => {
         setLoading(true);
         setError(null);
         try {
-            const { response, data } = await apiJson(`/compliance/sovereignty/${selectedBucket}?jurisdiction=IN`, {
+            const { response, data } = await apiJson(`/api/compliance/sovereignty/${selectedBucket}?jurisdiction=IN`, {
                 method: "GET", timeoutMs: 15000,
             });
             if (response.ok) {

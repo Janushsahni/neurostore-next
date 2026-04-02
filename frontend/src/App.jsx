@@ -363,7 +363,7 @@ const AppContent = () => {
   useEffect(() => {
     const bootstrapSession = async () => {
       try {
-        const { response, data } = await apiJson("/auth/session", { method: "GET", timeoutMs: 9000 });
+        const { response, data } = await apiJson("/api/session", { method: "GET", timeoutMs: 9000 });
         if (response.ok && data?.user) {
           setAuthSession(data.user, data.csrf_token || "");
           setIsAuthenticated(true);
@@ -384,7 +384,7 @@ const AppContent = () => {
   const handleLogin = (targetPath) => { setIsAuthenticated(true); navigate(typeof targetPath === "string" ? targetPath : "/dashboard/drive"); };
   const handleLogout = async () => {
     try {
-      await apiJson("/auth/logout", { method: "POST", timeoutMs: 9000 });
+      await apiJson("/api/logout", { method: "POST", timeoutMs: 9000 });
     } catch (error) {
       console.warn("Logout request failed, clearing session locally.", error);
     }

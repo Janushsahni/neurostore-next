@@ -15,7 +15,7 @@ export const ObjectExplorer = () => {
             setLoading(true);
             try {
                 // We use the new technical proof endpoint
-                const { response, data: result } = await apiJson(`/object/shards/${bucket}/${key}`, {
+                const { response, data: result } = await apiJson(`/api/object/shards/${bucket}/${key}`, {
                     method: 'GET'
                 });
                 if (response.ok) {

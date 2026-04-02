@@ -77,7 +77,7 @@ export const Login = ({ onAuth }) => {
         }
 
         try {
-            const { response, data } = await apiJson("/v1/auth/login", {
+            const { response, data } = await apiJson("/api/login", {
                 method: "POST",
                 body: { username: normalizedUsername, password },
                 timeoutMs: 12000,
@@ -134,7 +134,7 @@ export const Login = ({ onAuth }) => {
             if (!vaultKey) throw new Error("Vault Key reconstruction failed.");
 
             // 3. We successfully reconstructed their password. Issue a login natively!
-            const { response, data } = await apiJson("/v1/auth/login", {
+            const { response, data } = await apiJson("/api/login", {
                 method: "POST",
                 body: { username: normalizedUsername, password: vaultKey },
                 timeoutMs: 12000,
@@ -356,7 +356,7 @@ export const Register = ({ onAuth }) => {
         }
 
         try {
-            const { response, data } = await apiJson("/v1/auth/register", {
+            const { response, data } = await apiJson("/api/register", {
                 method: "POST",
                 body: { username: normalizedUsername, password },
                 timeoutMs: 12000,
