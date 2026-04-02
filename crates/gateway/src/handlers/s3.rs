@@ -1529,7 +1529,10 @@ pub async fn get_object(
                 }
             };
 
-            let final_data = reconstructed_data;
+            let mut final_data = reconstructed_data;
+            if final_data.len() > obj.size as usize {
+                final_data.truncate(obj.size as usize);
+            }
 
             let duration = start_time.elapsed();
             tracing::info!(
