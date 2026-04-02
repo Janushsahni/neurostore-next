@@ -7,7 +7,7 @@ COPY frontend/ ./
 
 # Disable demo mode so it hits the real sandbox backend
 ENV VITE_DEMO_MODE=false
-ENV VITE_API_URL=http://localhost:9009
+ENV VITE_API_URL=http://localhost:9019
 
 RUN npm run build
 

@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
-RUN cargo build -p neuro-node --release
+RUN cargo build -p neuronode --release
 
 # ── Runtime Stage ────────────────────────────────────────────
 FROM debian:bookworm-slim

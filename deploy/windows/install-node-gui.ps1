@@ -63,7 +63,7 @@ function Get-InstalledNodeId {
         if ($peerId.Length -lt 8) {
             return $null
         }
-        return "NEURO-{0}" -f $peerId.Substring(0, 8).ToUpperInvariant()
+        return "NEURO-{0}" -f $peerId.Substring([Math]::Max(0, $peerId.Length - 8)).ToUpperInvariant()
     } catch {
         return $null
     }
@@ -198,8 +198,31 @@ if ($exitCode -ne 0) {
     exit $exitCode
 }
 
+function Get-InstalledNodeClaimToken {
+    param(
+        [string]$ExePath,
+        [string]$ConfigPath
+    )
+
+    if (-not (Test-Path $ExePath)) {
+        return $null
+    }
+
+    try {
+        $token = & $ExePath --setup-config-path $ConfigPath --print-claim-token 2>$null
+        if ([string]::IsNullOrWhiteSpace($token)) {
+            return $null
+        }
+        return $token.Trim()
+    } catch {
+        return $null
+    }
+}
+
 $serviceExePath = Join-Path $PSScriptRoot 'neuro-node.exe'
 $nodeId = Get-InstalledNodeId -ExePath $serviceExePath -ConfigPath $DefaultConfigPath
+$claimToken = Get-InstalledNodeClaimToken -ExePath $serviceExePath -ConfigPath $DefaultConfigPath
+
 if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
     Set-Clipboard -Value $nodeId
 }
@@ -207,6 +230,9 @@ if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
 $dashboardUrl = "$frontendUrl/dashboard/node"
 if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
     $dashboardUrl = "$dashboardUrl?node_id=$([uri]::EscapeDataString($nodeId))"
+    if (-not [string]::IsNullOrWhiteSpace($claimToken)) {
+        $dashboardUrl = "$dashboardUrl&claim_token=$([uri]::EscapeDataString($claimToken))"
+    }
 }
 
 [System.Windows.MessageBox]::Show(

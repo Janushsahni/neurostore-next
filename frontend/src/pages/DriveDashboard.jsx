@@ -4,7 +4,7 @@ import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, Ref
 import DOMPurify from 'dompurify';
 import { toast } from 'react-hot-toast';
 import { API_BASE } from '../lib/config';
-import { getAuthToken, getSelectedPlan } from '../lib/authStorage';
+import { getAuthToken, getSelectedPlan, getUserDriveBucket, getVaultSecret } from '../lib/authStorage';
 import { decryptDownloadInWorker, encryptUploadInWorker, hashFileInWorker } from '../lib/cryptoWorkerClient';
 import { RecoverySetupModal } from '../components/RecoverySetupModal';
 
@@ -14,9 +14,9 @@ export const DriveDashboard = () => {
     const [files, setFiles] = useState([]);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadState, setUploadState] = useState({ progress: 0, text: '' });
+    const [uploadProof, setUploadProof] = useState(null);
     const [storageUsed, setStorageUsed] = useState(0);
-    // Vault key: derive from JWT auth token (never from cleartext sessionStorage)
-    const vaultPassword = getAuthToken() || "default-fallback-key";
+    const vaultPassword = getVaultSecret();
     const [previewFile, setPreviewFile] = useState(null);
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
     const [searchQuery, setSearchQuery] = useState('');
@@ -25,9 +25,10 @@ export const DriveDashboard = () => {
     const fileInputRef = useRef(null);
     const folderInputRef = useRef(null);
 
-    const BUCKET_NAME = "user-drive";
+    const BUCKET_NAME = getUserDriveBucket();
     const S3_GATEWAY_URL = API_BASE;
     const encodeKey = (name) => encodeURIComponent(name);
+    const explorerPath = (name) => `/explorer/${BUCKET_NAME}/${encodeKey(name)}`;
     const DIRECT_CHUNK_BYTES = 8 * 1024 * 1024;
 
     // Payout receipt signing (stub — production will use WebCrypto ECDSA)
@@ -45,6 +46,40 @@ export const DriveDashboard = () => {
         const headers = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
         return headers;
+    };
+
+    const requireVaultSecret = (action) => {
+        if (vaultPassword) {
+            return true;
+        }
+        console.warn(`Vault is locked. User must sign in again to ${action}.`);
+        return false;
+    };
+
+    const fetchUploadProof = async (fileName) => {
+        const proofRes = await fetch(`${S3_GATEWAY_URL}/api/object/shards/${BUCKET_NAME}/${encodeKey(fileName)}`, {
+            headers: getAuthHeaders(),
+        });
+        if (!proofRes.ok) {
+            throw new Error(`Proof lookup failed with status ${proofRes.status}`);
+        }
+
+        const proof = await proofRes.json();
+        const uniqueNodes = [...new Set((proof.shards || []).map((shard) => shard.peer_id))];
+        const uniqueRegions = [...new Set((proof.shards || []).map((shard) => shard.location).filter(Boolean))];
+        const verifiedShardCount = Array.isArray(proof.shards) ? proof.shards.length : 0;
+
+        const nextProof = {
+            fileName,
+            objectCid: proof.object_cid,
+            shardCount: verifiedShardCount,
+            nodeCount: uniqueNodes.length,
+            regions: uniqueRegions,
+            nodes: uniqueNodes.slice(0, 6),
+        };
+
+        setUploadProof(nextProof);
+        return nextProof;
     };
 
     const fetchFiles = async () => {
@@ -104,6 +139,9 @@ export const DriveDashboard = () => {
     }, []);
 
     const uploadSingleFile = async (file) => {
+        if (!requireVaultSecret('upload files')) {
+            throw new Error('Vault is locked');
+        }
         
         setUploadState({ progress: 5, text: `Planning node placement...` });
         let uploadPlan = null;
@@ -138,7 +176,7 @@ export const DriveDashboard = () => {
 
             if (dedupRes.ok) {
                 setUploadState({ progress: 100, text: `Global Match: Skipped Upload!` });
-                return Promise.resolve();
+                return fetchUploadProof(file.name).catch(() => null);
             }
         } catch (e) {
             console.error("Deduplication check failed, falling back to upload", e);
@@ -218,7 +256,7 @@ export const DriveDashboard = () => {
             if (!commitRes.ok) {
                 throw new Error(`Direct upload commit failed with status ${commitRes.status}`);
             }
-            return;
+            return fetchUploadProof(file.name);
         }
 
         return new Promise((resolve, reject) => {
@@ -243,7 +281,7 @@ export const DriveDashboard = () => {
 
             xhr.onload = () => {
                 if (xhr.status >= 200 && xhr.status < 300) {
-                    resolve();
+                    resolve(fetchUploadProof(file.name));
                 } else {
                     reject(new Error(`Upload failed with status ${xhr.status}`));
                 }
@@ -257,7 +295,7 @@ export const DriveDashboard = () => {
         const selectedFiles = Array.from(e.target.files);
         if (selectedFiles.length === 0) return;
 
-        if (!vaultPassword) {
+        if (!requireVaultSecret('upload files')) {
             toast.error("Authentication required to encrypt files.", { icon: '🔐' });
             return;
         }
@@ -265,9 +303,10 @@ export const DriveDashboard = () => {
         setIsUploading(true);
 
         try {
+            let latestProof = null;
             for (let i = 0; i < selectedFiles.length; i++) {
                 const f = selectedFiles[i];
-                await uploadSingleFile(f);
+                latestProof = await uploadSingleFile(f);
             }
 
             setUploadState({ progress: 100, text: 'Finalizing Shards on Ledger...' });
@@ -277,6 +316,11 @@ export const DriveDashboard = () => {
                 fetchFiles();
             }, 1000);
 
+            if (latestProof) {
+                toast.success(`Stored securely across ${latestProof.nodeCount || latestProof.shardCount} verified storage targets.`, { icon: '🛡️' });
+            } else {
+                toast.success('Upload completed and encrypted before storage.', { icon: '🛡️' });
+            }
         } catch (err) {
             console.error("Upload Queue Failed", err);
             toast.error("Upload failed: " + err.message);
@@ -287,7 +331,7 @@ export const DriveDashboard = () => {
     const handleDownload = async (fileName, mode = 'download') => {
         try {
             
-            if (!vaultPassword) {
+            if (!requireVaultSecret('decrypt files')) {
                 toast.error("Authentication required to decrypt this file.", { icon: '🔐' });
                 return;
             }
@@ -590,6 +634,48 @@ export const DriveDashboard = () => {
 
                 {/* File Grid/List View */}
                 <div className="flex-1 overflow-y-auto p-6 md:p-8">
+                    {!vaultPassword && (
+                        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+                            <p className="text-sm font-bold text-amber-900">Vault locked in this browser session</p>
+                            <p className="mt-1 text-sm text-amber-800">Sign in again before uploading, previewing, or decrypting files. Network access still works, but local cryptography stays locked.</p>
+                        </div>
+                    )}
+
+                    {uploadProof && (
+                        <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                <div>
+                                    <p className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-700 border border-emerald-200">
+                                        <ShieldCheck size={14} /> Stored Securely
+                                    </p>
+                                    <h2 className="mt-3 text-xl font-bold text-slate-800">{uploadProof.fileName}</h2>
+                                    <p className="mt-1 text-sm text-slate-600">Client-side encrypted before upload and committed to the storage mesh with a verifiable object ID.</p>
+                                </div>
+                                <button onClick={() => navigate(explorerPath(uploadProof.fileName))} className="btn-primary rounded-xl px-5 py-3 text-sm font-bold shadow-md">
+                                    View Technical Proof
+                                </button>
+                            </div>
+                            <div className="mt-4 grid gap-3 md:grid-cols-4">
+                                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Object CID</p>
+                                    <p className="mt-2 font-mono text-xs text-slate-700 break-all">{uploadProof.objectCid}</p>
+                                </div>
+                                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Verified Shards</p>
+                                    <p className="mt-2 text-2xl font-bold text-slate-800">{uploadProof.shardCount}</p>
+                                </div>
+                                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Storage Nodes</p>
+                                    <p className="mt-2 text-2xl font-bold text-slate-800">{uploadProof.nodeCount}</p>
+                                </div>
+                                <div className="rounded-xl border border-emerald-100 bg-white p-4">
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Regions</p>
+                                    <p className="mt-2 text-sm font-bold text-slate-800">{uploadProof.regions.length ? uploadProof.regions.join(', ') : 'GLOBAL'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {files.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center">
                             <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100 shadow-sm">
@@ -624,7 +710,7 @@ export const DriveDashboard = () => {
                                             </div>
 
                                             <div className="absolute w-max top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-wrap justify-end max-w-[calc(100%-1rem)] gap-1 bg-white/90 backdrop-blur-sm p-1 rounded-lg border border-slate-200 shadow-sm">
-                                                <button onClick={(e) => { e.stopPropagation(); navigate(`/explorer/${BUCKET_NAME}/${file.name}`); }} className="p-1.5 text-slate-500 hover:text-primary hover:bg-emerald-50 rounded-md transition-colors" title="Technical Proof">
+                                                <button onClick={(e) => { e.stopPropagation(); navigate(explorerPath(file.name)); }} className="p-1.5 text-slate-500 hover:text-primary hover:bg-emerald-50 rounded-md transition-colors" title="Technical Proof">
                                                     <Cpu size={14} />
                                                 </button>
                                                 <button onClick={(e) => { e.stopPropagation(); handleShare(file.name); }} className="p-1.5 text-slate-500 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="Share Proof">
@@ -671,7 +757,7 @@ export const DriveDashboard = () => {
                                                     </td>
                                                     <td className="p-4 text-right not-italic">
                                                         <div className="flex items-center justify-end gap-2">
-                                                            <button onClick={(e) => { e.stopPropagation(); navigate(`/explorer/${BUCKET_NAME}/${file.name}`); }} className="p-2 text-slate-400 hover:text-primary hover:bg-emerald-50 rounded-xl transition-all" title="Technical Proof">
+                                                            <button onClick={(e) => { e.stopPropagation(); navigate(explorerPath(file.name)); }} className="p-2 text-slate-400 hover:text-primary hover:bg-emerald-50 rounded-xl transition-all" title="Technical Proof">
                                                                 <Cpu size={16} />
                                                             </button>
                                                             <button onClick={(e) => { e.stopPropagation(); handleShare(file.name); }} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all" title="Share Proof">
@@ -701,17 +787,36 @@ export const DriveDashboard = () => {
 
             {/* ═══════ RIGHT SIDEBAR ═══════ */}
             <aside className="w-72 border-l border-slate-200 bg-white p-6 hidden lg:flex flex-col overflow-y-auto shrink-0 z-10">
-
-
-                <div className="mt-auto">
-                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-start gap-3">
-                        <Zap className="text-amber-500 shrink-0 mt-0.5" size={16} />
-                        <div>
-                            <p className="text-xs font-bold text-slate-700">Decentralized Backup</p>
-                            <p className="text-xs pb-1 text-slate-500 font-medium mt-1">Your files are sharded across 15+ global nodes.</p>
+                {uploadProof ? (
+                    <div className="space-y-4">
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Latest Secure Upload</p>
+                            <p className="mt-2 text-sm font-bold text-slate-800 break-words">{uploadProof.fileName}</p>
+                            <p className="mt-2 text-xs text-slate-600">Object CID</p>
+                            <p className="mt-1 font-mono text-[11px] text-slate-700 break-all">{uploadProof.objectCid}</p>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Verified Node IDs</p>
+                            <div className="mt-3 space-y-2">
+                                {uploadProof.nodes.map((nodeId) => (
+                                    <div key={nodeId} className="rounded-lg bg-white px-3 py-2 font-mono text-xs font-bold text-slate-700 border border-slate-200">
+                                        {nodeId}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="mt-auto">
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-start gap-3">
+                            <Zap className="text-amber-500 shrink-0 mt-0.5" size={16} />
+                            <div>
+                                <p className="text-xs font-bold text-slate-700">Decentralized Backup</p>
+                                <p className="text-xs pb-1 text-slate-500 font-medium mt-1">Every upload is client-side encrypted and mapped to verifiable shard placement so you can show proof to investors immediately.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </aside>
 
             {/* Secure Zero-Knowledge Preview Modal */}

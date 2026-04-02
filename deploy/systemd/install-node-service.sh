@@ -28,7 +28,9 @@ derive_node_id() {
   if [[ ${#peer_id} -lt 8 ]]; then
     return 1
   fi
-  printf 'NEURO-%s\n' "${peer_id:0:8}" | tr '[:lower:]' '[:upper:]'
+  local peer_len="${#peer_id}"
+  local start=$(( peer_len > 8 ? peer_len - 8 : 0 ))
+  printf 'NEURO-%s\n' "${peer_id:${start}}" | tr '[:lower:]' '[:upper:]'
 }
 
 copy_to_clipboard() {

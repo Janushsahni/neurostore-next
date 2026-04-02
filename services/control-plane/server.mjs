@@ -65,6 +65,13 @@ async function initDb() {
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 api_keys JSONB DEFAULT '[]'::jsonb
             );
+            CREATE TABLE IF NOT EXISTS cp_macaroons (
+                id UUID PRIMARY KEY,
+                project_id UUID NOT NULL REFERENCES cp_projects(id) ON DELETE CASCADE,
+                token TEXT NOT NULL UNIQUE,
+                expires_at TIMESTAMPTZ NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
             CREATE TABLE IF NOT EXISTS cp_nodes (
                 peer_id TEXT PRIMARY KEY,
                 addr TEXT,
@@ -644,8 +651,7 @@ app.post("/v1/nodes/deregister", requireNodeSecret, async (req, res) => {
 
     // Log the deregistration event
     await pool.query(
-        `INSERT INTO cp_audit_log (action, actor, target, details, ts)
-         VALUES ('NODE_DEREGISTERED', $1, $1, $2, NOW())`,
+        "INSERT INTO cp_audit_logs (action, actor, target, details) VALUES ('NODE_DEREGISTERED', $1, $1, $2)",
         [peer_id, JSON.stringify({ reason: reason || "voluntary", pending_migrations: pendingMigrations })]
     );
 

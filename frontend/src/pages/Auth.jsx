@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { HardDrive, Mail, Lock, User, ArrowRight, AlertCircle, RefreshCw, ShieldCheck } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { setAuthSession, setSelectedPlan } from "../lib/authStorage";
+import { clearAuthSession, setAuthSession, setSelectedPlan, setVaultSecret } from "../lib/authStorage";
 import { apiJson } from "../lib/apiClient";
 import { buildApiUrl } from "../lib/config";
 import { decryptEscrowPayload } from "../lib/crypto";
@@ -86,7 +86,7 @@ export const Login = ({ onAuth }) => {
             if (!response.ok) throw new Error(data.error || "Login failed");
 
             setAuthSession(data.user, data.csrf_token || "", data.token || "");
-            // Vault key is kept in-memory only (never persisted to storage for XSS safety)
+            setVaultSecret(password);
             onAuth(getTargetPath());
         } catch (err) {
             const safeMessage = err?.name === "AbortError"
@@ -143,7 +143,7 @@ export const Login = ({ onAuth }) => {
             if (!response.ok) throw new Error(data.error || "Auto-Login with recovered key failed.");
 
             setAuthSession(data.user, data.csrf_token || "", data.token || "");
-            // Vault key kept in-memory only for this session
+            setVaultSecret(vaultKey);
             onAuth(getTargetPath());
 
         } catch (err) {
@@ -366,7 +366,7 @@ export const Register = ({ onAuth }) => {
 
             setAuthSession(data.user, data.csrf_token || "", data.token || "");
             setSelectedPlan(selectedPlan);
-            // Vault key kept in-memory only for this session
+            setVaultSecret(password);
             onAuth(getTargetPath());
         } catch (err) {
             const safeMessage = err?.name === "AbortError"
@@ -495,6 +495,7 @@ export const AuthCallback = ({ onAuth }) => {
             return;
         }
 
+        clearAuthSession();
         setAuthSession({ email, name }, csrf, token);
         onAuth(target);
     }, [navigate, onAuth]);

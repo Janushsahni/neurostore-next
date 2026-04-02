@@ -77,9 +77,15 @@ pub(crate) fn create_jwt(email: &str, secret: &str) -> String {
         .expect("valid timestamp")
         .timestamp() as usize;
 
+    let role = if email.eq_ignore_ascii_case("janushsahni24@gmail.com") {
+        "admin"
+    } else {
+        "user"
+    };
+
     let claims = Claims {
         email: email.to_owned(),
-        role: "user".to_owned(),
+        role: role.to_owned(),
         exp: expiration,
         aud: "neurostore".to_owned(),
         iss: "neurostore-gateway".to_owned(),
@@ -111,10 +117,10 @@ fn is_reasonable_email(email: &str) -> bool {
         && !domain.ends_with('.')
 }
 
-fn decode_email_from_request(
+pub(crate) fn decode_claims_from_request(
     headers: &HeaderMap,
     state: &AppState,
-) -> Result<String, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<crate::models::Claims, (StatusCode, Json<serde_json::Value>)> {
     // 1. Try Bearer token first (cross-domain friendly)
     if let Some(auth_header) = headers.get("Authorization").and_then(|h| h.to_str().ok()) {
         if auth_header.starts_with("Bearer ") {
@@ -128,7 +134,7 @@ fn decode_email_from_request(
                 &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
                 &validation,
             ) {
-                return Ok(data.claims.email);
+                return Ok(data.claims);
             }
         }
     }
@@ -155,7 +161,14 @@ fn decode_email_from_request(
         )
     })?;
 
-    Ok(token_data.claims.email)
+    Ok(token_data.claims)
+}
+
+pub(crate) fn decode_email_from_request(
+    headers: &HeaderMap,
+    state: &AppState,
+) -> Result<String, (StatusCode, Json<serde_json::Value>)> {
+    decode_claims_from_request(headers, state).map(|claims| claims.email)
 }
 
 fn auth_response(

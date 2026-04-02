@@ -68,6 +68,9 @@ struct Args {
 
     #[arg(long, default_value_t = false)]
     print_peer_id: bool,
+
+    #[arg(long, default_value_t = false)]
+    print_claim_token: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -93,6 +96,37 @@ struct SetupConfig {
 
 fn default_gateway_url() -> Option<String> {
     Some(DEFAULT_GATEWAY_URL.to_string())
+}
+
+fn env_string(keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| {
+        std::env::var(key).ok().and_then(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        })
+    })
+}
+
+fn env_bool(keys: &[&str], default: bool) -> bool {
+    env_string(keys)
+        .map(|value| matches!(value.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(default)
+}
+
+fn derive_node_id(peer_id: &str) -> String {
+    let suffix: String = peer_id
+        .chars()
+        .rev()
+        .take(8)
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect();
+    format!("NEURO-{}", suffix.to_uppercase())
 }
 
 fn default_ingress_port() -> u16 {
@@ -186,12 +220,33 @@ async fn main() -> anyhow::Result<()> {
     run_foreground(args).await
 }
 
+fn get_or_create_claim_token(storage_path: &str) -> anyhow::Result<String> {
+    let key_path = std::path::PathBuf::from(storage_path).join("claim_token.txt");
+    if key_path.exists() {
+        return Ok(std::fs::read_to_string(&key_path)?.trim().to_string());
+    }
+    use rand::RngCore;
+    let mut bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    let token = hex::encode(bytes);
+    std::fs::write(&key_path, &token)?;
+    Ok(token)
+}
+
 async fn run_foreground(args: Args) -> anyhow::Result<()> {
     let runtime = build_runtime_config(&args)?;
     if args.print_peer_id {
-        fs::create_dir_all(&runtime.storage_path)?;
-        let keypair = load_or_create_identity(&runtime.storage_path)?;
+        std::fs::create_dir_all(&runtime.storage_path)?;
+        std::fs::create_dir_all(&runtime.identity_dir)?;
+        let keypair = load_or_create_identity(&runtime.identity_dir.to_string_lossy())?;
         println!("{}", keypair.public().to_peer_id());
+        return Ok(());
+    }
+    if args.print_claim_token {
+        std::fs::create_dir_all(&runtime.storage_path)?;
+        std::fs::create_dir_all(&runtime.identity_dir)?;
+        let token = get_or_create_claim_token(&runtime.identity_dir.to_string_lossy())?;
+        println!("{}", token);
         return Ok(());
     }
 
@@ -255,7 +310,7 @@ async fn run_node_with_shutdown(
     fs::create_dir_all(&runtime.identity_dir)?;
     let keypair = load_or_create_identity(&runtime.identity_dir.to_string_lossy())?;
     let peer_id = keypair.public().to_peer_id().to_string();
-    let node_id = format!("NEURO-{}", &peer_id[..8].to_uppercase());
+    let node_id = derive_node_id(&peer_id);
 
     // Lock the storage folder to the Node ID
     let mut final_storage_path = PathBuf::from(&runtime.storage_path);
@@ -315,7 +370,7 @@ async fn run_node_with_shutdown(
         .or_else(|_| std::env::var("NODE_SHARED_SECRET"))
         .unwrap_or_default();
     let ingress_store = store.clone();
-    let ingress_peer_id = peer_id.clone();
+    let ingress_node_id = node_id.clone();
     let ingress_url_for_server = advertised_ingress_url.clone();
     let ingress_port = runtime.ingress_port;
     tokio::spawn(async move {
@@ -324,7 +379,7 @@ async fn run_node_with_shutdown(
             return;
         }
         if let Err(err) =
-            ingress::serve_ingress(ingress_store, ingress_peer_id, ingress_secret, ingress_port)
+            ingress::serve_ingress(ingress_store, ingress_node_id, ingress_secret, ingress_port)
                 .await
         {
             tracing::error!("Node ingress server failed: {}", err);
@@ -449,10 +504,14 @@ fn resolve_setup_config(
     config_path: &Path,
 ) -> anyhow::Result<SetupConfig> {
     let defaults = SetupConfig {
-        storage_path: args.storage_path.clone(),
-        max_gb: args.max_gb,
-        relay_url: args.relay_url.clone(),
-        gateway_url: Some(args.gateway_url.clone()),
+        storage_path: env_string(&["NEUROSTORE_STORAGE_PATH", "STORAGE_PATH"])
+            .unwrap_or_else(|| args.storage_path.clone()),
+        max_gb: std::env::var("NEUROSTORE_MAX_GB")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(args.max_gb),
+        relay_url: env_string(&["NEUROSTORE_RELAY_URL", "RELAY_URL"]).or_else(|| args.relay_url.clone()),
+        gateway_url: env_string(&["NEUROSTORE_GATEWAY_URL", "GATEWAY_URL"]).or_else(|| Some(args.gateway_url.clone())),
         node_secret: std::env::var("NEUROSTORE_NODE_SHARED_SECRET")
             .ok()
             .or_else(|| std::env::var("NODE_SHARED_SECRET").ok()),
@@ -460,10 +519,10 @@ fn resolve_setup_config(
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(default_ingress_port()),
-        public_ingress_url: std::env::var("NEUROSTORE_PUBLIC_INGRESS_URL").ok(),
+        public_ingress_url: env_string(&["NEUROSTORE_PUBLIC_INGRESS_URL", "PUBLIC_INGRESS_URL"]),
         wallet_address: default_wallet_address(),
         declared_location: default_declared_location(),
-        auto_register: true,
+        auto_register: env_bool(&["NEUROSTORE_AUTO_REGISTER", "AUTO_REGISTER"], true),
     };
 
     let explicit_config = args.setup_config_path.is_some();
@@ -530,7 +589,7 @@ fn run_interactive_setup(
     fs::create_dir_all(identity_dir)?;
     let keypair = load_or_create_identity(&identity_dir.to_string_lossy())?;
     let peer_id = keypair.public().to_peer_id().to_string();
-    let node_id = format!("NEURO-{}", &peer_id[..8].to_uppercase());
+    let node_id = derive_node_id(&peer_id);
 
     let welcome_msg = format!("This wizard will help you join the NeuroStore infrastructure as a node. \n\nYOUR ASSIGNED NODE ID: {}\n\nClick Continue to choose your storage settings.", node_id);
     let _ = prompt_gui_fallback("NeuroStore Identity Registered", &welcome_msg, "Continue");
@@ -926,10 +985,12 @@ async fn ensure_gateway_registration(runtime: &RuntimeConfig, peer_id: &str) {
         "wallet_address": runtime.wallet_address,
         "capacity_gb": runtime.max_gb,
         "declared_location": runtime.declared_location,
+        "version": env!("CARGO_PKG_VERSION"),
         "latency_ms": serde_json::Value::Null,
         "ingress_url": resolve_public_ingress_url(runtime),
         "build_digest": build_digest(),
         "build_signature": build_signature(),
+        "claim_token": get_or_create_claim_token(&runtime.identity_dir.to_string_lossy()).ok(),
     });
 
     let client = reqwest::Client::new();
@@ -945,7 +1006,7 @@ async fn ensure_gateway_registration(runtime: &RuntimeConfig, peer_id: &str) {
         );
 
         match client
-            .post(format!("{gateway_url}/api/node/register"))
+            .post(format!("{gateway_url}/api/nodes/register"))
             .header("x-node-secret", node_secret.clone())
             .json(&payload)
             .timeout(std::time::Duration::from_secs(15))

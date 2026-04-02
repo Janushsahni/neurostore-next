@@ -24,6 +24,7 @@ pub struct NodeRegisterRequest {
     pub build_digest: Option<String>,
     pub build_signature: Option<String>,
     pub version: Option<String>,
+    pub claim_token: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -184,14 +185,14 @@ pub async fn register_provider_node(
     };
 
     // K. Node Version Fragmentation Enforcement
-    const MIN_NODE_VERSION: &str = "0.2.0";
+    let min_node_version = minimum_node_version();
     let node_ver = payload.version.as_deref().unwrap_or("0.1.0");
-    if is_version_older_than(node_ver, MIN_NODE_VERSION) {
+    if is_version_older_than(node_ver, &min_node_version) {
         admission_status = "rejected_deprecated";
         risk_score += 100;
         risk_reasons.push(format!(
             "Node version {} is deprecated. Required: {}",
-            node_ver, MIN_NODE_VERSION
+            node_ver, min_node_version
         ));
     }
 
@@ -204,8 +205,8 @@ pub async fn register_provider_node(
 
     let res = sqlx::query(
         r#"
-        INSERT INTO nodes (peer_id, wallet_address, storage_capacity_gb, country_code, ip_address, is_active, attestation_status, payout_hold_until, device_fingerprint, mac_address, ingress_url)
-        VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8, $9, $10)
+        INSERT INTO nodes (peer_id, wallet_address, storage_capacity_gb, country_code, ip_address, is_active, attestation_status, payout_hold_until, device_fingerprint, mac_address, ingress_url, claim_token)
+        VALUES ($1, $2, $3, $4, $5, FALSE, $6, $7, $8, $9, $10, $11)
         ON CONFLICT (peer_id) DO UPDATE SET
             storage_capacity_gb = excluded.storage_capacity_gb,
             ip_address = excluded.ip_address,
@@ -214,7 +215,8 @@ pub async fn register_provider_node(
             device_fingerprint = excluded.device_fingerprint,
             mac_address = excluded.mac_address,
             ingress_url = excluded.ingress_url,
-            is_active = CASE WHEN $11 THEN FALSE ELSE nodes.is_active END,
+            claim_token = COALESCE(excluded.claim_token, nodes.claim_token),
+            is_active = CASE WHEN $12 THEN FALSE ELSE nodes.is_active END,
             last_seen = CURRENT_TIMESTAMP
         "#,
     )
@@ -228,6 +230,7 @@ pub async fn register_provider_node(
     .bind(payload.device_fingerprint.as_deref())
     .bind(None::<String>) // Note: Registry payload does not currently capture mac_address upon setup, only Heartbeats do. We bind None to satisfy SQL.
     .bind(payload.ingress_url.as_deref())
+    .bind(payload.claim_token.as_deref())
     .bind(controls.quarantine_new_nodes || admission_status != "admitted")
     .execute(&state.db)
     .await;
@@ -345,6 +348,10 @@ fn is_valid_declared_location(value: &str) -> bool {
     parts.next().is_none()
 }
 
+fn minimum_node_version() -> String {
+    std::env::var("MIN_NODE_VERSION").unwrap_or_else(|_| "0.1.0".to_string())
+}
+
 const INR_PER_GB_PER_SECOND: f64 = 0.000009722;
 
 #[derive(Deserialize)]
@@ -425,8 +432,8 @@ pub async fn node_heartbeat(
 
     // Stop deprecated nodes from earning payouts
     let mut incremental_earnings = 0.0;
-    const MIN_NODE_VERSION: &str = "0.2.0";
-    let is_deprecated = is_version_older_than(version, MIN_NODE_VERSION);
+    let min_node_version = minimum_node_version();
+    let is_deprecated = is_version_older_than(version, &min_node_version);
     let mut actual_status = status.to_string();
 
     if is_deprecated {
@@ -469,6 +476,7 @@ pub async fn node_heartbeat(
             device_fingerprint: payload.device_fingerprint.clone(),
             mac_address: payload.mac_address.clone(),
             ip_address: Some(caller_ip),
+            ingress_url: payload.ingress_url.clone(),
         },
     )
     .await;
@@ -491,12 +499,13 @@ pub async fn get_admin_inventory(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    // Basic Admin Check (Real prod would verify JWT role)
-    let auth_header = headers.get("Authorization").and_then(|h| h.to_str().ok());
-    if auth_header.is_none()
-        && crate::handlers::auth::get_cookie_value(&headers, "neuro_auth").is_none()
-    {
-        return (StatusCode::UNAUTHORIZED, "Admin access required").into_response();
+    let claims = match crate::handlers::auth::decode_claims_from_request(&headers, &state) {
+        Ok(c) => c,
+        Err(_) => return (StatusCode::UNAUTHORIZED, "Admin access required").into_response(),
+    };
+
+    if claims.role != "admin" {
+        return (StatusCode::FORBIDDEN, "Admin role required").into_response();
     }
 
     let nodes = sqlx::query_as::<_, (String, String, String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, Option<String>, f32, f32, Option<String>)>(
@@ -591,40 +600,40 @@ fn verify_node_build(
 }
 
 pub async fn network_stats(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let total_nodes: i64 = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM node_registry")
+    let db_total_nodes: i64 = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM node_registry")
         .fetch_one(&state.db)
         .await
         .unwrap_or(0);
 
-    let active_nodes: i64 = sqlx::query_scalar::<_, i64>(
+    let db_active_nodes: i64 = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM node_registry WHERE last_heartbeat_at > NOW() - INTERVAL '2 minutes'",
     )
     .fetch_one(&state.db)
     .await
     .unwrap_or(0);
 
-    let total_storage_gb: f64 = sqlx::query_scalar::<_, f64>(
+    let db_total_storage_gb: f64 = sqlx::query_scalar::<_, f64>(
         "SELECT COALESCE(SUM(max_gb), 0) FROM node_registry WHERE last_heartbeat_at > NOW() - INTERVAL '2 minutes'",
     )
     .fetch_one(&state.db)
     .await
     .unwrap_or(0.0);
 
-    let used_storage_gb: f64 = sqlx::query_scalar::<_, f64>(
+    let db_used_storage_gb: f64 = sqlx::query_scalar::<_, f64>(
         "SELECT COALESCE(SUM(used_gb), 0) FROM node_registry WHERE last_heartbeat_at > NOW() - INTERVAL '2 minutes'",
     )
     .fetch_one(&state.db)
     .await
     .unwrap_or(0.0);
 
-    let total_shards: i64 = sqlx::query_scalar::<_, i64>(
+    let db_total_shards: i64 = sqlx::query_scalar::<_, i64>(
         "SELECT COALESCE(SUM(shard_count::bigint), 0) FROM node_registry WHERE last_heartbeat_at > NOW() - INTERVAL '2 minutes'",
     )
     .fetch_one(&state.db)
     .await
     .unwrap_or(0);
 
-    let total_earnings_inr: f64 = sqlx::query_scalar::<_, f64>(
+    let db_total_earnings_inr: f64 = sqlx::query_scalar::<_, f64>(
         "SELECT COALESCE(SUM(total_earned_inr), 0) FROM node_registry",
     )
     .fetch_one(&state.db)
@@ -640,7 +649,7 @@ pub async fn network_stats(State(state): State<Arc<AppState>>) -> impl IntoRespo
     .await
     .unwrap_or_default();
 
-    let top_nodes_json: Vec<serde_json::Value> = top_nodes
+    let mut top_nodes_json: Vec<serde_json::Value> = top_nodes
         .iter()
         .map(|(id, earned, shards, used, status)| {
             serde_json::json!({
@@ -652,6 +661,73 @@ pub async fn network_stats(State(state): State<Arc<AppState>>) -> impl IntoRespo
             })
         })
         .collect();
+
+    let cache_snapshot: Vec<crate::HeartbeatCacheEntry> = {
+        let cache = state.heartbeat_buffer.read().await;
+        cache.values().cloned().collect()
+    };
+    let live_cutoff = Utc::now() - chrono::Duration::minutes(2);
+    let live_entries: Vec<&crate::HeartbeatCacheEntry> = cache_snapshot
+        .iter()
+        .filter(|entry| entry.last_heartbeat_at > live_cutoff)
+        .collect();
+
+    let total_nodes = std::cmp::max(db_total_nodes, cache_snapshot.len() as i64);
+    let active_nodes = if cache_snapshot.is_empty() {
+        db_active_nodes
+    } else {
+        live_entries.len() as i64
+    };
+    let total_storage_gb = if cache_snapshot.is_empty() {
+        db_total_storage_gb
+    } else {
+        live_entries.iter().map(|entry| entry.max_gb).sum()
+    };
+    let used_storage_gb = if cache_snapshot.is_empty() {
+        db_used_storage_gb
+    } else {
+        live_entries.iter().map(|entry| entry.used_gb).sum()
+    };
+    let total_shards = if cache_snapshot.is_empty() {
+        db_total_shards
+    } else {
+        live_entries
+            .iter()
+            .map(|entry| entry.shard_count as i64)
+            .sum()
+    };
+    let total_earnings_inr = if cache_snapshot.is_empty() {
+        db_total_earnings_inr
+    } else {
+        cache_snapshot
+            .iter()
+            .map(|entry| entry.persisted_total_earned_inr + entry.pending_earnings_inr)
+            .sum()
+    };
+
+    if !cache_snapshot.is_empty() {
+        let mut ranked = cache_snapshot.clone();
+        ranked.sort_by(|a, b| {
+            let a_total = a.persisted_total_earned_inr + a.pending_earnings_inr;
+            let b_total = b.persisted_total_earned_inr + b.pending_earnings_inr;
+            b_total
+                .partial_cmp(&a_total)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        top_nodes_json = ranked
+            .iter()
+            .take(10)
+            .map(|entry| {
+                serde_json::json!({
+                    "node_id": entry.node_id,
+                    "earned_inr": format!("{:.2}", entry.persisted_total_earned_inr + entry.pending_earnings_inr),
+                    "shard_count": entry.shard_count,
+                    "used_gb": format!("{:.3}", entry.used_gb),
+                    "status": if entry.last_heartbeat_at > live_cutoff { entry.status.clone() } else { "offline".to_string() },
+                })
+            })
+            .collect();
+    }
 
     let recent_activity = sqlx::query_as::<_, (String, f64, String, String)>(
         "SELECT node_id, amount_inr, reason, created_at::text FROM node_earnings ORDER BY created_at DESC LIMIT 10"
@@ -691,14 +767,35 @@ pub async fn network_stats(State(state): State<Arc<AppState>>) -> impl IntoRespo
 
 pub async fn node_earnings(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     axum::extract::Path(node_id): axum::extract::Path<String>,
 ) -> impl IntoResponse {
+    let claims = match crate::handlers::auth::decode_claims_from_request(&headers, &state) {
+        Ok(c) => c,
+        Err(_) => return (StatusCode::UNAUTHORIZED, "Auth required").into_response(),
+    };
+
     if node_id.is_empty() || node_id.len() > 64 {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({ "error": "invalid node_id" })),
         )
             .into_response();
+    }
+
+    if claims.role != "admin" {
+        let is_owner: bool = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM node_ownership WHERE node_id = $1 AND owner_email = $2)",
+        )
+        .bind(&node_id)
+        .bind(&claims.email)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(false);
+
+        if !is_owner {
+            return (StatusCode::FORBIDDEN, "Not owner of this node").into_response();
+        }
     }
 
     let node = sqlx::query_as::<_, (String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, f32, f32)>(
@@ -910,6 +1007,11 @@ async fn cache_heartbeat(state: &Arc<AppState>, incoming: crate::HeartbeatCacheE
     entry.cpu_usage_percent = incoming.cpu_usage_percent;
     entry.memory_usage_percent = incoming.memory_usage_percent;
     entry.last_heartbeat_at = incoming.last_heartbeat_at;
+    entry.hostname = incoming.hostname;
+    entry.device_fingerprint = incoming.device_fingerprint;
+    entry.mac_address = incoming.mac_address;
+    entry.ip_address = incoming.ip_address;
+    entry.ingress_url = incoming.ingress_url;
     entry.persisted_total_earned_inr = entry
         .persisted_total_earned_inr
         .max(incoming.persisted_total_earned_inr);
@@ -952,8 +1054,8 @@ async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()
             INSERT INTO node_registry (
                 node_id, status, os, version, shard_count, used_gb, max_gb, free_gb,
                 uptime_minutes, total_earned_inr, last_heartbeat_at, cpu_usage_percent, memory_usage_percent,
-                hostname, device_fingerprint, ip_address
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                hostname, device_fingerprint, ip_address, ingress_url, mac_address
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             ON CONFLICT (node_id) DO UPDATE SET
                 status = excluded.status,
                 os = excluded.os,
@@ -969,7 +1071,9 @@ async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()
                 memory_usage_percent = excluded.memory_usage_percent,
                 hostname = COALESCE(excluded.hostname, node_registry.hostname),
                 device_fingerprint = COALESCE(excluded.device_fingerprint, node_registry.device_fingerprint),
-                ip_address = COALESCE(excluded.ip_address, node_registry.ip_address)
+                ip_address = COALESCE(excluded.ip_address, node_registry.ip_address),
+                ingress_url = COALESCE(excluded.ingress_url, node_registry.ingress_url),
+                mac_address = COALESCE(excluded.mac_address, node_registry.mac_address)
             "#,
         )
         .bind(&entry.node_id)
@@ -988,6 +1092,8 @@ async fn flush_heartbeat_buffer_once(state: &Arc<AppState>) -> anyhow::Result<()
         .bind(entry.hostname)
         .bind(entry.device_fingerprint)
         .bind(entry.ip_address)
+        .bind(entry.ingress_url)
+        .bind(entry.mac_address)
         .execute(&state.db)
         .await?;
 
@@ -1138,4 +1244,112 @@ pub async fn claim_payout(
         Json(serde_json::json!({ "status": "payout_credited", "amount_inr": payout_inr })),
     )
         .into_response()
+}
+
+#[derive(Deserialize)]
+pub struct ClaimNodeRequest {
+    pub node_id: String,
+    pub claim_token: String,
+}
+
+pub async fn claim_node(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<ClaimNodeRequest>,
+) -> impl IntoResponse {
+    let claims = match crate::handlers::auth::decode_claims_from_request(&headers, &state) {
+        Ok(c) => c,
+        Err(_) => return (StatusCode::UNAUTHORIZED, "Auth required").into_response(),
+    };
+
+    let valid_token: Option<String> = sqlx::query_scalar("SELECT claim_token FROM nodes WHERE peer_id = $1")
+        .bind(&payload.node_id)
+        .fetch_optional(&state.db)
+        .await
+        .unwrap_or(None);
+
+    let Some(valid_token) = valid_token else {
+        return (StatusCode::NOT_FOUND, "Node not found or not registered").into_response();
+    };
+
+    if valid_token != payload.claim_token {
+        return (StatusCode::FORBIDDEN, "Invalid claim token").into_response();
+    }
+
+    let insert_res = sqlx::query(
+        "INSERT INTO node_ownership (node_id, owner_email) VALUES ($1, $2) ON CONFLICT (node_id) DO NOTHING"
+    )
+    .bind(&payload.node_id)
+    .bind(&claims.email)
+    .execute(&state.db)
+    .await;
+
+    match insert_res {
+        Ok(r) if r.rows_affected() > 0 => (StatusCode::OK, "Node claimed successfully").into_response(),
+        Ok(_) => (StatusCode::CONFLICT, "Node already claimed").into_response(),
+        Err(e) => {
+            tracing::error!("Claim error: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+        }
+    }
+}
+
+pub async fn my_nodes(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let claims = match crate::handlers::auth::decode_claims_from_request(&headers, &state) {
+        Ok(c) => c,
+        Err(_) => return (StatusCode::UNAUTHORIZED, "Auth required").into_response(),
+    };
+
+    let nodes = sqlx::query_as::<_, (String, String, String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, Option<String>, f32, f32, Option<String>)>(
+        r#"SELECT r.node_id, r.status, r.os, r.version, r.shard_count, r.used_gb, r.max_gb, r.total_earned_inr, r.uptime_minutes, r.last_heartbeat_at, r.hostname, r.device_fingerprint, r.ip_address, r.cpu_usage_percent, r.memory_usage_percent, r.mac_address
+           FROM node_registry r
+           JOIN node_ownership o ON r.node_id = o.node_id
+           WHERE o.owner_email = $1
+           ORDER BY r.last_heartbeat_at DESC"#
+    )
+    .bind(&claims.email)
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let mut nodes_json = Vec::new();
+    for n in nodes {
+        let last_hb = n.9;
+        let status = if let Some(hb) = last_hb {
+            let diff = Utc::now().signed_duration_since(hb).num_seconds();
+            if diff > 120 {
+                "offline"
+            } else if diff > 60 {
+                "stale"
+            } else {
+                "online"
+            }
+        } else {
+            "offline"
+        };
+
+        nodes_json.push(serde_json::json!({
+            "node_id": n.0,
+            "status": status,
+            "os": n.2,
+            "version": n.3,
+            "shard_count": n.4,
+            "used_gb": format!("{:.3}", n.5),
+            "max_gb": format!("{:.1}", n.6),
+            "total_earned_inr": format!("{:.2}", n.7),
+            "uptime_minutes": format!("{:.1}", n.8),
+            "last_heartbeat_at": last_hb.map(|d| d.to_rfc3339()),
+            "hostname": n.10,
+            "device_fingerprint": n.11,
+            "ip_address": n.12,
+            "cpu_usage_percent": format!("{:.1}", n.13),
+            "memory_usage_percent": format!("{:.1}", n.14),
+            "mac_address": n.15,
+        }));
+    }
+
+    (StatusCode::OK, Json(nodes_json)).into_response()
 }

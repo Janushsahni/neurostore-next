@@ -22,19 +22,19 @@ use crate::store::SecureBlockStore;
 #[derive(Clone)]
 struct IngressState {
     store: Arc<SecureBlockStore>,
-    peer_id: String,
+    node_id: String,
     secret: String,
 }
 
 pub async fn serve_ingress(
     store: Arc<SecureBlockStore>,
-    peer_id: String,
+    node_id: String,
     secret: String,
     port: u16,
 ) -> anyhow::Result<()> {
     let state = IngressState {
         store,
-        peer_id,
+        node_id,
         secret,
     };
     let cors = CorsLayer::new()
@@ -130,7 +130,7 @@ fn verify_token(
 
     let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(state.secret.as_bytes())
         .expect("valid ingress secret");
-    mac.update(state.peer_id.as_bytes());
+    mac.update(state.node_id.as_bytes());
     mac.update(b":");
     mac.update(op.as_bytes());
     mac.update(b":");

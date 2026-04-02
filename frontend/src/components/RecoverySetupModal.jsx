@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, KeyRound, Copy, Check, ShieldCheck, Download, Loader2, ArrowRight } from 'lucide-react';
 import { encryptEscrowPayload } from '../lib/crypto';
-import { getAuthToken } from '../lib/authStorage';
+import { getAuthToken, getVaultSecret } from '../lib/authStorage';
 import { API_BASE } from '../lib/config';
 import { toast } from 'react-hot-toast';
 
@@ -14,7 +14,7 @@ export const RecoverySetupModal = () => {
     useEffect(() => {
         // Automatically prompt if they haven't escrowed their key during this session
         const isEscrowed = sessionStorage.getItem('neuro_vault_escrowed') === 'true';
-        const vaultKey = sessionStorage.getItem('neuro_vault_key');
+        const vaultKey = getVaultSecret();
 
         // Show prompt if vault key exists (they are logged in locally) but haven't secured it
         if (vaultKey && !isEscrowed) {
@@ -56,7 +56,7 @@ export const RecoverySetupModal = () => {
     const handleEscrow = async () => {
         setStep(3);
         try {
-            const vaultKey = sessionStorage.getItem('neuro_vault_key');
+            const vaultKey = getVaultSecret();
             if (!vaultKey) throw new Error("Vault key missing from session.");
 
             // Mathematically encrypt the user's password using the newly generated phrase

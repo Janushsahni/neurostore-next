@@ -1,0 +1,1 @@
+{"public_ingress_url":"http://127.0.0.1:9181","node_secret":"sandbox_node_shared_secret_not_production_fedcba09","max_gb":5,"declared_location":"IN","wallet_address":"0x1111000000000000000000000000000000001111","gateway_url":"http://127.0.0.1:9009","auto_register":true,"storage_path":"S:\\neurostore-next\\neurostore-next\\sandbox\\node1\\data","ingress_port":9181}

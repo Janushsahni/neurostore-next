@@ -65,8 +65,10 @@ services:
     container_name: sandbox-control-plane
     env_file:
       - .env.sandbox
+    environment:
+      PORT: "8080"
     ports:
-      - "8080:8080"
+      - "8081:8080"
     depends_on:
       neurostore-db:
         condition: service_healthy
@@ -90,8 +92,8 @@ services:
     env_file:
       - .env.sandbox
     ports:
-      - "9009:9009"
-      - "9010:9010"
+      - "9019:9009"
+      - "9020:9010"
     depends_on:
       neurostore-db:
         condition: service_healthy
@@ -111,15 +113,12 @@ services:
     <<: *node-base
     container_name: sandbox-node-mumbai
     environment:
-      NODE_ID: "node-mumbai-01"
-      NODE_REGION: "ap-south-1"
-      NODE_LABEL: "Mumbai-IN"
-      NODE_PORT: "9001"
+      NEUROSTORE_GATEWAY_URL: "http://neurostore-gateway:9009"
+      NEUROSTORE_INGRESS_PORT: "9181"
+      NEUROSTORE_PUBLIC_INGRESS_URL: "http://localhost:9181"
       STORAGE_PATH: "/data/shards"
-      GATEWAY_URL: "http://neurostore-gateway:9009"
-      CONTROL_PLANE_URL: "http://neurostore-control-plane:8080"
     ports:
-      - "9001:9000"
+      - "9181:9181"
     volumes:
       - sandbox-node-1-data:/data/shards
 
@@ -128,15 +127,12 @@ services:
     <<: *node-base
     container_name: sandbox-node-bangalore
     environment:
-      NODE_ID: "node-bangalore-02"
-      NODE_REGION: "ap-south-1"
-      NODE_LABEL: "Bangalore-IN"
-      NODE_PORT: "9002"
+      NEUROSTORE_GATEWAY_URL: "http://neurostore-gateway:9009"
+      NEUROSTORE_INGRESS_PORT: "9182"
+      NEUROSTORE_PUBLIC_INGRESS_URL: "http://localhost:9182"
       STORAGE_PATH: "/data/shards"
-      GATEWAY_URL: "http://neurostore-gateway:9009"
-      CONTROL_PLANE_URL: "http://neurostore-control-plane:8080"
     ports:
-      - "9002:9000"
+      - "9182:9182"
     volumes:
       - sandbox-node-2-data:/data/shards
 
@@ -145,15 +141,12 @@ services:
     <<: *node-base
     container_name: sandbox-node-delhi
     environment:
-      NODE_ID: "node-delhi-03"
-      NODE_REGION: "ap-south-1"
-      NODE_LABEL: "Delhi-IN"
-      NODE_PORT: "9003"
+      NEUROSTORE_GATEWAY_URL: "http://neurostore-gateway:9009"
+      NEUROSTORE_INGRESS_PORT: "9183"
+      NEUROSTORE_PUBLIC_INGRESS_URL: "http://localhost:9183"
       STORAGE_PATH: "/data/shards"
-      GATEWAY_URL: "http://neurostore-gateway:9009"
-      CONTROL_PLANE_URL: "http://neurostore-control-plane:8080"
     ports:
-      - "9003:9000"
+      - "9183:9183"
     volumes:
       - sandbox-node-3-data:/data/shards
 
@@ -164,7 +157,7 @@ services:
       dockerfile: deploy/Dockerfile.sandbox-web
     container_name: sandbox-frontend
     ports:
-      - "3000:80"
+      - "3001:80"
     depends_on:
       neurostore-gateway:
         condition: service_healthy

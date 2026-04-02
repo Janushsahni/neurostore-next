@@ -6,6 +6,7 @@ import { apiJson } from '../lib/apiClient';
 export const ObjectExplorer = () => {
     const { bucket, "*": key } = useParams();
     const navigate = useNavigate();
+    const decodedKey = decodeURIComponent(key || '');
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -15,7 +16,7 @@ export const ObjectExplorer = () => {
             setLoading(true);
             try {
                 // We use the new technical proof endpoint
-                const { response, data: result } = await apiJson(`/api/object/shards/${bucket}/${key}`, {
+                const { response, data: result } = await apiJson(`/api/object/shards/${bucket}/${encodeURIComponent(decodedKey)}`, {
                     method: 'GET'
                 });
                 if (response.ok) {
@@ -30,7 +31,7 @@ export const ObjectExplorer = () => {
             }
         };
         fetchData();
-    }, [bucket, key]);
+    }, [bucket, decodedKey]);
 
     if (loading) {
         return (

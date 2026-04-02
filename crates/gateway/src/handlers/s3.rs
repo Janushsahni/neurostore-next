@@ -868,7 +868,10 @@ pub async fn plan_upload(
 
     let rows = if country_filter.eq_ignore_ascii_case("GLOBAL") {
         sqlx::query_as::<_, (String, String, f64, Option<String>)>(
-            r#"SELECT node_id, COALESCE(country_code, 'GLOBAL'), COALESCE(free_gb, 0), ingress_url
+            r#"SELECT node_id,
+                      COALESCE(country_code, 'GLOBAL'),
+                      CAST(COALESCE(free_gb, 0) AS DOUBLE PRECISION),
+                      ingress_url
                FROM node_registry
                WHERE last_heartbeat_at > NOW() - INTERVAL '2 minutes'
                  AND ingress_url IS NOT NULL
@@ -884,7 +887,10 @@ pub async fn plan_upload(
         // If a specific country is requested (e.g. India-first INR billing), we MUST NOT fall back
         // to global nodes. We strictly query only nodes physically verified in that region.
         sqlx::query_as::<_, (String, String, f64, Option<String>)>(
-            r#"SELECT node_id, COALESCE(country_code, 'GLOBAL'), COALESCE(free_gb, 0), ingress_url
+            r#"SELECT node_id,
+                      COALESCE(country_code, 'GLOBAL'),
+                      CAST(COALESCE(free_gb, 0) AS DOUBLE PRECISION),
+                      ingress_url
                FROM node_registry
                WHERE last_heartbeat_at > NOW() - INTERVAL '2 minutes'
                  AND country_code = $1
@@ -899,39 +905,45 @@ pub async fn plan_upload(
         .await
     };
 
+    let rows = match rows {
+        Ok(nodes) => nodes,
+        Err(error) => {
+            tracing::error!(?error, "upload planner could not load candidate nodes");
+            Vec::new()
+        }
+    };
+
     let mut node_targets = Vec::new();
     let token_secret = std::env::var("NODE_INGRESS_SHARED_SECRET")
         .unwrap_or_else(|_| state.node_shared_secret.clone());
     let token_expires_at = chrono::Utc::now().timestamp() + 900;
-    if let Ok(nodes) = rows {
-        for (node_id, region, free_gb, ingress_url) in nodes {
-            let Some(ingress_url) = ingress_url else {
-                continue;
-            };
-            let upload_token = sign_ingress_token(
-                &token_secret,
-                &node_id,
-                "upload",
-                &upload_id,
-                token_expires_at,
-            );
-            let download_token = sign_ingress_token(
-                &token_secret,
-                &node_id,
-                "download",
-                &upload_id,
-                token_expires_at,
-            );
-            node_targets.push(UploadPlanNode {
-                node_id,
-                region,
-                free_gb,
-                ingress_url,
-                upload_token,
-                download_token,
-                token_expires_at,
-            });
-        }
+    for (node_id, region, free_gb, ingress_url) in rows {
+        let Some(ingress_url) = ingress_url else {
+            continue;
+        };
+        let upload_token = sign_ingress_token(
+            &token_secret,
+            &node_id,
+            "upload",
+            &upload_id,
+            token_expires_at,
+        );
+        let download_token = sign_ingress_token(
+            &token_secret,
+            &node_id,
+            "download",
+            &upload_id,
+            token_expires_at,
+        );
+        node_targets.push(UploadPlanNode {
+            node_id,
+            region,
+            free_gb,
+            ingress_url,
+            upload_token,
+            download_token,
+            token_expires_at,
+        });
     }
 
     // STRICT GEOLOCATION COMPLIANCE ENFORCEMENT
@@ -997,7 +1009,7 @@ pub async fn plan_download(
         r#"
         SELECT os.peer_id,
                COALESCE(os.country_code, nr.country_code, 'GLOBAL') AS region,
-               COALESCE(nr.free_gb, 0) AS free_gb,
+               CAST(COALESCE(nr.free_gb, 0) AS DOUBLE PRECISION) AS free_gb,
                COALESCE(EXTRACT(EPOCH FROM (NOW() - os.last_verified_at))::bigint, 0) AS staleness_seconds,
                nr.ingress_url
         FROM object_shards os
@@ -1016,8 +1028,15 @@ pub async fn plan_download(
     .bind(&object.cid)
     .bind(preferred_country)
     .fetch_all(&state.db)
-    .await
-    .unwrap_or_default();
+    .await;
+
+    let rows = match rows {
+        Ok(nodes) => nodes,
+        Err(error) => {
+            tracing::error!(?error, "download planner could not load candidate nodes");
+            Vec::new()
+        }
+    };
 
     let direct_chunks = sqlx::query_as::<_, (i32, String, String, String, i64)>(
         r#"SELECT chunk_index, chunk_cid, peer_id, ingress_url, size_bytes

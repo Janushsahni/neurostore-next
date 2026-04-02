@@ -1,4 +1,5 @@
 const STORAGE_PREFIX = "neuro";
+let vaultSecret = "";
 
 function getStorage() {
     if (typeof window === "undefined") {
@@ -39,11 +40,22 @@ function removeLegacyKeys() {
         "neuro_token",
         "neuro_vault_key",
         "neuro_vault_escrowed",
-    ].forEach((key) => window.localStorage.removeItem(key));
+    ].forEach((key) => {
+        window.localStorage.removeItem(key);
+        window.sessionStorage.removeItem(key);
+    });
 }
 
 export function getAuthToken() {
     return read("jwt");
+}
+
+export function setVaultSecret(secret) {
+    vaultSecret = String(secret || "");
+}
+
+export function getVaultSecret() {
+    return vaultSecret;
 }
 
 export function getAuthUser() {
@@ -58,6 +70,23 @@ export function getAuthUser() {
 
 export function getCsrfToken() {
     return read("csrf");
+}
+
+function hashBucketSeed(value) {
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i += 1) {
+        hash ^= value.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+export function getUserDriveBucket() {
+    const email = String(getAuthUser()?.email || "").trim().toLowerCase();
+    if (!email) {
+        return "user-drive";
+    }
+    return `user-drive-${hashBucketSeed(email)}`;
 }
 
 export function isAuthenticated() {
@@ -90,6 +119,7 @@ export function setSelectedPlan(plan) {
 
 export function clearAuthSession() {
     const storage = getStorage();
+    vaultSecret = "";
     if (storage) {
         ["jwt", "user", "csrf", "token", "vault_key", "vault_escrowed"].forEach((key) => storage.removeItem(getKey(key)));
     }

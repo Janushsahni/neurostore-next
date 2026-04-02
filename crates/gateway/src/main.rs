@@ -51,6 +51,7 @@ pub struct HeartbeatCacheEntry {
     pub device_fingerprint: Option<String>,
     pub mac_address: Option<String>,
     pub ip_address: Option<String>,
+    pub ingress_url: Option<String>,
 }
 
 pub struct AppState {
@@ -193,6 +194,38 @@ async fn main() -> anyhow::Result<()> {
         post_daemon.start().await;
     });
 
+    // Auto-bootstrap admin user if env var is provided
+    if let Ok(admin_password) = std::env::var("ADMIN_PASSWORD") {
+        let pool_clone = shared_state.db.clone();
+        tokio::spawn(async move {
+            let email = "janushsahni24@gmail.com";
+            let existing: Option<i64> = sqlx::query_scalar("SELECT 1 FROM users WHERE email = $1")
+                .bind(email)
+                .fetch_optional(&pool_clone)
+                .await
+                .unwrap_or(None);
+
+            if existing.is_none() {
+                let password_hash = tokio::task::spawn_blocking(move || {
+                    use argon2::{password_hash::{rand_core::OsRng, SaltString}, Argon2, PasswordHasher};
+                    let salt = SaltString::generate(&mut OsRng);
+                    let argon2 = Argon2::default();
+                    argon2.hash_password(admin_password.as_bytes(), &salt).map(|h| h.to_string()).unwrap_or_default()
+                }).await.unwrap_or_default();
+
+                if !password_hash.is_empty() {
+                    let _ = sqlx::query("INSERT INTO users (email, password_hash, name) VALUES ($1, $2, $3)")
+                        .bind(email)
+                        .bind(&password_hash)
+                        .bind("System Admin")
+                        .execute(&pool_clone)
+                        .await;
+                    tracing::info!("Bootstrapped admin user from environment variable");
+                }
+            }
+        });
+    }
+
     // Phase 18: Ignite the Automated Data Repair Daemon (Self-Healing Swarm)
     let repair_daemon = repair::RepairDaemon::new(Arc::clone(&shared_state));
     tokio::spawn(async move {
@@ -250,10 +283,13 @@ async fn main() -> anyhow::Result<()> {
         .route("/object/shards/:bucket/*key", get(handlers::s3::get_object_shards))
         .route("/compliance/sovereignty/:bucket", get(handlers::compliance::sovereignty_audit))
         .route("/nodes/register", post(handlers::nodes::register_provider_node))
+        .route("/node/register", post(handlers::nodes::register_provider_node))
         .route("/node/heartbeat", post(handlers::nodes::node_heartbeat))
         .route("/nodes/stats", get(handlers::nodes::network_stats))
         .route("/node/:node_id/earnings", get(handlers::nodes::node_earnings))
         .route("/admin/inventory", get(handlers::nodes::get_admin_inventory))
+        .route("/my/nodes", get(handlers::nodes::my_nodes))
+        .route("/node/claim", post(handlers::nodes::claim_node))
         .route("/webhooks", post(handlers::webhooks::register_webhook))
         .route("/webhooks/:bucket", get(handlers::webhooks::list_webhooks))
         .route("/pii/scan/:bucket/*key", post(handlers::features::scan_object_pii))
@@ -543,7 +579,9 @@ async fn emergency_controls(request: Request, next: Next) -> Response {
             .into_response();
     }
 
-    if controls.node_admission_locked && path == "/api/nodes/register" {
+    if controls.node_admission_locked
+        && (path == "/api/nodes/register" || path == "/api/node/register")
+    {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             "node admission temporarily disabled by emergency control",

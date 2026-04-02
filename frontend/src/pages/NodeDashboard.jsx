@@ -58,9 +58,24 @@ export const NodeDashboard = () => {
     // Try to read Node ID from localStorage (set by the installer)
     useEffect(() => {
         const bootstrapNode = async () => {
-            const queryNodeId = new URLSearchParams(window.location.search).get('node_id');
+            const params = new URLSearchParams(window.location.search);
+            const queryNodeId = params.get('node_id');
+            const claimToken = params.get('claim_token');
+
             if (queryNodeId) {
                 setNodeId(queryNodeId);
+                if (claimToken) {
+                    try {
+                        await apiJson('/api/node/claim', {
+                            method: 'POST',
+                            body: { node_id: queryNodeId, claim_token: claimToken }
+                        });
+                        // Remove claim token from URL so it doesn't stay visible
+                        window.history.replaceState({}, document.title, window.location.pathname + "?node_id=" + queryNodeId);
+                    } catch (e) {
+                        console.error('Failed to claim node', e);
+                    }
+                }
                 localStorage.setItem('neuro_node_id', queryNodeId);
                 await lookupNode(queryNodeId);
                 return;
@@ -75,8 +90,26 @@ export const NodeDashboard = () => {
         bootstrapNode();
     }, [lookupNode]);
 
+    const [myNodes, setMyNodes] = useState([]);
+
+    const fetchMyNodes = async () => {
+        try {
+            const { response, data } = await apiJson('/api/my/nodes', { method: 'GET' });
+            if (response.ok) {
+                setMyNodes(data);
+                if (data.length > 0 && !nodeId) {
+                    setNodeId(data[0].node_id);
+                    lookupNode(data[0].node_id);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch my nodes", e);
+        }
+    };
+
     useEffect(() => {
         fetchStats();
+        fetchMyNodes();
         const interval = setInterval(fetchStats, 10000);
         return () => clearInterval(interval);
     }, []);
@@ -165,6 +198,27 @@ export const NodeDashboard = () => {
                     <p>The installer shows your Node ID after setup and copies it to your clipboard automatically.</p>
                     <p className="font-mono text-emerald-600 bg-emerald-50 p-2 rounded mt-2 border border-emerald-100/50">Example: NEURO-ABC123XX</p>
                 </div>
+
+                {myNodes.length > 0 && (
+                    <div className="mb-4">
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Select Your Node</label>
+                        <select
+                            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-mono shadow-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                            value={nodeId}
+                            onChange={(e) => {
+                                setNodeId(e.target.value);
+                                lookupNode(e.target.value);
+                            }}
+                        >
+                            <option value="">-- Select a node --</option>
+                            {myNodes.map((n) => (
+                                <option key={n.node_id} value={n.node_id}>
+                                    {n.node_id} ({n.status})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 <div className="flex gap-3 relative z-10">
                     <input
