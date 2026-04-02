@@ -79,7 +79,7 @@ export const Login = ({ onAuth }) => {
         try {
             const { response, data } = await apiJson("/api/login", {
                 method: "POST",
-                body: { username: normalizedUsername, password },
+                body: { email: normalizedUsername, password },
                 timeoutMs: 12000,
             });
 
@@ -136,7 +136,7 @@ export const Login = ({ onAuth }) => {
             // 3. We successfully reconstructed their password. Issue a login natively!
             const { response, data } = await apiJson("/api/login", {
                 method: "POST",
-                body: { username: normalizedUsername, password: vaultKey },
+                body: { email: normalizedUsername, password: vaultKey },
                 timeoutMs: 12000,
             });
 
@@ -358,7 +358,7 @@ export const Register = ({ onAuth }) => {
         try {
             const { response, data } = await apiJson("/api/register", {
                 method: "POST",
-                body: { username: normalizedUsername, password },
+                body: { email: normalizedUsername, password },
                 timeoutMs: 12000,
             });
 
