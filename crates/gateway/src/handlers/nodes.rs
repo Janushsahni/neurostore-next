@@ -1353,3 +1353,35 @@ pub async fn my_nodes(
 
     (StatusCode::OK, Json(nodes_json)).into_response()
 }
+
+pub async fn list_public_nodes(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let nodes = sqlx::query_as::<_, (String, String, String, f64, f64, Option<chrono::DateTime<chrono::Utc>>)>(
+        r#"SELECT node_id, status, COALESCE(country_code, 'IN'), used_gb, max_gb, last_heartbeat_at
+           FROM node_registry 
+           WHERE last_heartbeat_at > NOW() - INTERVAL '24 hours'
+           ORDER BY last_heartbeat_at DESC LIMIT 100"#
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let nodes_json: Vec<_> = nodes.into_iter().map(|n| {
+        // Mask the node ID for privacy: NEURO-ABC123XX -> NEURO-ABC*****
+        let masked_id = if n.0.len() > 10 {
+            format!("{}*****", &n.0[..9])
+        } else {
+            n.0.clone()
+        };
+
+        serde_json::json!({
+            "id": masked_id,
+            "status": n.1,
+            "country": n.2,
+            "used_gb": format!("{:.2}", n.3),
+            "max_gb": format!("{:.1}", n.4),
+            "last_seen": n.5.map(|d| d.to_rfc3339()),
+        })
+    }).collect();
+
+    (StatusCode::OK, Json(nodes_json))
+}

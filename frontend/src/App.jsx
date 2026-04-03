@@ -18,7 +18,7 @@ import { About } from "./pages/About";
 import { Contact } from "./pages/Contact";
 import { ObjectExplorer } from "./pages/ObjectExplorer";
 import AdminNodes from "./pages/AdminNodes";
-import { clearAuthSession, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
+import { clearAuthSession, getAuthUser, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
 
 
@@ -311,6 +311,9 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
         <div className="hidden items-center gap-4 md:flex">
           {isAuthenticated ? (
             <>
+              {getAuthUser()?.email === 'janushsahni24@gmail.com' && (
+                <Link to="/admin/inventory" className="text-sm font-bold text-red-500 hover:text-red-600 transition-colors">Admin</Link>
+              )}
               <Link to="/dashboard/drive" className="btn-primary px-5 py-2.5 text-sm font-bold hover:shadow-lg transition">Dashboard</Link>
               <button onClick={onLogout} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400 hover:text-red-500 transition-colors bg-slate-100/50 hover:bg-red-50 rounded-lg">
                 <LogOut size={16} /> Logout

@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Play, Square, Activity, HardDrive, Terminal as TermIcon, ShieldCheck, Settings, Globe, Wallet, TrendingUp, Cpu, Zap } from 'lucide-react';
+import { Play, Square, Activity, HardDrive, Terminal as TermIcon, ShieldCheck, Globe, Wallet, TrendingUp, Cpu, Zap } from 'lucide-react';
 
 interface NodeConfig {
   storage_path: string;
   max_gb: number;
   wallet_address: string;
   gateway_url: string;
+  user_email?: string;
+  auth_token?: string;
 }
 
 interface NodeStats {

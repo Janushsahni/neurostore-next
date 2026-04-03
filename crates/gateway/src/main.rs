@@ -286,6 +286,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/node/register", post(handlers::nodes::register_provider_node))
         .route("/node/heartbeat", post(handlers::nodes::node_heartbeat))
         .route("/nodes/stats", get(handlers::nodes::network_stats))
+        .route("/nodes/explorer", get(handlers::nodes::list_public_nodes))
         .route("/node/:node_id/earnings", get(handlers::nodes::node_earnings))
         .route("/admin/inventory", get(handlers::nodes::get_admin_inventory))
         .route("/my/nodes", get(handlers::nodes::my_nodes))

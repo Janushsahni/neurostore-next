@@ -55,15 +55,15 @@ export const Download = () => {
 
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6">
                                     <a
-                                        href={windowsMsiUrl}
+                                        href="/NeuroStore-Node-Installer.zip"
                                         download
-                                        className="btn-primary inline-flex items-center gap-3 px-6 py-3.5 text-basis shadow-md"
+                                        className="btn-primary inline-flex items-center gap-3 px-6 py-3.5 text-basis shadow-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
                                     >
                                         <DownloadIcon size={20} />
-                                        Download Windows Installer (.msi)
+                                        Download One-Click Installer (.zip)
                                     </a>
-                                    <a href={windowsZipUrl} className="inline-flex items-center gap-3 border border-slate-300 text-slate-600 bg-white px-6 py-3.5 rounded-xl text-sm font-bold hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
-                                        Portable Bundle (.zip)
+                                    <a href={windowsMsiUrl} className="inline-flex items-center gap-3 border border-slate-300 text-slate-600 bg-white px-6 py-3.5 rounded-xl text-sm font-bold hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
+                                        Legacy MSI Installer
                                     </a>
                                 </div>
                                 <a href={checksumsUrl} className="text-sm font-semibold text-emerald-700 hover:underline">Download SHA256 checksums</a>

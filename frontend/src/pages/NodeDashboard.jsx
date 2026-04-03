@@ -107,10 +107,29 @@ export const NodeDashboard = () => {
         }
     };
 
+    const [publicNodes, setPublicNodes] = useState([]);
+    const [publicNodesLoading, setPublicNodesLoading] = useState(false);
+
+    const fetchPublicNodes = async () => {
+        setPublicNodesLoading(true);
+        try {
+            const { response, data } = await apiJson('/api/nodes/explorer', { method: 'GET' });
+            if (response.ok) setPublicNodes(data);
+        } catch (e) {
+            console.error("Failed to fetch public nodes", e);
+        } finally {
+            setPublicNodesLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchStats();
         fetchMyNodes();
-        const interval = setInterval(fetchStats, 10000);
+        fetchPublicNodes();
+        const interval = setInterval(() => {
+            fetchStats();
+            fetchPublicNodes();
+        }, 30000);
         return () => clearInterval(interval);
     }, []);
 
@@ -402,6 +421,87 @@ export const NodeDashboard = () => {
                     </div>
                 </div>
             )}
+
+            {/* ═══════ REWARDS CALCULATOR ═══════ */}
+            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                <h2 className="text-2xl font-display font-extrabold mb-6 flex items-center gap-2">
+                    <IndianRupee size={24} className="text-emerald-400" /> Projected Earnings Calculator
+                </h2>
+                <div className="grid md:grid-cols-2 gap-12 items-center">
+                    <div className="space-y-8">
+                        <div>
+                            <div className="flex justify-between mb-3">
+                                <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Storage Contribution</label>
+                                <span className="text-emerald-400 font-mono font-bold text-lg">500 GB</span>
+                            </div>
+                            <input type="range" min="50" max="10000" step="50" defaultValue="500" className="w-full accent-emerald-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
+                        </div>
+                        <div>
+                            <div className="flex justify-between mb-3">
+                                <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Network Uptime</label>
+                                <span className="text-emerald-400 font-mono font-bold text-lg">99 %</span>
+                            </div>
+                            <input type="range" min="10" max="100" step="1" defaultValue="99" className="w-full accent-emerald-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
+                        </div>
+                    </div>
+                    <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8 text-center">
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Estimated Monthly Income</p>
+                        <p className="text-5xl font-display font-black text-emerald-400 mb-2">₹210.00</p>
+                        <p className="text-slate-500 text-[10px] font-medium leading-relaxed">
+                            Based on current network demand and ₹0.42/GB base rate. Actual results vary by region and reputation score.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* ═══════ NETWORK EXPLORER ═══════ */}
+            <div>
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800"><Globe size={20} className="text-blue-500" /> Network Explorer</h2>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Active Swarm Inventory</span>
+                        <button onClick={fetchPublicNodes} className="text-blue-600 hover:text-blue-700 text-xs font-bold flex items-center gap-1">
+                            <Activity size={14} /> Refresh Map
+                        </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-slate-50/50">
+                                <tr className="text-slate-400 text-left font-semibold">
+                                    <th className="py-3 px-4">Anonymized Node</th>
+                                    <th className="py-3 px-4">Region</th>
+                                    <th className="py-3 px-4">Capacity</th>
+                                    <th className="py-3 px-4 text-right">Last Seen</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {publicNodesLoading && publicNodes.length === 0 ? (
+                                    <tr><td colSpan={4} className="py-8 text-center text-slate-400 italic">Scanning global mesh...</td></tr>
+                                ) : publicNodes.map((n, i) => (
+                                    <tr key={i} className="hover:bg-blue-50/30 transition-colors">
+                                        <td className="py-3 px-4 font-mono font-bold text-slate-500">{n.id}</td>
+                                        <td className="py-3 px-4">
+                                            <span className="flex items-center gap-2 font-medium">
+                                                <span className="text-lg">🇮🇳</span> {n.country === 'IN' ? 'India' : n.country}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4">
+                                            <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                                <div className="bg-blue-500 h-full" style={{ width: `${(parseFloat(n.used_gb) / parseFloat(n.max_gb)) * 100}%` }}></div>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-slate-400 mt-1 block">{n.used_gb} / {n.max_gb} GB</span>
+                                        </td>
+                                        <td className="py-3 px-4 text-slate-400 text-right font-medium">
+                                            {new Date(n.last_seen).toLocaleTimeString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
             {/* Empty state */}
             {!isLoading && (!stats || stats.total_nodes === 0) && !nodeData && (
