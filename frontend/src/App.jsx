@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Component } from "react";
-import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate, useLocation } from "react-router-dom";
 import {
   ArrowRight, Database, Globe, HardDrive, LogOut, Menu, Server,
   ShieldCheck, Sparkles, X, Zap, Cloud
@@ -362,6 +362,7 @@ const AppContent = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(hasAuthSession());
   const [sessionChecked, setSessionChecked] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const bootstrapSession = async () => {
@@ -383,6 +384,11 @@ const AppContent = () => {
     };
     bootstrapSession();
   }, []);
+
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [location.pathname]);
 
   const handleLogin = (targetPath) => { setIsAuthenticated(true); navigate(typeof targetPath === "string" ? targetPath : "/dashboard/drive"); };
   const handleLogout = async () => {
@@ -424,7 +430,7 @@ const AppContent = () => {
           <Route path="/explorer/:bucket/*" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute>} />
           <Route path="/s3-migration" element={<ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute>} />
           <Route path="/download" element={<Download />} />
-          <Route path="/admin/inventory" element={<AdminNodes />} />
+          <Route path="/admin/inventory" element={<ProtectedRoute isAuthenticated={isAuthenticated}><AdminNodes /></ProtectedRoute>} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />

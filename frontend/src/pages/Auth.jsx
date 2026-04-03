@@ -79,7 +79,7 @@ export const Login = ({ onAuth }) => {
         try {
             const { response, data } = await apiJson("/api/login", {
                 method: "POST",
-                body: { email: normalizedUsername, password },
+                body: { username: normalizedUsername, password },
                 timeoutMs: 12000,
             });
 
@@ -377,7 +377,7 @@ export const Register = ({ onAuth }) => {
         try {
             const { response, data } = await apiJson("/api/register", {
                 method: "POST",
-                body: { email: normalizedUsername, password },
+                body: { username: normalizedUsername, password },
                 timeoutMs: 12000,
             });
 

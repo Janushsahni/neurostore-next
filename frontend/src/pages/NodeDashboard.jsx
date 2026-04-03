@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins } from 'lucide-react';
+import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins, Globe } from 'lucide-react';
 import { apiJson } from '../lib/apiClient';
 
-const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janusahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
+const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
 
 export const NodeDashboard = () => {
     const [stats, setStats] = useState(null);
@@ -428,31 +428,7 @@ export const NodeDashboard = () => {
                 <h2 className="text-2xl font-display font-extrabold mb-6 flex items-center gap-2">
                     <IndianRupee size={24} className="text-emerald-400" /> Projected Earnings Calculator
                 </h2>
-                <div className="grid md:grid-cols-2 gap-12 items-center">
-                    <div className="space-y-8">
-                        <div>
-                            <div className="flex justify-between mb-3">
-                                <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Storage Contribution</label>
-                                <span className="text-emerald-400 font-mono font-bold text-lg">500 GB</span>
-                            </div>
-                            <input type="range" min="50" max="10000" step="50" defaultValue="500" className="w-full accent-emerald-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
-                        </div>
-                        <div>
-                            <div className="flex justify-between mb-3">
-                                <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Network Uptime</label>
-                                <span className="text-emerald-400 font-mono font-bold text-lg">99 %</span>
-                            </div>
-                            <input type="range" min="10" max="100" step="1" defaultValue="99" className="w-full accent-emerald-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
-                        </div>
-                    </div>
-                    <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8 text-center">
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Estimated Monthly Income</p>
-                        <p className="text-5xl font-display font-black text-emerald-400 mb-2">₹210.00</p>
-                        <p className="text-slate-500 text-[10px] font-medium leading-relaxed">
-                            Based on current network demand and ₹0.42/GB base rate. Actual results vary by region and reputation score.
-                        </p>
-                    </div>
-                </div>
+                <EarningsCalculator />
             </div>
 
             {/* ═══════ NETWORK EXPLORER ═══════ */}
@@ -513,6 +489,41 @@ export const NodeDashboard = () => {
                     </p>
                 </div>
             )}
+        </div>
+    );
+};
+
+// ── Interactive Earnings Calculator ──
+const EarningsCalculator = () => {
+    const [storage, setStorage] = useState(500);
+    const [uptime, setUptime] = useState(99);
+    const projected = ((storage * 0.42 * (uptime / 100))).toFixed(2);
+
+    return (
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-8">
+                <div>
+                    <div className="flex justify-between mb-3">
+                        <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Storage Contribution</label>
+                        <span className="text-emerald-400 font-mono font-bold text-lg">{storage.toLocaleString()} GB</span>
+                    </div>
+                    <input type="range" min="50" max="10000" step="50" value={storage} onChange={(e) => setStorage(parseInt(e.target.value))} className="w-full accent-emerald-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
+                </div>
+                <div>
+                    <div className="flex justify-between mb-3">
+                        <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">Network Uptime</label>
+                        <span className="text-emerald-400 font-mono font-bold text-lg">{uptime} %</span>
+                    </div>
+                    <input type="range" min="10" max="100" step="1" value={uptime} onChange={(e) => setUptime(parseInt(e.target.value))} className="w-full accent-emerald-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
+                </div>
+            </div>
+            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8 text-center">
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Estimated Monthly Income</p>
+                <p className="text-5xl font-display font-black text-emerald-400 mb-2">₹{parseFloat(projected).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                <p className="text-slate-500 text-[10px] font-medium leading-relaxed">
+                    Based on current network demand and ₹0.42/GB base rate. Actual results vary by region and reputation score.
+                </p>
+            </div>
         </div>
     );
 };

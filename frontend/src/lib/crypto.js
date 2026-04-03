@@ -183,10 +183,7 @@ export async function encryptEscrowPayload(vaultKey, recoveryPhrase) {
     const key = await deriveKey(recoveryPhrase, salt);
 
     const plaintext = TEXT_ENCODER.encode(vaultKey);
-    const ciphertext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, plaintext).catch(async () => {
-        // Fallback to encrypt (typo fix in flow)
-        return await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
-    });
+    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
 
     const packed = new Uint8Array(SALT_SIZE + IV_SIZE + ciphertext.byteLength);
     packed.set(salt, 0);
