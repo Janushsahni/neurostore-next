@@ -18,6 +18,8 @@ struct NodeConfig {
     max_gb: u64,
     wallet_address: String,
     gateway_url: String,
+    user_email: Option<String>,
+    auth_token: Option<String>,
 }
 
 impl Default for NodeConfig {
@@ -32,6 +34,8 @@ impl Default for NodeConfig {
             max_gb: 50,
             wallet_address: "0x0000000000000000000000000000000000000000".to_string(),
             gateway_url: DEFAULT_GATEWAY_URL.to_string(),
+            user_email: None,
+            auth_token: None,
         }
     }
 }
@@ -66,12 +70,25 @@ fn save_config(
 }
 
 #[tauri::command]
+fn open_auth_url(app_handle: AppHandle) -> Result<(), String> {
+    let auth_url = "https://neurostore-next.vercel.app/login?redirect=desktop";
+    let _ = tauri_plugin_opener::open_url(auth_url, None::<&str>);
+    Ok(())
+}
+
+#[tauri::command]
 async fn start_node(app_handle: AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
     if state.running.load(Ordering::SeqCst) {
         return Ok(true);
     }
 
     let config = state.config.lock().unwrap().clone();
+    
+    // Safety check: Don't start without auth
+    if config.user_email.is_none() {
+        return Err("Authentication required".to_string());
+    }
+
     let (tx, _rx) = oneshot::channel();
     *state.shutdown_tx.lock().unwrap() = Some(tx);
     state.running.store(true, Ordering::SeqCst);
@@ -101,9 +118,6 @@ async fn start_node(app_handle: AppHandle, state: State<'_, AppState>) -> Result
     // Spawn the ACTUAL Rust Storage Engine
     tauri::async_runtime::spawn(async move {
         let _ = app_handle_clone.emit("node-log", "[SYSTEM] Launching High-Performance Rust Storage Engine...");
-        
-        // Match actual library call:
-        // let _ = neuronode::run_node_with_shutdown(&_runtime, _rx).await;
         
         let mut sys = sysinfo::System::new_all();
         let mut loop_count = 0;
@@ -147,6 +161,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
+        .plugin(tauri_plugin_deep_link::init())
         .manage(AppState {
             running: Arc::new(AtomicBool::new(false)),
             config: std::sync::Mutex::new(NodeConfig::default()),
@@ -156,15 +171,23 @@ pub fn run() {
             start_node,
             stop_node,
             get_config,
-            save_config
+            save_config,
+            open_auth_url
         ])
         .setup(|app| {
-            // SINGLE INSTANCE ENFORCEMENT
+            // SINGLE INSTANCE & DEEP LINK HANDLING
             #[cfg(desktop)]
-            app.handle().plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            app.handle().plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.show();
                     let _ = window.set_focus();
+                }
+                
+                // Handle deep link from second instance
+                for arg in args {
+                    if arg.starts_with("neurostore://") {
+                        let _ = app.emit("deep-link", arg);
+                    }
                 }
             }))?;
 
@@ -180,7 +203,7 @@ pub fn run() {
                 }
             }
 
-            // SYSTEM TRAY INNOVATION
+            // SYSTEM TRAY
             let quit_i = MenuItem::with_id(app, "quit", "Quit NeuroStore", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Open Dashboard", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
@@ -200,19 +223,21 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // AUTO-IGNITE ON BOOT
+            // AUTO-IGNITE IF AUTHENTICATED
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let state = handle.state::<AppState>();
-                let _ = start_node(handle.clone(), state).await;
+                let config = state.config.lock().unwrap().clone();
+                if config.user_email.is_some() {
+                    let _ = start_node(handle.clone(), state).await;
+                }
             });
 
             Ok(())
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // Background Persistence: Hide window instead of closing
-                let _ = window.hide();
+                window.hide().unwrap();
                 api.prevent_close();
             }
         })

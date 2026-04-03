@@ -22,11 +22,14 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'settings'>('dashboard');
+  const [step, setStep] = useState<'auth' | 'setup' | 'dashboard'>('auth');
   const [config, setConfig] = useState<NodeConfig>({
     storage_path: '',
     max_gb: 50,
     wallet_address: '',
-    gateway_url: ''
+    gateway_url: '',
+    user_email: undefined,
+    auth_token: undefined
   });
   const [stats, setStats] = useState<NodeStats>({
     cpu: '0.0',
@@ -36,17 +39,15 @@ function App() {
     earnings: '0.0000'
   });
 
-  // Auto-scroll logic for terminal
-  useEffect(() => {
-    const term = document.getElementById('terminal-view');
-    if (term) term.scrollTop = term.scrollHeight;
-  }, [logs]);
-
   // Load config and setup listeners
   useEffect(() => {
     const init = async () => {
       const savedConfig = await invoke<NodeConfig>('get_config');
       setConfig(savedConfig);
+      
+      if (savedConfig.user_email) {
+        setStep('dashboard');
+      }
 
       const unlistenLog = await listen<string>('node-log', (event) => {
         setLogs(prev => [...prev.slice(-99), event.payload]);
@@ -56,14 +57,47 @@ function App() {
         setStats(event.payload);
       });
 
+      const unlistenDeepLink = await listen<string>('deep-link', (event) => {
+        // neurostore://auth?email=...&token=...
+        try {
+          const url = new URL(event.payload);
+          const email = url.searchParams.get('email');
+          const token = url.searchParams.get('token');
+          if (email && token) {
+            setConfig(prev => ({ ...prev, user_email: email, auth_token: token }));
+            setStep('setup');
+          }
+        } catch (e) {
+          console.error("Malformed deep link", e);
+        }
+      });
+
       return () => {
         unlistenLog();
         unlistenStats();
+        unlistenDeepLink();
       };
     };
 
     init();
   }, []);
+
+  const handleAuthenticate = async () => {
+    await invoke('open_auth_url');
+  };
+
+  const handleCompleteSetup = async () => {
+    try {
+      setLogs(prev => [...prev, "[SYSTEM] Finalizing hardware handshake..."]);
+      setLogs(prev => [...prev, "[SYSTEM] Provisioning secure local partition..."]);
+      await invoke('save_config', { config });
+      setStep('dashboard');
+      const success = await invoke('start_node');
+      if (success) setIsRunning(true);
+    } catch (e) {
+      setLogs(prev => [...prev, `[ERROR] Setup failed: ${e}`]);
+    }
+  };
 
   const toggleNode = async () => {
     if (isRunning) {
@@ -91,6 +125,70 @@ function App() {
       setLogs(prev => [...prev, `[ERROR] Failed to save config: ${e}`]);
     }
   };
+
+  if (step === 'auth') {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#0a0b10] text-slate-200 p-8">
+        <div className="w-20 h-20 rounded-3xl bg-primary flex items-center justify-center mb-8 shadow-[0_0_50px_-10px_rgba(59,130,246,0.5)]">
+          <Zap size={40} className="text-black fill-black" />
+        </div>
+        <h1 className="text-4xl font-black tracking-tighter mb-2">NEURO<span className="text-primary italic">STORE</span></h1>
+        <p className="text-slate-500 mb-12 text-center max-w-sm">Connect your hardware to the world's most innovative decentralized cloud.</p>
+        
+        <button 
+          onClick={handleAuthenticate}
+          className="w-full max-w-xs bg-primary text-black py-4 rounded-2xl font-black tracking-tight hover:scale-105 transition-all shadow-lg flex items-center justify-center gap-3"
+        >
+          <Globe size={20} /> AUTHENTICATE DEVICE
+        </button>
+        <p className="mt-6 text-[10px] uppercase tracking-widest opacity-30 font-bold">Secure Hardware Handshake</p>
+      </div>
+    );
+  }
+
+  if (step === 'setup') {
+    return (
+      <div className="h-screen flex flex-col bg-[#0a0b10] text-slate-200 p-12 overflow-y-auto">
+        <div className="max-w-md mx-auto w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="space-y-2">
+            <div className="text-primary text-xs font-black uppercase tracking-[0.2em]">Step 02 / Hardware Config</div>
+            <h2 className="text-3xl font-black tracking-tight">PROVISION RESOURCE</h2>
+            <p className="text-slate-500 text-sm">Configure your local "partition" for the decentralized network.</p>
+          </div>
+
+          <div className="space-y-6">
+            <ConfigInput 
+              label="Hardware Wallet" 
+              icon={<Wallet size={16}/>}
+              value={config.wallet_address}
+              onChange={(v) => setConfig({...config, wallet_address: v})}
+              placeholder="0x..."
+            />
+            <ConfigInput 
+              label="Storage Allocation (GB)" 
+              icon={<HardDrive size={16}/>}
+              value={config.max_gb.toString()}
+              onChange={(v) => setConfig({...config, max_gb: parseInt(v) || 0})}
+              type="number"
+            />
+            <ConfigInput 
+              label="Local Storage Root" 
+              icon={<HardDrive size={16}/>}
+              value={config.storage_path}
+              onChange={(v) => setConfig({...config, storage_path: v})}
+            />
+          </div>
+
+          <button 
+            onClick={handleCompleteSetup}
+            className="w-full bg-white text-black py-4 rounded-2xl font-black tracking-tight hover:bg-primary transition-all shadow-xl"
+          >
+            INITIALIZE ENGINE
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-[#0a0b10] text-slate-200 overflow-hidden font-sans select-none">

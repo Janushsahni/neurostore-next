@@ -41,6 +41,7 @@
   },
   "plugins": {
     "autostart": {},
-    "single-instance": {}
+    "single-instance": {},
+    "deep-link": {}
   }
 }

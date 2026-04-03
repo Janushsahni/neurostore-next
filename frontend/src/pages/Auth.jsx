@@ -87,6 +87,16 @@ export const Login = ({ onAuth }) => {
 
             setAuthSession(data.user, data.csrf_token || "", data.token || "");
             setVaultSecret(password);
+
+            const isDesktop = searchParams.get("redirect") === "desktop";
+            if (isDesktop) {
+                const desktopUrl = `neurostore://auth?email=${encodeURIComponent(data.user.email)}&token=${encodeURIComponent(data.token)}`;
+                window.location.href = desktopUrl;
+                // Keep the browser window open with a success message
+                setError("Logged in successfully! You can close this window and return to the NeuroStore app.");
+                return;
+            }
+
             onAuth(getTargetPath());
         } catch (err) {
             const safeMessage = err?.name === "AbortError"
@@ -143,7 +153,16 @@ export const Login = ({ onAuth }) => {
             if (!response.ok) throw new Error(data.error || "Auto-Login with recovered key failed.");
 
             setAuthSession(data.user, data.csrf_token || "", data.token || "");
-            setVaultSecret(vaultKey);
+            setVaultSecret(password);
+
+            const isDesktop = searchParams.get("redirect") === "desktop";
+            if (isDesktop) {
+                const desktopUrl = `neurostore://auth?email=${encodeURIComponent(data.user.email)}&token=${encodeURIComponent(data.token)}`;
+                window.location.href = desktopUrl;
+                setError("Account created and device linked! You can close this window and return to the NeuroStore app.");
+                return;
+            }
+
             onAuth(getTargetPath());
 
         } catch (err) {
