@@ -40,6 +40,17 @@ scripts/deploy-readiness.sh --strict
 scripts/perf-kpi-gate.sh --strict
 ```
 
+## Join the Swarm (Community Nodes)
+
+You can contribute storage to the NeuroStore network and earn rewards by running a local node on your Windows machine.
+
+### Windows One-Click Installer
+1. Download `NeuroStore-Node-Installer.zip` from this repository.
+2. Extract the folder to your computer.
+3. Double-click `Install-NeuroStore.bat`.
+4. Follow the GUI prompts to select your storage location and capacity.
+5. Once installed, your browser will open the dashboard where you can claim your node and start earning.
+
 ## Large Audience Rollout
 
 Scale gateway replicas behind the load balancer:
