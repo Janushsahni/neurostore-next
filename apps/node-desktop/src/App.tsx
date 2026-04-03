@@ -1,12 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Play, Square, Activity, HardDrive, Terminal as TermIcon, ShieldCheck } from 'lucide-react';
+import { Play, Square, Activity, HardDrive, Terminal as TermIcon, ShieldCheck, Settings, Globe, Wallet, TrendingUp, Cpu, Zap } from 'lucide-react';
+
+interface NodeConfig {
+  storage_path: string;
+  max_gb: number;
+  wallet_address: string;
+  gateway_url: string;
+}
+
+interface NodeStats {
+  cpu: string;
+  mem: string;
+  shards: number;
+  uptime: number;
+  earnings: string;
+}
 
 function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-  const [storageLimit, setStorageLimit] = useState(500);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'settings'>('dashboard');
+  const [config, setConfig] = useState<NodeConfig>({
+    storage_path: '',
+    max_gb: 50,
+    wallet_address: '',
+    gateway_url: ''
+  });
+  const [stats, setStats] = useState<NodeStats>({
+    cpu: '0.0',
+    mem: '0',
+    shards: 0,
+    uptime: 0,
+    earnings: '0.0000'
+  });
 
   // Auto-scroll logic for terminal
   useEffect(() => {
@@ -14,21 +42,27 @@ function App() {
     if (term) term.scrollTop = term.scrollHeight;
   }, [logs]);
 
-  // Listen for Rust backend events
+  // Load config and setup listeners
   useEffect(() => {
-    const setupListener = async () => {
-      const unlisten = await listen<string>('node-log', (event) => {
+    const init = async () => {
+      const savedConfig = await invoke<NodeConfig>('get_config');
+      setConfig(savedConfig);
+
+      const unlistenLog = await listen<string>('node-log', (event) => {
         setLogs(prev => [...prev.slice(-99), event.payload]);
       });
+
+      const unlistenStats = await listen<NodeStats>('node-stats', (event) => {
+        setStats(event.payload);
+      });
+
       return () => {
-        unlisten();
+        unlistenLog();
+        unlistenStats();
       };
     };
 
-    const unlistenPromise = setupListener();
-    return () => {
-      unlistenPromise.then(unlisten => unlisten());
-    };
+    init();
   }, []);
 
   const toggleNode = async () => {
@@ -36,9 +70,10 @@ function App() {
       await invoke('stop_node');
       setIsRunning(false);
       setLogs(prev => [...prev, "[SYSTEM] Node stopped gracefully."]);
+      setStats({ cpu: '0.0', mem: '0', shards: 0, uptime: 0, earnings: stats.earnings });
     } else {
-      setLogs(prev => [...prev, `[SYSTEM] Starting Node with ${storageLimit}GB limit...`]);
-      const success = await invoke('start_node', { capacityGb: storageLimit });
+      setLogs(prev => [...prev, "[SYSTEM] Initiating Production Bootloader..."]);
+      const success = await invoke('start_node');
       if (success) {
         setIsRunning(true);
       } else {
@@ -47,95 +82,228 @@ function App() {
     }
   };
 
+  const handleSaveConfig = async () => {
+    try {
+      await invoke('save_config', { config });
+      setLogs(prev => [...prev, "[SYSTEM] Configuration updated successfully."]);
+      setActiveTab('dashboard');
+    } catch (e) {
+      setLogs(prev => [...prev, `[ERROR] Failed to save config: ${e}`]);
+    }
+  };
+
   return (
-    <div className="h-screen flex flex-col pt-8 bg-background overflow-hidden relative" data-tauri-drag-region>
-      {/* Draggable Top Bar Area */}
-      <div className="absolute top-0 inset-x-0 h-10 -z-10" data-tauri-drag-region></div>
-
-      {/* Main Header */}
-      <div className="px-8 pb-6 border-b border-border flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-primary flex items-center justify-center text-background shadow-lg glow-primary">
-            <HardDrive size={24} />
+    <div className="h-screen flex flex-col bg-[#0a0b10] text-slate-200 overflow-hidden font-sans select-none">
+      {/* Draggable Top Bar */}
+      <div className="h-12 flex items-center justify-between px-6 border-b border-white/5 bg-black/20" data-tauri-drag-region>
+        <div className="flex items-center gap-2 pointer-events-none">
+          <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
+            <Zap size={14} className="text-black fill-black" />
           </div>
-          <div>
-            <h1 className="text-xl font-display font-bold leading-tight">NeuroStore</h1>
-            <p className="text-xs font-mono text-muted flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`}></span>
-              {isRunning ? 'Connected to Relay' : 'Node Offline'}
-            </p>
-          </div>
+          <span className="text-xs font-bold tracking-widest uppercase opacity-80">NeuroStore Engine</span>
         </div>
-
-        <button
-          onClick={toggleNode}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold transition-all shadow-lg ${isRunning
-              ? 'bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20'
-              : 'bg-primary text-background hover:bg-primary/90 glow-primary'
-            }`}
-        >
-          {isRunning ? <><Square size={16} /> Stop Node</> : <><Play size={16} /> Start Node</>}
-        </button>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setActiveTab('dashboard')}
+            className={`text-xs font-bold uppercase tracking-tighter transition-all ${activeTab === 'dashboard' ? 'text-primary' : 'opacity-40 hover:opacity-100'}`}
+          >
+            Dashboard
+          </button>
+          <button 
+            onClick={() => setActiveTab('settings')}
+            className={`text-xs font-bold uppercase tracking-tighter transition-all ${activeTab === 'settings' ? 'text-primary' : 'opacity-40 hover:opacity-100'}`}
+          >
+            Settings
+          </button>
+        </div>
       </div>
 
-      {/* Dashboard Body */}
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
-
-        <div className="grid grid-cols-2 gap-6">
-          {/* Storage Config */}
-          <div className="glass-card p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold flex items-center gap-2"><HardDrive className="text-primary" size={18} /> Allocation</h3>
-              <span className="font-mono text-primary font-bold">{storageLimit} GB</span>
+      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+        {activeTab === 'dashboard' ? (
+          <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            
+            {/* Hero Section */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-4xl font-black tracking-tighter text-white mb-1">
+                  NODE <span className="text-primary italic">ACTIVE</span>
+                </h1>
+                <p className="text-slate-500 text-sm font-medium flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-primary animate-pulse' : 'bg-red-500'}`}></span>
+                  {isRunning ? `LIVE: Connected to ${new URL(config.gateway_url).hostname}` : 'OFFLINE: Standing by for instructions'}
+                </p>
+              </div>
+              <button
+                onClick={toggleNode}
+                className={`group relative flex items-center gap-3 px-8 py-4 rounded-2xl font-black transition-all overflow-hidden ${isRunning
+                    ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20'
+                    : 'bg-primary text-black hover:scale-105 active:scale-95 shadow-[0_0_30px_-5px_rgba(59,130,246,0.5)]'
+                  }`}
+              >
+                {isRunning ? <><Square size={20} fill="currentColor" /> STOP ENGINE</> : <><Play size={20} fill="currentColor" /> IGNITE NODE</>}
+              </button>
             </div>
-            <input
-              type="range"
-              className="w-full accent-primary mt-4"
-              min="50" max="2000" step="50"
-              value={storageLimit}
-              onChange={(e) => setStorageLimit(parseInt(e.target.value))}
-              disabled={isRunning}
-            />
-            <p className="text-xs text-muted mt-4">Adjust maximum storage provided to the network. Lock requires node restart.</p>
-          </div>
 
-          {/* AI Reputation */}
-          <div className="glass-card p-6 flex flex-col relative overflow-hidden">
-            {isRunning && <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/20 blur-[50px] -mr-16 -mt-16 rounded-full mix-blend-screen"></div>}
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold flex items-center gap-2"><Activity className={isRunning ? 'text-green-400' : 'text-muted'} size={18} /> Sentinal Score</h3>
-              <ShieldCheck className={isRunning ? 'text-green-400' : 'text-muted'} size={18} />
+            {/* Stats Grid */}
+            <div className="grid grid-cols-4 gap-4">
+              <StatCard icon={<TrendingUp size={16}/>} label="Earnings" value={`₹ ${stats.earnings}`} sub="Total accumulated" primary />
+              <StatCard icon={<HardDrive size={16}/>} label="Shards" value={stats.shards.toString()} sub="Verified residency" />
+              <StatCard icon={<Cpu size={16}/>} label="CPU Load" value={`${stats.cpu}%`} sub="System overhead" />
+              <StatCard icon={<Activity size={16}/>} label="Uptime" value={`${stats.uptime}s`} sub="Session duration" />
             </div>
-            <div className="mt-auto">
-              <span className={`text-5xl font-display font-bold ${isRunning ? 'text-white' : 'text-muted'}`}>
-                {isRunning ? '99.9' : '---'}<span className="text-lg text-muted">/100</span>
-              </span>
-              <p className="text-xs text-muted mt-2">Driven by 24h uptime and bandwidth availability.</p>
-            </div>
-          </div>
-        </div>
 
-        {/* Live Terminal Log View */}
-        <div className="glass-card flex flex-col h-64 overflow-hidden border-border/40">
-          <div className="bg-background/80 px-4 py-2 border-b border-border/40 flex items-center gap-2 text-xs font-mono text-muted">
-            <TermIcon size={14} /> Live Node Output
-          </div>
-          <div id="terminal-view" className="flex-1 bg-black/50 p-4 overflow-y-auto font-mono text-[11px] leading-relaxed text-gray-300 space-y-1">
-            {logs.length === 0 ? (
-              <span className="text-muted/50 italic">Waiting for node start...</span>
-            ) : (
-              logs.map((log, i) => (
-                <div key={i} className={`${log.includes('ERROR') ? 'text-red-400' : log.includes('SYSTEM') ? 'text-primary' : ''}`}>
-                  {log}
+            {/* Main Content Area */}
+            <div className="grid grid-cols-3 gap-6">
+              {/* Reputation Gauge */}
+              <div className="col-span-1 glass-panel p-6 flex flex-col justify-between aspect-square relative overflow-hidden group">
+                <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 blur-[60px] rounded-full group-hover:bg-primary/20 transition-all duration-1000"></div>
+                <div className="flex justify-between items-start z-10">
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-40">AI Reputation</span>
+                  <ShieldCheck size={20} className={isRunning ? 'text-primary' : 'text-slate-700'} />
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+                <div className="z-10">
+                  <div className="text-6xl font-black tracking-tighter text-white">
+                    {isRunning ? '99' : '--'}<span className="text-2xl opacity-20">.9</span>
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-500 mt-2 leading-relaxed">
+                    Verified by Sentinel AI protocol. Maintain 98%+ for max rewards.
+                  </p>
+                </div>
+              </div>
 
+              {/* Terminal View */}
+              <div className="col-span-2 glass-panel flex flex-col h-full border-white/5 overflow-hidden">
+                <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                  <div className="flex items-center gap-2">
+                    <TermIcon size={12} className="text-primary" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">System Logs</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-white/10"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-white/10"></div>
+                  </div>
+                </div>
+                <div id="terminal-view" className="flex-1 p-5 overflow-y-auto font-mono text-[10px] leading-relaxed text-slate-400 space-y-1.5 bg-black/40 scrollbar-hide">
+                  {logs.length === 0 ? (
+                    <div className="opacity-20 italic">Waiting for process start...</div>
+                  ) : (
+                    logs.map((log, i) => (
+                      <div key={i} className="flex gap-3">
+                        <span className="opacity-20 select-none">[{i.toString().padStart(3, '0')}]</span>
+                        <span className={`${log.includes('ERROR') ? 'text-red-400' : log.includes('SUCCESS') ? 'text-primary' : log.includes('SYSTEM') ? 'text-white font-bold' : ''}`}>
+                          {log}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        ) : (
+          <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-black tracking-tight text-white">SYSTEM CONFIG</h2>
+              <p className="text-slate-500 text-sm">Fine-tune your hardware contribution parameters.</p>
+            </div>
+
+            <div className="glass-panel p-8 space-y-6 bg-white/[0.02]">
+              <div className="space-y-4">
+                <ConfigInput 
+                  label="Payout Wallet (ERC-20)" 
+                  icon={<Wallet size={16}/>}
+                  value={config.wallet_address}
+                  onChange={(v) => setConfig({...config, wallet_address: v})}
+                  placeholder="0x..."
+                />
+                <ConfigInput 
+                  label="Storage Allocation (GB)" 
+                  icon={<HardDrive size={16}/>}
+                  value={config.max_gb.toString()}
+                  onChange={(v) => setConfig({...config, max_gb: parseInt(v) || 0})}
+                  type="number"
+                />
+                <ConfigInput 
+                  label="Gateway Cluster URL" 
+                  icon={<Globe size={16}/>}
+                  value={config.gateway_url}
+                  onChange={(v) => setConfig({...config, gateway_url: v})}
+                />
+                <ConfigInput 
+                  label="Data Directory" 
+                  icon={<HardDrive size={16}/>}
+                  value={config.storage_path}
+                  onChange={(v) => setConfig({...config, storage_path: v})}
+                />
+              </div>
+
+              <div className="pt-4 flex gap-4">
+                <button 
+                  onClick={handleSaveConfig}
+                  className="flex-1 bg-primary text-black py-3 rounded-xl font-black text-sm tracking-tight hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  APPLY CHANGES
+                </button>
+                <button 
+                  onClick={() => setActiveTab('dashboard')}
+                  className="px-8 bg-white/5 text-white py-3 rounded-xl font-black text-sm tracking-tight hover:bg-white/10 transition-all"
+                >
+                  CANCEL
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+      
+      {/* CSS Utilities */}
+      <style>{`
+        .glass-panel {
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 24px;
+          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .text-primary { color: #3b82f6; }
+        .bg-primary { background-color: #3b82f6; }
+      `}</style>
     </div>
   );
 }
 
+function StatCard({ icon, label, value, sub, primary = false }: { icon: React.ReactNode, label: string, value: string, sub: string, primary?: boolean }) {
+  return (
+    <div className={`glass-panel p-5 space-y-3 transition-all hover:bg-white/[0.05] ${primary ? 'border-primary/20 bg-primary/[0.02]' : ''}`}>
+      <div className="flex items-center gap-2 opacity-40">
+        {icon}
+        <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+      </div>
+      <div>
+        <div className={`text-xl font-black tracking-tighter ${primary ? 'text-primary' : 'text-white'}`}>{value}</div>
+        <div className="text-[9px] font-bold text-slate-600 uppercase tracking-tight">{sub}</div>
+      </div>
+    </div>
+  )
+}
+
+function ConfigInput({ label, icon, value, onChange, placeholder, type = "text" }: { label: string, icon: React.ReactNode, value: string, onChange: (v: string) => void, placeholder?: string, type?: string }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-black uppercase tracking-widest opacity-40 flex items-center gap-2">
+        {icon} {label}
+      </label>
+      <input 
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all"
+      />
+    </div>
+  )
+}
+
 export default App;
+

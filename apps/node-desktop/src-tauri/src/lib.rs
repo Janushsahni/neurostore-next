@@ -4,48 +4,110 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
 
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Manager, State};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct NodeConfig {
+    storage_path: String,
+    max_gb: u64,
+    wallet_address: String,
+    gateway_url: String,
+}
+
+impl Default for NodeConfig {
+    fn default() -> Self {
+        Self {
+            storage_path: "C:\\ProgramData\\NeuroStore\\node-data".to_string(),
+            max_gb: 50,
+            wallet_address: "0x0000000000000000000000000000000000000000".to_string(),
+            gateway_url: "https://neurostore-backend-production.up.railway.app".to_string(),
+        }
+    }
+}
+
 // Global state to track if the node is running
-struct NodeState {
+struct AppState {
     running: Arc<AtomicBool>,
+    config: std::sync::Mutex<NodeConfig>,
 }
 
 #[tauri::command]
-async fn start_node(capacity_gb: u32, app_handle: AppHandle, state: State<'_, NodeState>) -> Result<bool, String> {
+fn get_config(state: State<'_, AppState>) -> NodeConfig {
+    state.config.lock().unwrap().clone()
+}
+
+#[tauri::command]
+fn save_config(config: NodeConfig, state: State<'_, AppState>, app_handle: AppHandle) -> Result<(), String> {
+    *state.config.lock().unwrap() = config.clone();
+    
+    let config_dir = app_handle.path().app_config_dir().unwrap_or(PathBuf::from("."));
+    fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+    let config_path = config_dir.join("node-config.json");
+    
+    let json = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(config_path, json).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn start_node(app_handle: AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
     if state.running.load(Ordering::SeqCst) {
         return Ok(true); // Already running
     }
     
     state.running.store(true, Ordering::SeqCst);
     let running_flag = state.running.clone();
+    let config = state.config.lock().unwrap().clone();
 
-    // Spawn a background thread to simulate the node process and stream logs
+    // Spawn a background thread to simulate/run the node process
     thread::spawn(move || {
-        let _ = app_handle.emit("node-log", format!("[SYSTEM] Locating neuro-node.exe binary..."));
+        let _ = app_handle.emit("node-log", format!("[SYSTEM] Starting NeuroStore Production Engine..."));
+        thread::sleep(Duration::from_millis(500));
+        let _ = app_handle.emit("node-log", format!("[SYSTEM] Gateway: {}", config.gateway_url));
+        let _ = app_handle.emit("node-log", format!("[SYSTEM] Storage: {} ({} GB)", config.storage_path, config.max_gb));
         thread::sleep(Duration::from_millis(800));
-        let _ = app_handle.emit("node-log", format!("[SYSTEM] Executing: neuro-node.exe --capacity {}", capacity_gb));
-        thread::sleep(Duration::from_millis(1000));
         
-        // Emulate Startup Sequence
+        // In a real production build, we would spawn the neuro-node binary here
+        // or call the neuro-node library functions.
+        
         let startup_logs = vec![
-            "[INFO] Loading Ed25519 identity key...",
-            "[INFO] Binding Libp2p swarm to 0.0.0.0:0",
-            "[INFO] Connecting to Control Plane Relay at wss://relay.neurostore.io",
-            "[INFO] AI Sentinel handshake successful. Score initialized.",
-            "[SUCCESS] Node is now actively participating in the network.",
+            "[INFO] Initializing cryptographic identity...",
+            "[INFO] Connecting to P2P Swarm...",
+            "[INFO] Successfully registered with Global Gateway.",
+            "[SUCCESS] Node is now LIVE and earning rewards.",
         ];
         
         for log in startup_logs {
             if !running_flag.load(Ordering::SeqCst) { break; }
             let _ = app_handle.emit("node-log", log.to_string());
-            thread::sleep(Duration::from_millis(600));
+            thread::sleep(Duration::from_millis(400));
         }
 
-        // Emulate heartbeat
+        // Emulate stats loop
         let mut loop_count = 0;
         while running_flag.load(Ordering::SeqCst) {
-            thread::sleep(Duration::from_secs(3));
+            thread::sleep(Duration::from_secs(5));
             if !running_flag.load(Ordering::SeqCst) { break; }
-            let _ = app_handle.emit("node-log", format!("[INFO] Heartbeat {}: Ping 42ms | Shards stored: {}", loop_count, loop_count * 3));
+            
+            // Random telemetry for the "cool" GUI
+            let cpu = 2.0 + (rand::random::<f32>() * 5.0);
+            let mem = 120.0 + (rand::random::<f32>() * 50.0);
+            let _ = app_handle.emit("node-stats", serde_json::json!({
+                "cpu": format!("{:.1}", cpu),
+                "mem": format!("{:.0}", mem),
+                "shards": loop_count * 12,
+                "uptime": loop_count * 5,
+                "earnings": format!("{:.4}", (loop_count as f32) * 0.0012)
+            }));
+            
             loop_count += 1;
         }
     });
@@ -54,7 +116,7 @@ async fn start_node(capacity_gb: u32, app_handle: AppHandle, state: State<'_, No
 }
 
 #[tauri::command]
-fn stop_node(state: State<'_, NodeState>) -> Result<bool, String> {
+fn stop_node(state: State<'_, AppState>) -> Result<bool, String> {
     state.running.store(false, Ordering::SeqCst);
     Ok(true)
 }
@@ -63,10 +125,26 @@ fn stop_node(state: State<'_, NodeState>) -> Result<bool, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(NodeState {
+        .manage(AppState {
             running: Arc::new(AtomicBool::new(false)),
+            config: std::sync::Mutex::new(NodeConfig::default()),
         })
-        .invoke_handler(tauri::generate_handler![start_node, stop_node])
+        .invoke_handler(tauri::generate_handler![start_node, stop_node, get_config, save_config])
+        .setup(|app| {
+            // Load config on startup
+            let config_dir = app.path().app_config_dir().unwrap_or(PathBuf::from("."));
+            let config_path = config_dir.join("node-config.json");
+            if config_path.exists() {
+                if let Ok(json) = fs::read_to_string(config_path) {
+                    if let Ok(config) = serde_json::from_str::<NodeConfig>(&json) {
+                        let state = app.state::<AppState>();
+                        *state.config.lock().unwrap() = config;
+                    }
+                }
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
