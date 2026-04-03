@@ -10,6 +10,10 @@ authors = ["Janush Sahni"]
 name = "neuro-node"
 path = "src/main.rs"
 
+[lib]
+name = "neuronode"
+path = "src/lib.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 serde = { workspace = true }

@@ -8,6 +8,7 @@ members = [
   "crates/sentinel",
   "crates/uploader",
   "crates/gateway",
+  "apps/node-desktop/src-tauri",
 ]
 exclude = ["apps/tauri-shell/src-tauri"]
 
