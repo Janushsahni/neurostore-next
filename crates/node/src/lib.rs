@@ -17,7 +17,7 @@ use tokio::sync::oneshot;
 use tracing::{info, warn};
 
 pub const DEFAULT_GATEWAY_URL: &str = "https://neurostore-backend-production.up.railway.app";
-pub const DEFAULT_RELAY_URL: &str = "wss://demo.neurostore.network/v1/nodes/ws";
+pub const DEFAULT_RELAY_URL: &str = "wss://neurostore-backend-production.up.railway.app/v1/nodes/ws";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SetupConfig {

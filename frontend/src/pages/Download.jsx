@@ -50,34 +50,28 @@ export const Download = () => {
                     {activeOS === 'windows' && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="space-y-4 mb-8">
-                                <h2 className="text-2xl font-bold tracking-tight text-slate-800">Windows GUI Installer</h2>
-                                <p className="text-slate-600 font-medium">Download the MSI installer — it installs files, opens the setup GUI automatically, registers a background service, and auto-starts on reboot.</p>
+                                <h2 className="text-2xl font-bold tracking-tight text-slate-800">Windows Seamless Node</h2>
+                                <p className="text-slate-600 font-medium">Download the executable and run it once. It instantly transforms your PC into a stealthy, background Network storage provider without showing any terminals, popups, or UAC prompts.</p>
 
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6">
                                     <a
-                                        href="/NeuroStore-Node-Installer.zip"
-                                        download
+                                        href={`${GITHUB_RELEASE_BASE}/NeuroStore-Node.exe`}
                                         className="btn-primary inline-flex items-center gap-3 px-6 py-3.5 text-basis shadow-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
                                     >
                                         <DownloadIcon size={20} />
-                                        Download One-Click Installer (.zip)
-                                    </a>
-                                    <a href={windowsMsiUrl} className="inline-flex items-center gap-3 border border-slate-300 text-slate-600 bg-white px-6 py-3.5 rounded-xl text-sm font-bold hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
-                                        Legacy MSI Installer
+                                        Download NeuroStore-Node.exe
                                     </a>
                                 </div>
                                 <a href={checksumsUrl} className="text-sm font-semibold text-emerald-700 hover:underline">Download SHA256 checksums</a>
                             </div>
 
                             <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-6 mb-8 text-emerald-900 shadow-sm">
-                                <h3 className="font-bold text-emerald-800 mb-3 flex items-center gap-2"><Monitor size={18} /> Expected Flow</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm font-medium">
-                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">1</span> Run the .msi installer</div>
-                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">2</span> Setup GUI opens automatically</div>
-                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">3</span> Pick storage folder and capacity</div>
-                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">4</span> Service installs and starts</div>
-                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">5</span> Node ID is shown and copied</div>
-                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">6</span> Runs silently, auto-starts on reboot</div>
+                                <h3 className="font-bold text-emerald-800 mb-3 flex items-center gap-2"><Monitor size={18} /> Frictionless Zero-Click Setup</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-1 gap-3 text-sm font-medium">
+                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full shrink-0 bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">1</span> Double-click the downloaded <strong>NeuroStore-Node.exe</strong> file.</div>
+                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full shrink-0 bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">2</span> Wait 3 seconds. The desktop app securely migrates to your local AppData folder.</div>
+                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full shrink-0 bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">3</span> It safely adds itself to Windows Startup to ensure you maintain high uptime points.</div>
+                                    <div className="flex items-center gap-2"><span className="w-5 h-5 rounded-full shrink-0 bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">4</span> Setup complete! Your browser will open the Web Dashboard instantly to claim the Node so you can start earning.</div>
                                 </div>
                             </div>
 
@@ -87,7 +81,7 @@ export const Download = () => {
                                     <div>
                                         <h3 className="font-bold text-amber-800 mb-1">Windows SmartScreen</h3>
                                         <p className="text-sm font-medium text-amber-700/80 leading-relaxed">
-                                            If SmartScreen warns, click <strong className="text-amber-900">More info</strong> then <strong className="text-amber-900">Run anyway</strong>.
+                                            If SmartScreen warns you because this is a new application, click <strong className="text-amber-900">More info</strong> then <strong className="text-amber-900">Run anyway</strong>. No Administrator privileges are required. To uninstall, run <code className="bg-amber-100 px-1 rounded">NeuroStore-Node.exe --uninstall</code>.
                                         </p>
                                     </div>
                                 </div>

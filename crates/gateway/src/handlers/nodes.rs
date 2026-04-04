@@ -798,8 +798,8 @@ pub async fn node_earnings(
         }
     }
 
-    let node = sqlx::query_as::<_, (String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, f32, f32)>(
-        r#"SELECT node_id, status, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, os, version, cpu_usage_percent, memory_usage_percent
+    let node = sqlx::query_as::<_, (String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, f32, f32, String)>(
+        r#"SELECT node_id, status, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, os, version, cpu_usage_percent, memory_usage_percent, wallet_address
            FROM node_registry WHERE node_id = $1"#,
     )
     .bind(&node_id)
@@ -832,20 +832,8 @@ pub async fn node_earnings(
         })
         .collect();
 
-    let (
-        status,
-        shard_count,
-        used_gb,
-        max_gb,
-        total_earned_inr,
-        uptime_minutes,
-        cpu_usage_percent,
-        memory_usage_percent,
-        last_heartbeat_at,
-        os,
-        version,
-    ) = match (node, cached_entry) {
-        (Some(_node), Some(cache)) => (
+    let (status, os, version, last_heartbeat_at, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, cpu_usage_percent, memory_usage_percent, wallet_address) = match (node, cached_entry) {
+        (Some(node), Some(cache)) => (
             cache.status,
             cache.shard_count,
             cache.used_gb,
@@ -857,6 +845,7 @@ pub async fn node_earnings(
             Some(cache.last_heartbeat_at),
             cache.os,
             cache.version,
+            node.12,
         ),
         (Some(node), None) => (
             node.1,
@@ -870,6 +859,7 @@ pub async fn node_earnings(
             node.7,
             node.8.unwrap_or_else(|| "Unknown".to_string()),
             node.9.unwrap_or_else(|| "1.0.0".to_string()),
+            node.12,
         ),
         (None, Some(cache)) => (
             cache.status,
@@ -883,6 +873,7 @@ pub async fn node_earnings(
             Some(cache.last_heartbeat_at),
             cache.os,
             cache.version,
+            "".to_string(),
         ),
         (None, None) => {
             return (
@@ -966,6 +957,7 @@ pub async fn node_earnings(
             "payout_status": if is_quarantined { "HOLD" } else { "ACTIVE" },
             "payout_hold_reason": hold_reason,
             "recent_earnings": earnings_json,
+            "wallet_address": wallet_address,
         })),
     )
         .into_response()
@@ -1384,4 +1376,56 @@ pub async fn list_public_nodes(State(state): State<Arc<AppState>>) -> impl IntoR
     }).collect();
 
     (StatusCode::OK, Json(nodes_json))
+}
+#[derive(Deserialize)]
+pub struct WalletUpdateRequest {
+    pub wallet_address: String,
+}
+
+pub async fn update_node_wallet(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::extract::Path(node_id): axum::extract::Path<String>,
+    Json(payload): Json<WalletUpdateRequest>,
+) -> impl IntoResponse {
+    let claims = match crate::handlers::auth::decode_claims_from_request(&headers, &state) {
+        Ok(c) => c,
+        Err(_) => return (StatusCode::UNAUTHORIZED, "Auth required").into_response(),
+    };
+
+    if !is_valid_wallet_address(&payload.wallet_address) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Invalid EVM wallet address format" }))
+        ).into_response();
+    }
+
+    if claims.role != "admin" {
+        let is_owner: bool = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM node_ownership WHERE node_id = $1 AND owner_email = $2)"
+        )
+        .bind(&node_id)
+        .bind(&claims.email)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(false);
+
+        if !is_owner {
+            return (StatusCode::FORBIDDEN, "Not owner of this node").into_response();
+        }
+    }
+
+    let _ = sqlx::query("UPDATE node_registry SET wallet_address = $1 WHERE node_id = $2")
+        .bind(&payload.wallet_address)
+        .bind(&node_id)
+        .execute(&state.db)
+        .await;
+
+    let _ = sqlx::query("UPDATE nodes SET wallet_address = $1 WHERE peer_id = $2 OR (peer_id LIKE '%' || $2)")
+        .bind(&payload.wallet_address)
+        .bind(&node_id)
+        .execute(&state.db)
+        .await;
+        
+    (StatusCode::OK, Json(serde_json::json!({ "status": "success", "wallet_address": &payload.wallet_address }))).into_response()
 }

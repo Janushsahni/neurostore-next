@@ -11,6 +11,36 @@ export const NodeDashboard = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [lookupError, setLookupError] = useState('');
+    const [walletAddress, setWalletAddress] = useState('');
+    const [walletSaving, setWalletSaving] = useState(false);
+    const [walletSaved, setWalletSaved] = useState(false);
+
+    useEffect(() => {
+        if (nodeData?.wallet_address && nodeData.wallet_address !== '0x0000000000000000000000000000000000000000') {
+            setWalletAddress(nodeData.wallet_address);
+        } else {
+            setWalletAddress('');
+        }
+    }, [nodeData]);
+
+    const saveWallet = async () => {
+        setWalletSaving(true);
+        try {
+            const { response, data } = await apiJson(`/api/node/${nodeId}/wallet`, {
+                method: 'PUT',
+                body: { wallet_address: walletAddress }
+            });
+            if (response.ok) {
+                setWalletSaved(true);
+                setTimeout(() => setWalletSaved(false), 3000);
+            } else {
+                alert(data?.error || 'Failed to save wallet');
+            }
+        } catch (e) {
+            alert('Failed to save wallet. Make sure you are logged in.');
+        }
+        setWalletSaving(false);
+    };
 
     const fetchStats = async () => {
         try {
@@ -44,7 +74,11 @@ export const NodeDashboard = () => {
                 setNodeData(data);
                 localStorage.setItem('neuro_node_id', searchId.trim());
             } else {
-                setLookupError(data?.error || 'Node not found');
+                if (response.status === 401 || response.status === 403 || data?.error === "Auth required") {
+                    setLookupError('Node Active! Please Log In or Register an account to claim your earnings and view telemetry.');
+                } else {
+                    setLookupError(data?.error || 'Node not found');
+                }
                 setNodeData(null);
             }
         } catch {
@@ -338,6 +372,30 @@ export const NodeDashboard = () => {
                                 <p className="text-purple-600/80 text-xs font-bold uppercase tracking-wider mb-1">Memory Usage</p>
                                 <p className="text-2xl font-bold text-purple-700">{(parseFloat(nodeData.memory_usage_percent || 0)).toFixed(1)}%</p>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Payout Settings */}
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800">
+                            <Coins size={18} className="text-amber-500" /> Payout Settings (Withdrawal)
+                        </h3>
+                        <p className="text-sm text-slate-500 mb-4">Enter your ERC-20 compatible wallet address to receive your monthly INR earnings securely on-chain.</p>
+                        <div className="flex flex-col md:flex-row gap-3">
+                            <input
+                                type="text"
+                                placeholder="0x..."
+                                value={walletAddress}
+                                onChange={(e) => setWalletAddress(e.target.value)}
+                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 font-mono shadow-inner focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
+                            />
+                            <button
+                                onClick={saveWallet}
+                                disabled={walletSaving || !walletAddress.startsWith('0x')}
+                                className="bg-amber-500 hover:bg-amber-600 focus:ring-amber-500 text-white px-8 py-3 rounded-xl font-bold flex items-center justify-center shadow-md disabled:opacity-50 transition"
+                            >
+                                {walletSaving ? 'Saving...' : walletSaved ? 'Saved!' : 'Save Address'}
+                            </button>
                         </div>
                     </div>
 

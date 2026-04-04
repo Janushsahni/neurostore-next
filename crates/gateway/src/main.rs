@@ -291,6 +291,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/node/:node_id/earnings", get(handlers::nodes::node_earnings))
         .route("/admin/inventory", get(handlers::nodes::get_admin_inventory))
         .route("/my/nodes", get(handlers::nodes::my_nodes))
+        .route("/node/:node_id/wallet", axum::routing::put(handlers::nodes::update_node_wallet))
         .route("/node/claim", post(handlers::nodes::claim_node))
         .route("/webhooks", post(handlers::webhooks::register_webhook))
         .route("/webhooks/:bucket", get(handlers::webhooks::list_webhooks))

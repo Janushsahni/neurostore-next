@@ -5,7 +5,7 @@ param(
     [string]$StoragePath = "",
     [int]$MaxGB = 500,
     [string]$GatewayUrl = "https://neurostore-backend-production.up.railway.app",
-    [string]$RelayUrl = "wss://demo.neurostore.network/v1/nodes/ws",
+    [string]$RelayUrl = "wss://neurostore-backend-production.up.railway.app/v1/nodes/ws",
     [string]$ConfigPath = "",
     [string]$NodeSecret = "",
     [string]$WalletAddress = "0x0000000000000000000000000000000000000000",

@@ -10,7 +10,7 @@ param(
     [string]$StoragePath,
     [int]$MaxGB,
     [string]$ServiceName = "NeurostoreNode",
-    [string]$RelayUrl = "wss://demo.neurostore.network/v1/nodes/ws",
+    [string]$RelayUrl = "wss://neurostore-backend-production.up.railway.app/v1/nodes/ws",
     [string]$GatewayUrl = "https://neurostore-backend-production.up.railway.app",
     [string]$ConfigPath = "$env:ProgramData\NeuroStore\config\node-config.json",
     [string]$NodeSecret,
@@ -45,7 +45,7 @@ if (-not (Test-Path $exePath)) {
 
 $StoragePath = Normalize-Path $StoragePath "$env:ProgramData\NeuroStore\node-data"
 $ConfigPath = Normalize-Path $ConfigPath "$env:ProgramData\NeuroStore\config\node-config.json"
-$RelayUrl = Normalize-Path $RelayUrl "wss://demo.neurostore.network/v1/nodes/ws"
+$RelayUrl = Normalize-Path $RelayUrl "wss://neurostore-backend-production.up.railway.app/v1/nodes/ws"
 $GatewayUrl = Normalize-Path $GatewayUrl "https://neurostore-backend-production.up.railway.app"
 $NodeSecret = Normalize-Path $NodeSecret ""
 $WalletAddress = Normalize-Path $WalletAddress "0x0000000000000000000000000000000000000000"
