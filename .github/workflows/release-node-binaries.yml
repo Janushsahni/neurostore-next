@@ -48,46 +48,55 @@ jobs:
         env:
           NODE_BINARY_SIGNING_SECRET: ${{ secrets.NODE_BINARY_SIGNING_SECRET }}
         run: |
-          .\scripts\prepare-node-build-signature.ps1 `
-            -Target "${{ matrix.target }}" `
-            -Package "neuro-node" `
-            -Version "${{ github.ref_name }}" `
-            -GitSha "${{ github.sha }}" `
-            -ArtifactName "${{ matrix.bundle_name }}" `
-            -JsonOut "dist/${{ matrix.bundle_name }}.build.json"
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          if ("${env:NODE_BINARY_SIGNING_SECRET}" -ne "") {
+            .\scripts\prepare-node-build-signature.ps1 `
+              -Target "${{ matrix.target }}" `
+              -Package "neuro-node" `
+              -Version "${{ github.ref_name }}" `
+              -GitSha "${{ github.sha }}" `
+              -ArtifactName "${{ matrix.bundle_name }}" `
+              -JsonOut "dist/${{ matrix.bundle_name }}.build.json"
+          } else {
+            "No signing secret, skipping extended identity signing."
+            "{}" | Set-Content -Path "dist/${{ matrix.bundle_name }}.build.json"
+          }
 
       - name: Build neuro-node binary
         run: cargo build --release -p neuronode --target ${{ matrix.target }}
 
-      - name: Rename binary for macOS/Linux
-        if: matrix.os != 'windows-latest'
-        run: mv target/${{ matrix.target }}/release/${{ matrix.artifact_name }} target/${{ matrix.target }}/release/neuro-node
-
-      - name: Bundle Mac/Linux release assets
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          mkdir -p dist/release_bundle
-          cp target/${{ matrix.target }}/release/neuro-node dist/release_bundle/neuro-node
-          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            cp deploy/systemd/install-node-service.sh dist/release_bundle/install-node-service.sh
-            cp deploy/systemd/uninstall-node-service.sh dist/release_bundle/uninstall-node-service.sh
-            cp deploy/systemd/neuro-node.service dist/release_bundle/neuro-node.service
-          else
-            cp deploy/launchd/install-node-service.sh dist/release_bundle/install-node-service.sh
-            cp deploy/launchd/uninstall-node-service.sh dist/release_bundle/uninstall-node-service.sh
-            cp deploy/launchd/com.neurostore.node.plist dist/release_bundle/com.neurostore.node.plist
-          fi
-          chmod +x dist/release_bundle/neuro-node dist/release_bundle/install-node-service.sh dist/release_bundle/uninstall-node-service.sh
-          tar -czvf dist/${{ matrix.asset_name }} -C dist/release_bundle .
-
-      - name: Bundle release assets
+      - name: Bundle assets
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
           if ("${{ matrix.os }}" -eq "windows-latest") {
+            # Windows: Just the single renamed EXE for the seamless experience
             Copy-Item "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "dist/${{ matrix.asset_name }}"
+          } else {
+            # MacOS/Linux: Bundle with install scripts
+            $bundleDir = "dist/release_bundle"
+            New-Item -ItemType Directory -Path $bundleDir -Force | Out-Null
+            Copy-Item "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "$bundleDir/neuro-node"
+            
+            if ("${{ matrix.os }}" -eq "ubuntu-latest") {
+              Copy-Item "deploy/systemd/install-node-service.sh" "$bundleDir/"
+              Copy-Item "deploy/systemd/uninstall-node-service.sh" "$bundleDir/"
+              Copy-Item "deploy/systemd/neuro-node.service" "$bundleDir/"
+            } else {
+              Copy-Item "deploy/launchd/install-node-service.sh" "$bundleDir/"
+              Copy-Item "deploy/launchd/uninstall-node-service.sh" "$bundleDir/"
+              Copy-Item "deploy/launchd/com.neurostore.node.plist" "$bundleDir/"
+            }
+            
+            # Create tarball
+            # (Using shell for tar as it is more reliable for permissions)
+            if ("${{ matrix.os }}" -eq "macos-latest") {
+              # Bash handles this better on unix-alikes
+              bash -c "chmod +x $bundleDir/* && tar -czvf dist/${{ matrix.asset_name }} -C $bundleDir ."
+            } else {
+              bash -c "chmod +x $bundleDir/* && tar -czvf dist/${{ matrix.asset_name }} -C $bundleDir ."
+            }
           }
+
           $binaryHash = (Get-FileHash -Path "dist/${{ matrix.asset_name }}" -Algorithm SHA256).Hash.ToLowerInvariant()
           @"
           $binaryHash  ${{ matrix.asset_name }}
