@@ -33,6 +33,7 @@ pub struct Object {
 // ── API Payloads ────────────────────────────────────────────────
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
+    #[serde(alias = "username")]
     pub email: String,
     pub password: String,
     pub name: Option<String>,
@@ -40,8 +41,15 @@ pub struct RegisterRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
+    #[serde(alias = "username")]
     pub email: String,
     pub password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RecoveryKitQuery {
+    pub username: Option<String>,
+    pub email: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

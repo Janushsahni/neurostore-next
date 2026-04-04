@@ -542,9 +542,10 @@ pub async fn get_recovery_kit(
 
 pub async fn get_recovery_kit_public(
     State(state): State<Arc<AppState>>,
-    axum::extract::Path(email): axum::extract::Path<String>,
+    axum::extract::Query(query): axum::extract::Query<crate::models::RecoveryKitQuery>,
 ) -> impl IntoResponse {
-    let normalized_email = normalize_email(&email);
+    let raw_email = query.username.or(query.email).unwrap_or_default();
+    let normalized_email = normalize_email(&raw_email);
 
     let row = sqlx::query(
         r#"SELECT wrapped_vault_key, wrapped_manifest_seed FROM recovery_kits WHERE email = $1"#,

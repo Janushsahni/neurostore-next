@@ -266,6 +266,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/session", get(handlers::auth::session))
         .route("/auth/escrow", post(handlers::auth::setup_escrow))
         .route("/auth/recovery-kit", get(handlers::auth::get_recovery_kit).post(handlers::auth::setup_escrow))
+        .route("/auth/recovery-kit/public", get(handlers::auth::get_recovery_kit_public))
         .route("/auth/sso/saml", post(handlers::auth::sso_saml_login))
         .route("/auth/sso/oauth", post(handlers::auth::sso_oauth_login))
         .route("/auth/google/login", get(handlers::oauth::google_login))

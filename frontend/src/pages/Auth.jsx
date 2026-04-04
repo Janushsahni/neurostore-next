@@ -123,7 +123,7 @@ export const Login = ({ onAuth }) => {
 
         try {
             // 1. Fetch encrypted payload from public endpoint
-            const res = await fetch(buildApiUrl(`/api/auth/recovery-kit?username=${encodeURIComponent(normalizedUsername)}`), {
+            const res = await fetch(buildApiUrl(`/api/auth/recovery-kit/public?username=${encodeURIComponent(normalizedUsername)}`), {
                 method: "GET",
                 credentials: "include",
             });
