@@ -40,6 +40,15 @@ const ProtectedRoute = ({ isAuthenticated, children }) => {
   return children;
 };
 
+const AdminRoute = ({ isAuthenticated, children }) => {
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const user = getAuthUser();
+  if (user?.email !== 'janushsahni24@gmail.com' && user?.username !== 'janushsahni24@gmail.com') {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+};
+
 // ═══════ ERROR BOUNDARY ═══════
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -430,7 +439,7 @@ const AppContent = () => {
           <Route path="/explorer/:bucket/*" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute>} />
           <Route path="/s3-migration" element={<ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute>} />
           <Route path="/download" element={<Download />} />
-          <Route path="/admin/inventory" element={<ProtectedRoute isAuthenticated={isAuthenticated}><AdminNodes /></ProtectedRoute>} />
+          <Route path="/admin/inventory" element={<AdminRoute isAuthenticated={isAuthenticated}><AdminNodes /></AdminRoute>} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
@@ -442,22 +451,21 @@ const AppContent = () => {
       {/* ═══════ MOBILE BOTTOM NAVIGATION ═══════ */}
       <nav className="fixed bottom-0 inset-x-0 z-50 bg-white/90 backdrop-blur-xl border-t border-slate-200 md:hidden safe-area-bottom">
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
-          <Link to="/" className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-emerald-600 transition-colors min-w-[60px] py-1">
-            <HardDrive size={20} />
-            <span className="text-[10px] font-bold">Home</span>
-          </Link>
-          <Link to="/dashboard/drive" className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-emerald-600 transition-colors min-w-[60px] py-1">
-            <Database size={20} />
-            <span className="text-[10px] font-bold">Drive</span>
-          </Link>
-          <Link to="/dashboard/node" className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-emerald-600 transition-colors min-w-[60px] py-1">
-            <Server size={20} />
-            <span className="text-[10px] font-bold">Node</span>
-          </Link>
-          <Link to="/pricing" className="flex flex-col items-center gap-0.5 text-slate-400 hover:text-emerald-600 transition-colors min-w-[60px] py-1">
-            <Zap size={20} />
-            <span className="text-[10px] font-bold">Plans</span>
-          </Link>
+          {[
+            { to: "/", icon: HardDrive, label: "Home" },
+            { to: "/dashboard/drive", icon: Database, label: "Drive" },
+            { to: "/dashboard/node", icon: Server, label: "Node" },
+            { to: "/pricing", icon: Zap, label: "Plans" },
+          ].map(({ to, icon: Icon, label }) => {
+            const isActive = location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
+            return (
+              <Link key={to} to={to} className={`flex flex-col items-center gap-0.5 min-w-[60px] py-1 transition-colors ${isActive ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'}`}>
+                <Icon size={20} />
+                <span className="text-[10px] font-bold">{label}</span>
+                {isActive && <div className="w-1 h-1 rounded-full bg-emerald-500 mt-0.5" />}
+              </Link>
+            );
+          })}
         </div>
       </nav>
     </div>

@@ -9,12 +9,12 @@ export function getApiBase() {
 
     if (!raw && typeof window !== "undefined") {
         const { protocol, hostname } = window.location;
-        const apiPort = import.meta.env.VITE_API_PORT || "9009";
+        const apiPort = import.meta.env.VITE_API_PORT || "8080";
         return `${protocol}//${hostname || "localhost"}:${apiPort}`;
     }
 
     if (!raw) {
-        return "http://localhost:9009";
+        return "http://localhost:8080";
     }
 
     const normalized = trimTrailingSlash(raw);

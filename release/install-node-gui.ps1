@@ -1,7 +1,13 @@
 <#
-    NeuroStore Node GUI Installer
+    NeuroStore Node GUI Installer v2.1
     Uses Windows dialogs to collect storage path and capacity, then installs
     the background service without requiring terminal interaction.
+    
+    Features:
+    - Pre-flight checks (disk space, .NET, Windows version)
+    - Progress feedback during installation
+    - Automatic firewall rule via install-service.ps1
+    - Opens dashboard with node claim token after install
 #>
 param(
     [switch]$Uninstall
@@ -135,6 +141,35 @@ function Show-FolderPicker {
     return $dialog.SelectedPath
 }
 
+# ── Pre-flight checks ──
+function Test-Prerequisites {
+    $issues = @()
+
+    # Check neuro-node.exe exists
+    $exePath = Join-Path $PSScriptRoot 'neuro-node.exe'
+    if (-not (Test-Path $exePath)) {
+        $issues += "neuro-node.exe not found in installer directory"
+    }
+
+    # Check install-service.ps1 exists
+    if (-not (Test-Path $InstallServiceScript)) {
+        $issues += "install-service.ps1 not found in installer directory"
+    }
+
+    # Check .NET Framework (needed for WinForms)
+    try {
+        $dotnet = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full' -ErrorAction SilentlyContinue
+        if (-not $dotnet -or $dotnet.Release -lt 394802) {
+            $issues += ".NET Framework 4.6.2 or later recommended (some features may not work)"
+        }
+    } catch {
+        # Non-critical, continue
+    }
+
+    return $issues
+}
+
+# ── Handle uninstall mode ──
 if ($Uninstall) {
     $exitCode = Ensure-AdminAndRun -ScriptPath $UninstallServiceScript -Arguments @('-ServiceName', $ServiceName)
     if ($exitCode -eq 0) {
@@ -143,12 +178,24 @@ if ($Uninstall) {
     exit $exitCode
 }
 
-if (-not (Test-Path $InstallServiceScript)) {
-    throw "Installer backend script not found: $InstallServiceScript"
+# ── Run pre-flight checks ──
+$prereqIssues = Test-Prerequisites
+if ($prereqIssues.Count -gt 0) {
+    $issueText = ($prereqIssues | ForEach-Object { "• $_" }) -join "`n"
+    $result = [System.Windows.MessageBox]::Show(
+        "Pre-flight checks found issues:`n`n$issueText`n`nDo you want to continue anyway?",
+        'NeuroStore Node — Pre-flight Check',
+        'YesNo',
+        'Warning'
+    )
+    if ($result -ne 'Yes') {
+        exit 1
+    }
 }
 
+# ── Welcome dialog ──
 $welcome = [System.Windows.MessageBox]::Show(
-    "NeuroStore Node will install a real Windows service that starts on boot and stores encrypted shards in the folder you choose.`n`nClick OK to continue.",
+    "NeuroStore Node Installer v2.1`n`nThis will install a real Windows service that:`n`n• Starts automatically on boot`n• Runs silently in the background`n• Auto-restarts on failure`n• Stores encrypted shards in a folder you choose`n• Earns ₹ INR passively`n`nClick OK to continue.",
     'NeuroStore Node Setup',
     'OKCancel',
     'Information'
@@ -157,11 +204,13 @@ if ($welcome -ne 'OK') {
     exit 0
 }
 
+# ── Collect storage path ──
 $storagePath = Show-FolderPicker -SelectedPath $DefaultStoragePath
 if ([string]::IsNullOrWhiteSpace($storagePath)) {
     exit 0
 }
 
+# ── Collect GB allocation ──
 $maxGbValue = Show-InputDialog -Title 'Storage Allocation' -Prompt 'How many GB of storage do you want to rent out?' -DefaultValue '500'
 if ([string]::IsNullOrWhiteSpace($maxGbValue)) {
     exit 0
@@ -171,6 +220,26 @@ $maxGb = 0
 if (-not [int]::TryParse($maxGbValue, [ref]$maxGb) -or $maxGb -le 0) {
     [System.Windows.MessageBox]::Show('Please enter a valid positive number for GB.', 'NeuroStore Node', 'OK', 'Error') | Out-Null
     exit 1
+}
+
+# ── Check available disk space ──
+try {
+    $drive = (Get-Item $storagePath -ErrorAction SilentlyContinue)
+    if ($drive) {
+        $driveLetter = $drive.Root.Name
+        $freeGB = [math]::Round((Get-PSDrive ($driveLetter.TrimEnd(':\'))).Free / 1GB, 1)
+        if ($freeGB -lt $maxGb) {
+            $spaceResult = [System.Windows.MessageBox]::Show(
+                "Warning: Only ${freeGB}GB free on drive $driveLetter but you requested ${maxGb}GB.`n`nThe node will use whatever space is available. Continue?",
+                'NeuroStore Node — Disk Space',
+                'YesNo',
+                'Warning'
+            )
+            if ($spaceResult -ne 'Yes') { exit 0 }
+        }
+    }
+} catch {
+    # Non-critical, continue
 }
 
 $gatewayUrl = $DefaultGatewayUrl
@@ -194,7 +263,12 @@ $arguments = @(
 
 $exitCode = Ensure-AdminAndRun -ScriptPath $InstallServiceScript -Arguments $arguments
 if ($exitCode -ne 0) {
-    [System.Windows.MessageBox]::Show('NeuroStore service installation failed. Check install logs.', 'NeuroStore Node', 'OK', 'Error') | Out-Null
+    [System.Windows.MessageBox]::Show(
+        "NeuroStore service installation failed (exit code: $exitCode).`n`nCheck install.log in the installer directory for details.`n`nCommon issues:`n• Windows Defender blocking neuro-node.exe`n• Port 9944 already in use`n• Insufficient permissions",
+        'NeuroStore Node',
+        'OK',
+        'Error'
+    ) | Out-Null
     exit $exitCode
 }
 
@@ -235,8 +309,20 @@ if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
     }
 }
 
+# ── Verify service is actually running ──
+$serviceRunning = $false
+try {
+    Start-Sleep -Seconds 2
+    $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($svc -and $svc.Status -eq "Running") {
+        $serviceRunning = $true
+    }
+} catch {}
+
+$statusMsg = if ($serviceRunning) { "✅ Service is running" } else { "⚠️ Service may need manual start" }
+
 [System.Windows.MessageBox]::Show(
-    "NeuroStore Node is now installed as a silent background service.`n`nNode ID: $nodeId`nStorage path: $storagePath`nCapacity: $maxGb GB`nConfig: $DefaultConfigPath`n`nYour Node ID has been copied to clipboard.",
+    "NeuroStore Node installed successfully!`n`n$statusMsg`n`nNode ID: $nodeId`nStorage path: $storagePath`nCapacity: $maxGb GB`nConfig: $DefaultConfigPath`n`nYour Node ID has been copied to clipboard.`nOpening your earnings dashboard...",
     'NeuroStore Node',
     'OK',
     'Information'

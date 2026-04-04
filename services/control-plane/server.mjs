@@ -1130,6 +1130,75 @@ app.post("/api/node/claim", requireUserSession, async (req, res) => {
     }
 });
 
+// ── Admin Middleware ───────────────────────────────────────────
+const ADMIN_EMAILS = ['janushsahni24@gmail.com'];
+
+function requireAdmin(req, res, next) {
+    const username = req.user?.username || '';
+    if (!ADMIN_EMAILS.includes(username)) {
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+    next();
+}
+
+// ── Admin Node Inventory ──────────────────────────────────────
+app.get("/api/admin/inventory", requireUserSession, requireAdmin, async (_req, res) => {
+    try {
+        const nodesRes = await pool.query(`
+            SELECT n.peer_id as node_id, n.status, n.addr, n.used_gb, n.max_gb, n.score,
+                   n.last_heartbeat, n.registered_at, n.latest_metrics,
+                   COALESCE(SUM(e.amount_inr), 0) as total_earned_inr,
+                   COUNT(DISTINCT os.id) as shard_count
+            FROM cp_nodes n
+            LEFT JOIN cp_node_earnings e ON e.node_id = n.peer_id
+            LEFT JOIN object_shards os ON os.peer_id = n.peer_id
+            GROUP BY n.peer_id, n.status, n.addr, n.used_gb, n.max_gb, n.score,
+                     n.last_heartbeat, n.registered_at, n.latest_metrics
+            ORDER BY n.last_heartbeat DESC NULLS LAST
+        `);
+
+        const now = Date.now();
+        const nodes = nodesRes.rows.map(n => {
+            const lastHb = n.last_heartbeat ? new Date(n.last_heartbeat).getTime() : 0;
+            const staleThreshold = 5 * 60 * 1000; // 5 minutes
+            const offlineThreshold = 15 * 60 * 1000; // 15 minutes
+            let status = 'offline';
+            if (n.status === 'active' && (now - lastHb) < staleThreshold) status = 'online';
+            else if (n.status === 'active' && (now - lastHb) < offlineThreshold) status = 'stale';
+
+            const uptimeMinutes = n.registered_at
+                ? ((now - new Date(n.registered_at).getTime()) / 60000).toFixed(1)
+                : '0';
+
+            return {
+                node_id: n.node_id,
+                status,
+                hostname: n.latest_metrics?.hostname || '',
+                ip_address: n.latest_metrics?.ip_address || n.addr || '',
+                mac_address: n.latest_metrics?.mac_address || '',
+                device_fingerprint: n.latest_metrics?.device_fingerprint || '',
+                os: n.latest_metrics?.os || 'Windows',
+                version: n.latest_metrics?.version || '1.0.0',
+                cpu_usage_percent: n.latest_metrics?.cpu_percent || null,
+                memory_usage_percent: n.latest_metrics?.mem_percent || null,
+                used_gb: parseFloat(n.used_gb || 0).toFixed(1),
+                max_gb: parseFloat(n.max_gb || 0).toFixed(0),
+                score: parseFloat(n.score || 0).toFixed(0),
+                shard_count: parseInt(n.shard_count || 0, 10),
+                total_earned_inr: parseFloat(n.total_earned_inr || 0).toFixed(2),
+                uptime_minutes: uptimeMinutes,
+                last_heartbeat_at: n.last_heartbeat,
+                registered_at: n.registered_at,
+            };
+        });
+
+        res.json(nodes);
+    } catch (e) {
+        console.error("[admin-inventory] error:", e.message);
+        res.status(500).json({ error: "Failed to fetch inventory" });
+    }
+});
+
 // ── Uptime Reward Daemon ───────────────────────────────────────
 // Every 5 minutes, award small INR to active nodes
 setInterval(async () => {
