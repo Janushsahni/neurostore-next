@@ -176,6 +176,10 @@ impl SecureBlockStore {
         read_used_bytes(&self.db).unwrap_or(0)
     }
 
+    pub fn get_max_bytes(&self) -> u64 {
+        self.max_bytes
+    }
+
     pub fn get_shard_count(&self) -> i32 {
         if let Ok(entries) = fs::read_dir(&self.shards_path) {
             entries

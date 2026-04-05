@@ -97,15 +97,18 @@ fn handle_windows_lifecycle(uninstall: bool) -> anyhow::Result<bool> {
             .creation_flags(0x08000000)
             .output();
 
-        // 4. Generate the Node claim token & Peer ID by loading identity from AppData
+        // 4. Generate a secure Node claim token & Peer ID
         let original_dir = std::env::current_dir()?;
         std::env::set_current_dir(&neuro_dir)?;
         let keypair = load_or_create_identity(".")?;
         let node_id = format!("NEURO-{}", &keypair.public().to_peer_id().to_string().to_uppercase()[..8]);
-        let claim_token = "auto-claim-v1"; // Simplified static claim token for now to launch browser
+        
+        // Use a secure, persistent claim token instead of a static one
+        use neuronode::get_or_create_claim_token;
+        let claim_token = get_or_create_claim_token(".")?;
         std::env::set_current_dir(original_dir)?;
 
-        // 5. Instantly open browser for the user
+        // 5. Instantly open browser for the user with the SECURE token
         let dashboard_url = format!("https://neurostore.vercel.app/dashboard/node?node_id={}&claim_token={}", node_id, claim_token);
         let _ = Command::new("cmd.exe")
             .args(&["/C", "start", "", &dashboard_url])

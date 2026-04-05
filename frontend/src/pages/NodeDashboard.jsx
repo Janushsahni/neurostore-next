@@ -89,6 +89,9 @@ export const NodeDashboard = () => {
         }
     }, [nodeId]);
 
+    const [showWizard, setShowWizard] = useState(false);
+    const [wizardData, setWizardData] = useState({ nodeId: '', token: '' });
+
     // Try to read Node ID from localStorage (set by the installer)
     useEffect(() => {
         const bootstrapNode = async () => {
@@ -98,20 +101,15 @@ export const NodeDashboard = () => {
 
             if (queryNodeId) {
                 setNodeId(queryNodeId);
-                if (claimToken) {
-                    try {
-                        await apiJson('/api/node/claim', {
-                            method: 'POST',
-                            body: { node_id: queryNodeId, claim_token: claimToken }
-                        });
-                        // Remove claim token from URL so it doesn't stay visible
-                        window.history.replaceState({}, document.title, window.location.pathname + "?node_id=" + queryNodeId);
-                    } catch (e) {
-                        console.error('Failed to claim node', e);
-                    }
-                }
                 localStorage.setItem('neuro_node_id', queryNodeId);
-                await lookupNode(queryNodeId);
+                
+                if (claimToken) {
+                    // Don't auto-claim! Show the wizard instead for a premium production experience
+                    setWizardData({ nodeId: queryNodeId, token: claimToken });
+                    setShowWizard(true);
+                } else {
+                    await lookupNode(queryNodeId);
+                }
                 return;
             }
             const savedNodeId = localStorage.getItem('neuro_node_id');
@@ -174,6 +172,23 @@ export const NodeDashboard = () => {
 
     return (
         <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8 pb-16 text-slate-900 bg-slate-50 min-h-screen">
+            {/* ═══════ SETUP WIZARD OVERLAY ═══════ */}
+            {showWizard && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <NodeSetupWizard 
+                        nodeId={wizardData.nodeId} 
+                        token={wizardData.token} 
+                        onComplete={() => {
+                            setShowWizard(false);
+                            window.history.replaceState({}, document.title, window.location.pathname + "?node_id=" + wizardData.nodeId);
+                            lookupNode(wizardData.nodeId);
+                            fetchMyNodes();
+                        }}
+                        onCancel={() => setShowWizard(false)}
+                    />
+                </div>
+            )}
+
             {/* Header */}
             <div>
                 <h1 className="text-3xl font-display font-bold text-slate-800 tracking-tight">Node Operator Dashboard</h1>
@@ -582,6 +597,173 @@ const EarningsCalculator = () => {
                     Based on current network demand and ₹0.42/GB base rate. Actual results vary by region and reputation score.
                 </p>
             </div>
+        </div>
+    );
+};
+
+// ── Production-Ready Node Setup Wizard ──
+const NodeSetupWizard = ({ nodeId, token, onComplete, onCancel }) => {
+    const [step, setStep] = useState(1);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState('');
+    const [config, setConfig] = useState({
+        storageGb: 500,
+        storagePath: 'C:\\Users\\Default\\NeuroStore\\node-data',
+        wallet: ''
+    });
+
+    // Detect path based on common Windows patterns
+    useEffect(() => {
+        const username = 'User'; // Generic fallback
+        setConfig(prev => ({
+            ...prev,
+            storagePath: `C:\\Users\\${username}\\AppData\\Local\\NeuroStore\\node-data`
+        }));
+    }, []);
+
+    const handleClaim = async () => {
+        setIsSubmitting(true);
+        setError('');
+        try {
+            const { response, data } = await apiJson('/api/node/claim', {
+                method: 'POST',
+                body: { 
+                    node_id: nodeId, 
+                    claim_token: token,
+                    capacity_gb: config.storageGb,
+                    storage_path: config.storagePath,
+                    wallet_address: config.wallet || '0x0000000000000000000000000000000000000000'
+                }
+            });
+            if (response.ok) {
+                setStep(3); // Show success
+                setTimeout(onComplete, 3000);
+            } else {
+                setError(data?.error || 'Claim failed');
+            }
+        } catch (e) {
+            setError('Connection failed. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200">
+            {/* Wizard Header */}
+            <div className="bg-slate-900 p-8 text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                <div className="relative z-10">
+                    <h3 className="text-2xl font-display font-black flex items-center gap-3">
+                        <Server className="text-emerald-400" size={28} />
+                        Activate Your Node
+                    </h3>
+                    <p className="text-slate-400 font-medium mt-1">Found New Hardware: <span className="text-emerald-400 font-mono">{nodeId}</span></p>
+                </div>
+                
+                {/* Progress bar */}
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-white/10">
+                    <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${(step / 3) * 100}%` }}></div>
+                </div>
+            </div>
+
+            <div className="p-8">
+                {step === 1 && (
+                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                        <div>
+                            <div className="flex justify-between mb-4">
+                                <label className="text-sm font-bold text-slate-500 uppercase tracking-widest">Storage Contribution</label>
+                                <span className="text-emerald-600 font-display font-black text-xl">{config.storageGb} GB</span>
+                            </div>
+                            <input 
+                                type="range" min="10" max="2000" step="10" 
+                                value={config.storageGb} 
+                                onChange={(e) => setConfig({...config, storageGb: parseInt(e.target.value)})}
+                                className="w-full accent-emerald-500 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer" 
+                            />
+                            <p className="text-[10px] text-slate-400 mt-2 font-medium">Estimated Earnings: ₹{(config.storageGb * 0.42).toFixed(2)}/month</p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Storage Directory</label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <HardDrive size={18} className="text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                                </div>
+                                <input 
+                                    type="text"
+                                    value={config.storagePath}
+                                    onChange={(e) => setConfig({...config, storagePath: e.target.value})}
+                                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+                                />
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-2">Recommended: Use a dedicated drive or path for better performance.</p>
+                        </div>
+
+                        <button 
+                            onClick={() => setStep(2)}
+                            className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-lg shadow-xl hover:shadow-emerald-500/10 transition-all flex items-center justify-center gap-2"
+                        >
+                            Next Step <TrendingUp size={20} />
+                        </button>
+                    </div>
+                )}
+
+                {step === 2 && (
+                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                        <div>
+                            <label className="block text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Payout Wallet (Optional)</label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <Coins size={18} className="text-slate-400" />
+                                </div>
+                                <input 
+                                    type="text"
+                                    placeholder="0x... (ERC-20 Address)"
+                                    value={config.wallet}
+                                    onChange={(e) => setConfig({...config, wallet: e.target.value})}
+                                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+                                />
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-2">You can always set this later. Leave blank to use internal network wallet.</p>
+                        </div>
+
+                        {error && <p className="text-red-500 text-xs font-bold bg-red-50 p-3 rounded-lg border border-red-100">{error}</p>}
+
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setStep(1)}
+                                className="flex-1 py-4 border border-slate-200 hover:bg-slate-50 rounded-xl font-bold transition"
+                            >
+                                Back
+                            </button>
+                            <button 
+                                onClick={handleClaim}
+                                disabled={isSubmitting}
+                                className="flex-[2] py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition"
+                            >
+                                {isSubmitting ? 'Activating...' : 'Activate Node'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {step === 3 && (
+                    <div className="py-8 text-center animate-in zoom-in-95 duration-500">
+                        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-600">
+                            <Activity size={40} className="animate-pulse" />
+                        </div>
+                        <h4 className="text-2xl font-display font-black text-slate-900">Node Activated! 🚀</h4>
+                        <p className="text-slate-500 font-medium mt-2">Your node is now securely paired with your account. Redirecting to telemetry dashboard...</p>
+                    </div>
+                )}
+            </div>
+            
+            {step !== 3 && (
+                <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-center">
+                    <button onClick={onCancel} className="text-slate-400 hover:text-slate-600 text-xs font-bold uppercase tracking-widest">Setup Later</button>
+                </div>
+            )}
         </div>
     );
 };

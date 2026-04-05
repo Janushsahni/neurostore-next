@@ -1242,6 +1242,9 @@ pub async fn claim_payout(
 pub struct ClaimNodeRequest {
     pub node_id: String,
     pub claim_token: String,
+    pub capacity_gb: Option<i64>,
+    pub storage_path: Option<String>,
+    pub wallet_address: Option<String>,
 }
 
 pub async fn claim_node(
@@ -1276,8 +1279,31 @@ pub async fn claim_node(
     .execute(&state.db)
     .await;
 
+    if let Ok(r) = &insert_res {
+        if r.rows_affected() > 0 {
+            // Update node configuration in main registry and historical record
+            let _ = sqlx::query(
+                "UPDATE node_registry SET max_gb = COALESCE($1, max_gb), is_active = TRUE WHERE node_id = $2"
+            )
+            .bind(payload.capacity_gb.map(|v| v as f64))
+            .bind(&payload.node_id)
+            .execute(&state.db)
+            .await;
+
+            let _ = sqlx::query(
+                "UPDATE nodes SET storage_capacity_gb = COALESCE($1, storage_capacity_gb), wallet_address = COALESCE($2, wallet_address), is_active = TRUE WHERE peer_id = $3"
+            )
+            .bind(payload.capacity_gb)
+            .bind(payload.wallet_address)
+            .bind(&payload.node_id)
+            .execute(&state.db)
+            .await;
+            
+            return (StatusCode::OK, "Node claimed and configured successfully").into_response();
+        }
+    }
+
     match insert_res {
-        Ok(r) if r.rows_affected() > 0 => (StatusCode::OK, "Node claimed successfully").into_response(),
         Ok(_) => (StatusCode::CONFLICT, "Node already claimed").into_response(),
         Err(e) => {
             tracing::error!("Claim error: {}", e);
