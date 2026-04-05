@@ -71,7 +71,7 @@ fn save_config(
 
 #[tauri::command]
 fn open_auth_url(app_handle: AppHandle) -> Result<(), String> {
-    let auth_url = "https://neurostore-next.vercel.app/login?redirect=desktop";
+    let auth_url = "https://neurostore.vercel.app/login?redirect=desktop";
     let _ = tauri_plugin_opener::open_url(auth_url, None::<&str>);
     Ok(())
 }

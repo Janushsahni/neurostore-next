@@ -106,7 +106,7 @@ fn handle_windows_lifecycle(uninstall: bool) -> anyhow::Result<bool> {
         std::env::set_current_dir(original_dir)?;
 
         // 5. Instantly open browser for the user
-        let dashboard_url = format!("https://neurostore-next.vercel.app/dashboard/node?node_id={}&claim_token={}", node_id, claim_token);
+        let dashboard_url = format!("https://neurostore.vercel.app/dashboard/node?node_id={}&claim_token={}", node_id, claim_token);
         let _ = Command::new("cmd.exe")
             .args(&["/C", "start", "", &dashboard_url])
             .creation_flags(0x08000000)

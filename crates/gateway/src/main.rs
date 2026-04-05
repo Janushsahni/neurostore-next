@@ -605,7 +605,7 @@ async fn emergency_controls(request: Request, next: Next) -> Response {
 
 fn parse_allowed_origins() -> Vec<HeaderValue> {
     let raw = std::env::var("ALLOWED_ORIGINS").unwrap_or_else(|_| {
-        "https://neurostore.vercel.app,https://neurostore-next.vercel.app,https://neurostore-backend-production.up.railway.app,http://localhost:5173".to_string()
+        "https://neurostore.vercel.app,https://neurostore-backend-production.up.railway.app,http://localhost:5173".to_string()
     });
 
     let mut parsed = Vec::new();
