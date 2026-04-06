@@ -43,8 +43,10 @@ export const DriveDashboard = () => {
 
     const getAuthHeaders = () => {
         const token = getAuthToken();
+        const csrfToken = getCsrfToken();
         const headers = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
+        if (csrfToken) headers['x-csrf-token'] = csrfToken;
         return headers;
     };
 
@@ -152,7 +154,7 @@ export const DriveDashboard = () => {
                     'Content-Type': 'application/json',
                     ...getAuthHeaders(),
                 },
-                body: JSON.stringify({ size_bytes: file.size, desired_nodes: 15, geofence: 'IN' })
+                body: JSON.stringify({ size_bytes: file.size, desired_nodes: 15, geofence: 'GLOBAL' })
             });
             if (planRes.ok) {
                 uploadPlan = await planRes.json();
@@ -265,8 +267,12 @@ export const DriveDashboard = () => {
             xhr.setRequestHeader('Content-Type', 'application/octet-stream');
             xhr.setRequestHeader('x-neuro-client-manifest', clientManifest);
             const token = getAuthToken();
+            const csrfToken = getCsrfToken();
             if (token) {
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+            if (csrfToken) {
+                xhr.setRequestHeader('x-csrf-token', csrfToken);
             }
 
             xhr.upload.onprogress = (e) => {

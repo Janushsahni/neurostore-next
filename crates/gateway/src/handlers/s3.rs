@@ -946,13 +946,10 @@ pub async fn plan_upload(
         });
     }
 
-    // STRICT GEOLOCATION COMPLIANCE ENFORCEMENT
-    if !country_filter.eq_ignore_ascii_case("GLOBAL") && node_targets.len() < 6 {
-        tracing::error!("Strict Data Residency Violation: Requested {}, but only found {} compliant online nodes.", country_filter, node_targets.len());
-        return (StatusCode::FORBIDDEN, Json(serde_json::json!({
-            "error": "strict_geofence_violation",
-            "message": format!("Insufficient compliant nodes in {} to satisfy data residency requirements.", country_filter)
-        }))).into_response();
+    // Relaxed geofencing for initial network growth: mode becomes gateway-relay if no nodes found.
+    if !country_filter.eq_ignore_ascii_case("GLOBAL") && node_targets.len() < 3 {
+        tracing::warn!("Insufficient compliant nodes in {} ({}) for strict geofence. Falling back to global relay mode.", country_filter, node_targets.len());
+        // We no longer return 403 here. Instead, we let it fall back to gateway-relay in the response.
     }
 
     let response = UploadPlanResponse {
