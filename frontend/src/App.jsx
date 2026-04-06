@@ -36,12 +36,20 @@ const FeatureCard = ({ icon, title, description, badge, color = "text-primary" }
 );
 
 const ProtectedRoute = ({ isAuthenticated, children }) => {
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!isAuthenticated) {
+    const returnUrl = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?return=${returnUrl}`} replace />;
+  }
   return children;
 };
 
 const AdminRoute = ({ isAuthenticated, children }) => {
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!isAuthenticated) {
+    const returnUrl = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?return=${returnUrl}`} replace />;
+  }
   const user = getAuthUser();
   if (user?.email !== 'janushsahni24@gmail.com' && user?.username !== 'janushsahni24@gmail.com') {
     return <Navigate to="/" replace />;
@@ -129,6 +137,8 @@ export const CardSkeleton = ({ count = 3 }) => (
 const AuthRedirectRoute = ({ isAuthenticated, component, onAuth }) => {
   if (isAuthenticated) {
     const params = new URLSearchParams(window.location.search);
+    const returnUrl = params.get('return');
+    if (returnUrl) return <Navigate to={decodeURIComponent(returnUrl)} replace />;
     if (params.get('intent') === 'node') return <Navigate to="/dashboard/node" replace />;
     return <Navigate to="/dashboard/drive" replace />;
   }

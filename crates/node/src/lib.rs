@@ -241,10 +241,20 @@ pub async fn run_node_with_shutdown(
                     if resp.status().is_success() {
                         if let Ok(data) = resp.json::<serde_json::Value>().await {
                             debug!("Heartbeat ACK: {}", data);
+                            
+                            // Dynamic Config Sync: check if gateway assigned a specific capacity
+                            if let Some(assigned_gb) = data.get("assigned_max_gb").and_then(|v| v.as_f64()) {
+                                let current_max = store_clone.get_max_bytes() / 1_073_741_824;
+                                if (assigned_gb as u64) != current_max {
+                                    info!("Syncing storage limit from gateway: {} GB", assigned_gb);
+                                    store_clone.update_limit(assigned_gb as u64);
+                                }
+                            }
                         }
                     } else {
                         let status = resp.status();
-                        warn!("Heartbeat rejected: HTTP {}", status);
+                        let body = resp.text().await.unwrap_or_default();
+                        warn!("Heartbeat rejected: HTTP {} - {}", status, body);
                     }
                 }
                 Err(e) => warn!("Heartbeat failed: {}", e),

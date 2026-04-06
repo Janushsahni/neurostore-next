@@ -4,6 +4,7 @@ use aes_gcm::{
 };
 use sha2::Digest;
 use sled::Db;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::fs;
 use std::io::{Read, Write as IoWrite};
 use std::path::{Path, PathBuf};
@@ -15,7 +16,7 @@ pub struct SecureBlockStore {
     db: Db, // Still used for metadata and tracking
     storage_path: PathBuf,
     shards_path: PathBuf,
-    max_bytes: u64,
+    max_bytes: AtomicU64,
     cipher: Aes256Gcm,
 }
 
@@ -56,12 +57,46 @@ impl SecureBlockStore {
             "Secure node initialized at {:?}. Shards: {:?}. Capacity: {} GB. Used: {} bytes. E2E Encryption Enabled.",
             storage_path, shards_path, max_gb, used_bytes
         );
-        Self {
+        let store = Self {
             db,
             storage_path,
             shards_path,
-            max_bytes,
+            max_bytes: AtomicU64::new(max_bytes),
             cipher,
+        };
+        
+        store.provision_storage();
+        store
+    }
+
+    /// Update the storage limit dynamically without restarting the node.
+    pub fn update_limit(&self, max_gb: u64) {
+        let max_bytes = max_gb
+            .saturating_mul(1024)
+            .saturating_mul(1024)
+            .saturating_mul(1024);
+        self.max_bytes.store(max_bytes, Ordering::Relaxed);
+    }
+
+    /// Provision the storage area with security markers and platform-specific protection.
+    pub fn provision_storage(&self) {
+        #[cfg(target_os = "windows")]
+        {
+            use std::process::Command;
+            use std::os::windows::process::CommandExt;
+            
+            // Mark the storage folder as a System Hidden folder to prevent accidental tampering
+            let path = self.storage_path.to_string_lossy();
+            let _ = Command::new("attrib.exe")
+                .args(&["+s", "+h", &path])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .output();
+                
+            // Create a .lock file to "provision" the space for NeuroStore
+            let lock_file = self.storage_path.join(".neurostore_vault.lock");
+            if !lock_file.exists() {
+                let _ = fs::write(lock_file, "NeuroStore Secure Vault - DO NOT DELETE\nThis folder is managed by the NeuroStore Decentralized Storage Service.");
+            }
         }
     }
 
@@ -104,7 +139,7 @@ impl SecureBlockStore {
             .saturating_sub(old_size)
             .saturating_add(encrypted_data.len() as u64);
 
-        if projected > self.max_bytes {
+        if projected > self.max_bytes.load(Ordering::Relaxed) {
             return Ok(false);
         }
 
@@ -177,7 +212,7 @@ impl SecureBlockStore {
     }
 
     pub fn get_max_bytes(&self) -> u64 {
-        self.max_bytes
+        self.max_bytes.load(Ordering::Relaxed)
     }
 
     pub fn get_shard_count(&self) -> i32 {

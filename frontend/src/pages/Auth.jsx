@@ -52,6 +52,8 @@ export const Login = ({ onAuth }) => {
     const [recoveryPhrase, setRecoveryPhrase] = useState("");
 
     const getTargetPath = () => {
+        const returnUrl = searchParams.get("return");
+        if (returnUrl) return decodeURIComponent(returnUrl);
         if (intent === "node") return "/dashboard/node";
         return "/dashboard/drive";
     };

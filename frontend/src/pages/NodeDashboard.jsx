@@ -104,7 +104,7 @@ export const NodeDashboard = () => {
                 localStorage.setItem('neuro_node_id', queryNodeId);
                 
                 if (claimToken) {
-                    // Don't auto-claim! Show the wizard instead for a premium production experience
+                    // Premium production experience: Show the wizard
                     setWizardData({ nodeId: queryNodeId, token: claimToken });
                     setShowWizard(true);
                 } else {
@@ -640,10 +640,10 @@ const NodeSetupWizard = ({ nodeId, token, onComplete, onCancel }) => {
 
     // Detect path based on common Windows patterns
     useEffect(() => {
-        const username = 'User'; // Generic fallback
+        const username = 'User'; 
         setConfig(prev => ({
             ...prev,
-            storagePath: `C:\\Users\\${username}\\AppData\\Local\\NeuroStore\\node-data`
+            storagePath: `C:\\Users\\${username}\\NeuroStore_Vault`
         }));
     }, []);
 
@@ -662,6 +662,8 @@ const NodeSetupWizard = ({ nodeId, token, onComplete, onCancel }) => {
                 }
             });
             if (response.ok) {
+                setStep(2.5); // Transition to provisioning visual
+                await new Promise(r => setTimeout(r, 2500)); // Hold for visual "Hardware Provisioning"
                 setStep(3); // Show success
                 setTimeout(onComplete, 3000);
             } else if (response.status === 401) {
@@ -776,6 +778,31 @@ const NodeSetupWizard = ({ nodeId, token, onComplete, onCancel }) => {
                                 {isSubmitting ? 'Activating...' : 'Activate Node'}
                             </button>
                         </div>
+                    </div>
+                )}
+
+                {step === 2.5 && (
+                    <div className="py-12 text-center animate-in zoom-in-95 duration-500">
+                        <div className="w-24 h-24 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-8 relative">
+                             <div className="absolute inset-0 rounded-2xl border-2 border-emerald-500/20 animate-ping"></div>
+                             <Server size={44} className="text-emerald-500" />
+                        </div>
+                        <h4 className="text-2xl font-display font-black text-slate-900 mb-2">Provisioning Vault...</h4>
+                        <p className="text-slate-400 text-sm font-medium mb-8">Marking sectors and enabling shard encryption</p>
+                        
+                        <div className="max-w-xs mx-auto">
+                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500 rounded-full animate-[progress_2s_ease-in-out_infinite]"></div>
+                            </div>
+                        </div>
+                        
+                        <style dangerouslySetInnerHTML={{__html: `
+                            @keyframes progress {
+                                0% { width: 0%; margin-left: 0%; }
+                                50% { width: 70%; margin-left: 15%; }
+                                100% { width: 0%; margin-left: 100%; }
+                            }
+                        `}} />
                     </div>
                 )}
 

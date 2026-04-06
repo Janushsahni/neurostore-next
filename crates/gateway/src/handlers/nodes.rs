@@ -486,10 +486,17 @@ pub async fn node_heartbeat(
     )
     .await;
 
+    let assigned_max_gb: f64 = sqlx::query_scalar("SELECT max_gb FROM node_registry WHERE node_id = $1")
+        .bind(&payload.node_id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(max_gb);
+
     (
         StatusCode::OK,
         Json(serde_json::json!({
             "status": "ack",
+            "assigned_max_gb": assigned_max_gb,
             "earned_this_heartbeat_inr": format!("{:.4}", incremental_earnings),
             "total_earned_inr": format!("{:.2}", total_earned),
             "pending_shards": serde_json::Value::Null,
