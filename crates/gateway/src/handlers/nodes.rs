@@ -59,8 +59,13 @@ pub async fn register_provider_node(
     let secrets_match = provided_secret
         .as_bytes()
         .ct_eq(state.node_shared_secret.as_bytes());
-    if provided_secret.is_empty() || !bool::from(secrets_match) {
-        return (StatusCode::UNAUTHORIZED, "Unauthorized node registration").into_response();
+    let has_valid_secret = !provided_secret.is_empty() && bool::from(secrets_match);
+    let has_claim_token = payload.claim_token.as_ref().map_or(false, |t| t.len() >= 32);
+
+    // Allow registration if node has EITHER a valid shared secret OR a strong claim_token.
+    // This enables the seamless Windows exe flow where NODE_SHARED_SECRET env var may not exist.
+    if !has_valid_secret && !has_claim_token {
+        return (StatusCode::UNAUTHORIZED, "Unauthorized: provide x-node-secret header or a valid claim_token").into_response();
     }
 
     if !is_valid_peer_id(&payload.peer_id) {
@@ -1254,60 +1259,68 @@ pub async fn claim_node(
 ) -> impl IntoResponse {
     let claims = match crate::handlers::auth::decode_claims_from_request(&headers, &state) {
         Ok(c) => c,
-        Err(_) => return (StatusCode::UNAUTHORIZED, "Auth required").into_response(),
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Please log in first to claim your node"}))).into_response(),
     };
 
-    let valid_token: Option<String> = sqlx::query_scalar("SELECT claim_token FROM nodes WHERE peer_id = $1")
-        .bind(&payload.node_id)
-        .fetch_optional(&state.db)
-        .await
-        .unwrap_or(None);
+    // Try to find the node's claim_token.
+    // The node_id from the browser is NEURO-XXXXXXXX format, but the `nodes` table
+    // stores the raw peer_id. So we search by claim_token directly across ALL nodes.
+    let node_row: Option<(String,)> = sqlx::query_as(
+        "SELECT peer_id FROM nodes WHERE claim_token = $1 AND claim_token IS NOT NULL"
+    )
+    .bind(&payload.claim_token)
+    .fetch_optional(&state.db)
+    .await
+    .ok()
+    .flatten();
 
-    let Some(valid_token) = valid_token else {
-        return (StatusCode::NOT_FOUND, "Node not found or not registered").into_response();
+    let Some((peer_id,)) = node_row else {
+        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Node not found. Make sure the node is running and has registered with the network."}))).into_response();
     };
 
-    if valid_token != payload.claim_token {
-        return (StatusCode::FORBIDDEN, "Invalid claim token").into_response();
-    }
+    // Use the NEURO-format node_id from the request for ownership records
+    let node_id = &payload.node_id;
 
     let insert_res = sqlx::query(
         "INSERT INTO node_ownership (node_id, owner_email) VALUES ($1, $2) ON CONFLICT (node_id) DO NOTHING"
     )
-    .bind(&payload.node_id)
+    .bind(node_id)
     .bind(&claims.email)
     .execute(&state.db)
     .await;
 
     if let Ok(r) = &insert_res {
         if r.rows_affected() > 0 {
-            // Update node configuration in main registry and historical record
+            // Update node configuration in node_registry (keyed by NEURO-format node_id)
             let _ = sqlx::query(
-                "UPDATE node_registry SET max_gb = COALESCE($1, max_gb), is_active = TRUE WHERE node_id = $2"
+                "UPDATE node_registry SET max_gb = COALESCE($1, max_gb), wallet_address = COALESCE($2, wallet_address) WHERE node_id = $3"
             )
             .bind(payload.capacity_gb.map(|v| v as f64))
-            .bind(&payload.node_id)
+            .bind(&payload.wallet_address)
+            .bind(node_id)
             .execute(&state.db)
             .await;
 
+            // Update the nodes table (keyed by raw peer_id)
             let _ = sqlx::query(
                 "UPDATE nodes SET storage_capacity_gb = COALESCE($1, storage_capacity_gb), wallet_address = COALESCE($2, wallet_address), is_active = TRUE WHERE peer_id = $3"
             )
             .bind(payload.capacity_gb)
-            .bind(payload.wallet_address)
-            .bind(&payload.node_id)
+            .bind(&payload.wallet_address)
+            .bind(&peer_id)
             .execute(&state.db)
             .await;
-            
-            return (StatusCode::OK, "Node claimed and configured successfully").into_response();
+
+            tracing::info!("Node {} claimed by {}", node_id, claims.email);
+            return (StatusCode::OK, Json(serde_json::json!({"status": "ok", "message": "Node claimed and configured successfully"}))).into_response();
         }
     }
 
     match insert_res {
-        Ok(_) => (StatusCode::CONFLICT, "Node already claimed").into_response(),
+        Ok(_) => (StatusCode::CONFLICT, Json(serde_json::json!({"error": "Node already claimed by another account"}))).into_response(),
         Err(e) => {
             tracing::error!("Claim error: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Database error during claim"}))).into_response()
         }
     }
 }

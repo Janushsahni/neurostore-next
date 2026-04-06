@@ -101,7 +101,10 @@ fn handle_windows_lifecycle(uninstall: bool) -> anyhow::Result<bool> {
         let original_dir = std::env::current_dir()?;
         std::env::set_current_dir(&neuro_dir)?;
         let keypair = load_or_create_identity(".")?;
-        let node_id = format!("NEURO-{}", &keypair.public().to_peer_id().to_string().to_uppercase()[..8]);
+        let peer_id = keypair.public().to_peer_id().to_string();
+        // CRITICAL: use the SAME derive_node_id function as lib.rs
+        // so the browser URL matches what the heartbeat sends
+        let node_id = neuronode::derive_node_id(&peer_id);
         
         // Use a secure, persistent claim token instead of a static one
         use neuronode::get_or_create_claim_token;
