@@ -445,7 +445,7 @@ const AppContent = () => {
           <Route path="/auth/callback" element={<AuthCallback onAuth={handleLogin} />} />
           <Route path="/dashboard/drive" element={<ProtectedRoute isAuthenticated={isAuthenticated}><DriveDashboard /></ProtectedRoute>} />
           <Route path="/dashboard/compliance" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ComplianceDashboard /></ProtectedRoute>} />
-          <Route path="/dashboard/node" element={<ProtectedRoute isAuthenticated={isAuthenticated}><NodeDashboard /></ProtectedRoute>} />
+          <Route path="/dashboard/node" element={<NodeDashboard />} />
           <Route path="/explorer/:bucket/*" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute>} />
           <Route path="/s3-migration" element={<ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute>} />
           <Route path="/download" element={<Download />} />

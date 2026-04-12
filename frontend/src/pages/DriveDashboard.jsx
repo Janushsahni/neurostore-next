@@ -4,7 +4,7 @@ import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, Ref
 import DOMPurify from 'dompurify';
 import { toast } from 'react-hot-toast';
 import { API_BASE } from '../lib/config';
-import { getAuthToken, getSelectedPlan, getUserDriveBucket, getVaultSecret } from '../lib/authStorage';
+import { getAuthToken, getCsrfToken, getSelectedPlan, getUserDriveBucket, getVaultSecret } from '../lib/authStorage';
 import { decryptDownloadInWorker, encryptUploadInWorker, hashFileInWorker } from '../lib/cryptoWorkerClient';
 import { RecoverySetupModal } from '../components/RecoverySetupModal';
 

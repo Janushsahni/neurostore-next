@@ -92,7 +92,7 @@ export const NodeDashboard = () => {
     const [showWizard, setShowWizard] = useState(false);
     const [wizardData, setWizardData] = useState({ nodeId: '', token: '' });
 
-    // Try to read Node ID from localStorage (set by the installer)
+    // Try to read Node ID from URL params (set by the installer) or localStorage
     useEffect(() => {
         const bootstrapNode = async () => {
             const params = new URLSearchParams(window.location.search);
@@ -104,23 +104,56 @@ export const NodeDashboard = () => {
                 localStorage.setItem('neuro_node_id', queryNodeId);
                 
                 if (claimToken) {
-                    // Premium production experience: Show the wizard
+                    // Node EXE opened the browser with claim params → show the wizard
                     setWizardData({ nodeId: queryNodeId, token: claimToken });
                     setShowWizard(true);
                 } else {
-                    await lookupNode(queryNodeId);
+                    // Node ID in URL but no claim token → just look it up
+                    try {
+                        let { response, data } = await apiJson(`/api/node/${encodeURIComponent(queryNodeId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
+                        if (!response.ok) {
+                            const fallback = await apiJson(`/node/${encodeURIComponent(queryNodeId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
+                            response = fallback.response;
+                            data = fallback.data;
+                        }
+                        if (response.ok) {
+                            setNodeData(data);
+                        } else {
+                            if (response.status === 401 || response.status === 403) {
+                                setLookupError('Node Active! Please Log In or Register an account to claim your earnings and view telemetry.');
+                            } else {
+                                setLookupError(data?.error || 'Node not found. It may still be starting up — try again in 30 seconds.');
+                            }
+                        }
+                    } catch {
+                        setLookupError('Failed to connect to network');
+                    }
                 }
                 return;
             }
+
             const savedNodeId = localStorage.getItem('neuro_node_id');
             if (savedNodeId) {
                 setNodeId(savedNodeId);
-                await lookupNode(savedNodeId);
+                try {
+                    let { response, data } = await apiJson(`/api/node/${encodeURIComponent(savedNodeId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
+                    if (!response.ok) {
+                        const fallback = await apiJson(`/node/${encodeURIComponent(savedNodeId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
+                        response = fallback.response;
+                        data = fallback.data;
+                    }
+                    if (response.ok) {
+                        setNodeData(data);
+                    }
+                } catch {
+                    // Silent fail for saved node lookup
+                }
             }
         };
 
         bootstrapNode();
-    }, [lookupNode]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const [myNodes, setMyNodes] = useState([]);
 
@@ -634,18 +667,17 @@ const NodeSetupWizard = ({ nodeId, token, onComplete, onCancel }) => {
     const [error, setError] = useState('');
     const [config, setConfig] = useState({
         storageGb: 500,
-        storagePath: 'C:\\Users\\Default\\NeuroStore\\node-data',
+        storagePath: `%LOCALAPPDATA%\\NeuroStore\\node-data\\${nodeId}`,
         wallet: ''
     });
 
-    // Detect path based on common Windows patterns
+    // Show the actual vault path with the node ID
     useEffect(() => {
-        const username = 'User'; 
         setConfig(prev => ({
             ...prev,
-            storagePath: `C:\\Users\\${username}\\NeuroStore_Vault`
+            storagePath: `%LOCALAPPDATA%\\NeuroStore\\node-data\\${nodeId}`
         }));
-    }, []);
+    }, [nodeId]);
 
     const handleClaim = async () => {
         setIsSubmitting(true);
@@ -667,9 +699,9 @@ const NodeSetupWizard = ({ nodeId, token, onComplete, onCancel }) => {
                 setStep(3); // Show success
                 setTimeout(onComplete, 3000);
             } else if (response.status === 401) {
-                // User is not logged in — redirect to login with return URL
-                const returnUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/login?intent=node_claim&return=${returnUrl}`;
+                // User is not logged in — redirect to login, preserving the node_id + claim_token so the wizard re-appears after auth
+                const returnPath = `/dashboard/node?node_id=${encodeURIComponent(nodeId)}&claim_token=${encodeURIComponent(token)}`;
+                window.location.href = `/login?intent=node_claim&return=${encodeURIComponent(returnPath)}`;
             } else {
                 const errorMsg = data?.error || data?.message || 'Claim failed. Make sure your node is running.';
                 setError(errorMsg);
