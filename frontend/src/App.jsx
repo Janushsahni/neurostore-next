@@ -5,6 +5,7 @@ import {
   ShieldCheck, Sparkles, X, Zap, Cloud
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { AuthCallback, Login, Register } from "./pages/Auth";
 import { DriveDashboard } from "./pages/DriveDashboard";
@@ -23,7 +24,13 @@ import { apiJson } from "./lib/apiClient";
 
 
 const FeatureCard = ({ icon, title, description, badge, color = "text-primary" }) => (
-  <article className="glass-card interactive-card p-6 md:p-8 hover:-translate-y-1 hover:border-primary/50 hover:shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all duration-300">
+  <motion.article 
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, margin: "-100px" }}
+    whileHover={{ y: -5, transition: { duration: 0.2 } }}
+    className="glass-card interactive-card p-6 md:p-8 border-transparent hover:border-primary/50 shadow-sm hover:shadow-[0_12px_30px_rgba(0,0,0,0.15)] transition-colors duration-300"
+  >
     <div className="mb-4 flex items-center gap-3">
       <div className={`hero-glow inline-flex rounded-xl bg-primary/15 p-3 ${color}`}>
         {React.createElement(icon, { size: 20 })}
@@ -32,7 +39,7 @@ const FeatureCard = ({ icon, title, description, badge, color = "text-primary" }
     </div>
     <h3 className="mb-2 text-xl font-bold">{title}</h3>
     <p className="text-sm text-muted leading-relaxed">{description}</p>
-  </article>
+  </motion.article>
 );
 
 const ProtectedRoute = ({ isAuthenticated, children }) => {
@@ -158,24 +165,50 @@ const LandingPage = () => (
     {/* ── HERO ── */}
     <section className="relative px-6 pb-20 pt-24 md:pt-32">
       <div className="mx-auto max-w-6xl text-center relative z-10">
-        <div className="appear-up mb-8 inline-flex items-center gap-2 rounded-full glass-card bg-white/60 backdrop-blur-md px-5 py-2.5 text-xs font-bold text-emerald-700 shadow-sm border border-emerald-200/50">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="mb-8 inline-flex items-center gap-2 rounded-full glass-card bg-white/60 backdrop-blur-md px-5 py-2.5 text-xs font-bold text-emerald-700 shadow-sm border border-emerald-200/50"
+        >
           <Sparkles size={14} className="text-emerald-500" /> The Future of Secure Cloud Storage
-        </div>
+        </motion.div>
 
-        <h1 className="appear-up mb-6 font-display text-5xl font-extrabold leading-tight md:text-7xl text-slate-900 tracking-tight drop-shadow-sm">
+        <motion.h1 
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.1, ease: "easeOut" }}
+          className="mb-6 font-display text-5xl font-extrabold leading-tight md:text-7xl text-slate-900 tracking-tight drop-shadow-sm"
+        >
           Own Your Data.
           <br />
           <span className="bg-gradient-to-r from-emerald-500 to-emerald-600 bg-clip-text text-transparent">Secure, Fast, Limitless.</span>
-        </h1>
+        </motion.h1>
 
-        <p className="mx-auto mb-14 max-w-2xl text-base text-slate-500 md:text-xl leading-relaxed font-medium">
+        <motion.p 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
+          className="mx-auto mb-14 max-w-2xl text-base text-slate-500 md:text-xl leading-relaxed font-medium"
+        >
           Whether you want to earn passive income by sharing your idle storage, or need military-grade encrypted cloud backup for your files — NeuroStore has you covered.
-        </p>
+        </motion.p>
 
         {/* ── 2 MASSIVE CTA OPTIONS (Glassmorphic) ── */}
-        <div className="mx-auto grid max-w-4xl gap-8 md:grid-cols-2 mt-8">
+        <motion.div 
+          initial="hidden"
+          animate="visible"
+          variants={{
+            hidden: {},
+            visible: { transition: { staggerChildren: 0.2, delayChildren: 0.4 } }
+          }}
+          className="mx-auto grid max-w-4xl gap-8 md:grid-cols-2 mt-8"
+        >
           {/* Be a Node Card */}
-          <div className="glass-card bg-white/70 backdrop-blur-xl rounded-[2rem] p-8 md:p-10 group relative overflow-hidden flex flex-col h-full text-left shadow-xl hover:shadow-2xl border border-white/80 transition-all duration-500 hover:-translate-y-2">
+          <motion.div 
+            variants={{ hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } } }}
+            className="glass-card bg-white/70 backdrop-blur-xl rounded-[2rem] p-8 md:p-10 group relative overflow-hidden flex flex-col h-full text-left shadow-xl hover:shadow-2xl border border-white/80 transition-all duration-500 hover:-translate-y-2"
+          >
             <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-emerald-100/50 blur-[50px] group-hover:bg-emerald-200/60 transition-colors duration-500" />
 
             <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm text-emerald-600 border border-emerald-50 relative z-10 group-hover:scale-110 transition-transform duration-500">
@@ -194,10 +227,13 @@ const LandingPage = () => (
                 Download Software
               </Link>
             </div>
-          </div>
+          </motion.div>
 
           {/* Subscription Card */}
-          <div className="glass-card bg-white/70 backdrop-blur-xl rounded-[2rem] p-8 md:p-10 group relative overflow-hidden flex flex-col h-full text-left shadow-xl hover:shadow-2xl border border-white/80 transition-all duration-500 hover:-translate-y-2">
+          <motion.div 
+            variants={{ hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } } }}
+            className="glass-card bg-white/70 backdrop-blur-xl rounded-[2rem] p-8 md:p-10 group relative overflow-hidden flex flex-col h-full text-left shadow-xl hover:shadow-2xl border border-white/80 transition-all duration-500 hover:-translate-y-2"
+          >
             <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-blue-100/50 blur-[50px] group-hover:bg-blue-200/60 transition-colors duration-500" />
 
             <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm text-blue-600 border border-blue-50 relative z-10 group-hover:scale-110 transition-transform duration-500">
@@ -211,31 +247,53 @@ const LandingPage = () => (
             <Link to="/login?intent=user" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold bg-slate-900 text-white hover:bg-emerald-500 transition-all shadow-md group-hover:shadow-lg relative z-10">
               Get Cloud Storage <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
             </Link>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
     </section>
 
     {/* ── CORE CAPABILITIES ── */}
     <section className="px-6 py-20 relative">
       <div className="mx-auto max-w-6xl relative z-10">
-        <div className="grid gap-6 md:grid-cols-3">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-12"
+        >
+          <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Core Capabilities</span>
+          <h2 className="text-3xl md:text-4xl font-display font-extrabold text-slate-900 tracking-tight">Enterprise-grade infrastructure,<br />beautifully simple.</h2>
+        </motion.div>
+        <motion.div 
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          variants={{
+            hidden: {},
+            visible: { transition: { staggerChildren: 0.15 } }
+          }}
+          className="grid gap-6 md:grid-cols-3"
+        >
           <FeatureCard
             icon={ShieldCheck}
             title="P2P Managed Ledger"
-            description="No centralized database of locations. Shard mapping is sharded across the swarm."
+            description="No centralized database of locations. Shard mapping is distributed across the swarm for unbreakable resilience."
+            badge="ZK-Proofs"
           />
           <FeatureCard
             icon={Globe}
             title="Proof of Residency"
-            description="Verified geographical locations for data compliance and low-latency storage."
+            description="Verified geographical locations with latency-tether validation for regulatory compliance."
+            badge="DPDP Ready"
           />
           <FeatureCard
             icon={Zap}
             title="BFT Self-Healing"
-            description="Autonomous data reconstruction if a subset of nodes goes offline."
+            description="Autonomous data reconstruction with Byzantine fault tolerance if nodes go offline."
+            badge="99.99% SLA"
           />
-        </div>
+        </motion.div>
       </div>
     </section>
 
@@ -376,6 +434,18 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
   );
 };
 
+// ═══════ PAGE TRANSITIONS ═══════
+const PageTransition = ({ children }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 15 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -15 }}
+    transition={{ duration: 0.3, ease: "easeInOut" }}
+  >
+    {children}
+  </motion.div>
+);
+
 // ═══════ APP CONTENT ═══════
 const AppContent = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(hasAuthSession());
@@ -438,24 +508,26 @@ const AppContent = () => {
       <Toaster position="bottom-right" toastOptions={{ style: { background: "#0f172a", color: "#f8fafc", border: "1px solid rgba(29,211,176,0.3)", fontSize: "13px" } }} />
       <Navbar isAuthenticated={isAuthenticated} onLogout={handleLogout} />
       <main>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<AuthRedirectRoute isAuthenticated={isAuthenticated} component={Login} onAuth={handleLogin} />} />
-          <Route path="/register" element={<AuthRedirectRoute isAuthenticated={isAuthenticated} component={Register} onAuth={handleLogin} />} />
-          <Route path="/auth/callback" element={<AuthCallback onAuth={handleLogin} />} />
-          <Route path="/dashboard/drive" element={<ProtectedRoute isAuthenticated={isAuthenticated}><DriveDashboard /></ProtectedRoute>} />
-          <Route path="/dashboard/compliance" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ComplianceDashboard /></ProtectedRoute>} />
-          <Route path="/dashboard/node" element={<NodeDashboard />} />
-          <Route path="/explorer/:bucket/*" element={<ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute>} />
-          <Route path="/s3-migration" element={<ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute>} />
-          <Route path="/download" element={<Download />} />
-          <Route path="/admin/inventory" element={<AdminRoute isAuthenticated={isAuthenticated}><AdminNodes /></AdminRoute>} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/faq" element={<FAQ />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<PageTransition><LandingPage /></PageTransition>} />
+            <Route path="/login" element={<PageTransition><AuthRedirectRoute isAuthenticated={isAuthenticated} component={Login} onAuth={handleLogin} /></PageTransition>} />
+            <Route path="/register" element={<PageTransition><AuthRedirectRoute isAuthenticated={isAuthenticated} component={Register} onAuth={handleLogin} /></PageTransition>} />
+            <Route path="/auth/callback" element={<PageTransition><AuthCallback onAuth={handleLogin} /></PageTransition>} />
+            <Route path="/dashboard/drive" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><DriveDashboard /></ProtectedRoute></PageTransition>} />
+            <Route path="/dashboard/compliance" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><ComplianceDashboard /></ProtectedRoute></PageTransition>} />
+            <Route path="/dashboard/node" element={<PageTransition><NodeDashboard /></PageTransition>} />
+            <Route path="/explorer/:bucket/*" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute></PageTransition>} />
+            <Route path="/s3-migration" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute></PageTransition>} />
+            <Route path="/download" element={<PageTransition><Download /></PageTransition>} />
+            <Route path="/admin/inventory" element={<PageTransition><AdminRoute isAuthenticated={isAuthenticated}><AdminNodes /></AdminRoute></PageTransition>} />
+            <Route path="/pricing" element={<PageTransition><Pricing /></PageTransition>} />
+            <Route path="/about" element={<PageTransition><About /></PageTransition>} />
+            <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
+            <Route path="/faq" element={<PageTransition><FAQ /></PageTransition>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AnimatePresence>
       </main>
 
       {/* ═══════ MOBILE BOTTOM NAVIGATION ═══════ */}

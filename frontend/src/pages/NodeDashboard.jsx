@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins, Globe } from 'lucide-react';
+import { Activity, HardDrive, IndianRupee, Server, Cpu, TrendingUp, Search, Wifi, WifiOff, Clock, Coins, Globe, Download } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { apiJson } from '../lib/apiClient';
 
 const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
@@ -235,23 +236,23 @@ export const NodeDashboard = () => {
             </div>
 
             {/* ═══════ NETWORK STATS ═══════ */}
-            <div>
+            <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }}>
                 <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800"><Activity size={20} className="text-emerald-500" /> Network Overview</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatCard icon={Server} label="Total Nodes" value={stats?.total_nodes ?? '—'} accent="text-blue-600 bg-blue-50" />
-                    <StatCard icon={Wifi} label="Active Now" value={stats?.active_nodes ?? '—'} accent="text-emerald-600 bg-emerald-50" />
-                    <StatCard icon={HardDrive} label="Network Storage" value={stats?.total_storage_gb ? `${stats.total_storage_gb} GB` : '—'} accent="text-purple-600 bg-purple-50" />
-                    <StatCard icon={Cpu} label="Total Shards" value={stats?.total_shards?.toLocaleString() ?? '—'} accent="text-orange-600 bg-orange-50" />
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}><StatCard icon={Server} label="Total Nodes" value={stats?.total_nodes ?? '—'} accent="text-blue-600 bg-blue-50" /></motion.div>
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}><StatCard icon={Wifi} label="Active Now" value={stats?.active_nodes ?? '—'} accent="text-emerald-600 bg-emerald-50" /></motion.div>
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}><StatCard icon={HardDrive} label="Network Storage" value={stats?.total_storage_gb ? `${stats.total_storage_gb} GB` : '—'} accent="text-purple-600 bg-purple-50" /></motion.div>
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}><StatCard icon={Cpu} label="Total Shards" value={stats?.total_shards?.toLocaleString() ?? '—'} accent="text-orange-600 bg-orange-50" /></motion.div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-                    <StatCard icon={HardDrive} label="Storage Used" value={stats?.used_storage_gb ? `${stats.used_storage_gb} GB` : '—'} accent="text-cyan-600 bg-cyan-50" />
-                    <StatCard icon={Coins} label="Rate" value="₹0.42/GB/month" accent="text-emerald-700 bg-emerald-100" />
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}><StatCard icon={HardDrive} label="Storage Used" value={stats?.used_storage_gb ? `${stats.used_storage_gb} GB` : '—'} accent="text-cyan-600 bg-cyan-50" /></motion.div>
+                    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}><StatCard icon={Coins} label="Rate" value="₹0.42/GB/month" accent="text-emerald-700 bg-emerald-100" /></motion.div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* ═══════ NETWORK ACTIVITY ═══════ */}
             {stats?.recent_activity?.length > 0 && (
-                <div>
+                <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }}>
                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800"><Activity size={20} className="text-blue-500" /> Live Network Activity</h2>
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="overflow-x-auto">
@@ -266,7 +267,13 @@ export const NodeDashboard = () => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {stats.recent_activity.map((act, i) => (
-                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                        <motion.tr 
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: i * 0.05 }}
+                                            key={i} 
+                                            className="hover:bg-slate-50/50 transition-colors"
+                                        >
                                             <td className="py-3 px-4 font-mono font-bold text-slate-600">{act.node_id}</td>
                                             <td className="py-3 px-4">
                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight ${act.reason.includes('uptime') ? 'bg-emerald-50 text-emerald-600' :
@@ -280,17 +287,22 @@ export const NodeDashboard = () => {
                                             <td className="py-3 px-4 text-slate-400 text-right font-medium">
                                                 {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                             </td>
-                                        </tr>
+                                        </motion.tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                </div>
+                </motion.div>
             )}
 
             {/* ═══════ NODE LOOKUP ═══════ */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden">
+            <motion.div 
+                initial={{ opacity: 0, y: 30 }} 
+                whileInView={{ opacity: 1, y: 0 }} 
+                viewport={{ once: true, margin: "-50px" }}
+                className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden"
+            >
                 <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -z-10 -mr-20 -mt-20"></div>
                 <h2 className="text-xl font-bold mb-2 flex items-center gap-2 text-slate-800"><Search size={20} className="text-emerald-500" /> My Node Telemetry</h2>
 
@@ -341,11 +353,58 @@ export const NodeDashboard = () => {
                 {lookupError && (
                     <p className="text-red-500 text-sm mt-3 font-medium">{lookupError}</p>
                 )}
-            </div>
+            </motion.div>
+
+            {myNodes.length === 0 && !nodeData && !lookupLoading && (
+                <motion.div 
+                    initial={{ opacity: 0, y: 30 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    className="mt-8 bg-white border border-slate-200 shadow-xl rounded-3xl p-12 text-center relative overflow-hidden group"
+                >
+                    <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-emerald-100 rounded-full blur-[100px] -z-10 group-hover:scale-110 transition-transform duration-1000"></div>
+                    <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[100px] -z-10 group-hover:scale-110 transition-transform duration-1000"></div>
+                    
+                    <motion.div 
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.5, delay: 0.2, type: "spring" }}
+                        className="w-32 h-32 bg-white/80 backdrop-blur-md border border-emerald-100 shadow-2xl rounded-[2rem] mx-auto flex items-center justify-center mb-8 relative"
+                    >
+                        <motion.div 
+                            animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
+                            transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                            className="absolute inset-0 bg-emerald-400 rounded-[2rem]"
+                        ></motion.div>
+                        <HardDrive size={56} className="text-emerald-500 relative z-10" />
+                    </motion.div>
+
+                    <motion.h3 
+                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+                        className="text-4xl font-display font-extrabold text-slate-900 mb-4"
+                    >
+                        Activate Your First Node
+                    </motion.h3>
+                    
+                    <motion.p 
+                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+                        className="text-slate-500 max-w-xl mx-auto text-lg mb-10 leading-relaxed font-medium"
+                    >
+                        Turn your unused hard drive space into passive income. Download the NeuroStore Node software, and your node ID will activate automatically upon startup.
+                    </motion.p>
+                    
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+                        <a href={WINDOWS_NODE_INSTALLER_URL} className="inline-flex btn-primary px-10 py-5 rounded-2xl font-bold items-center gap-3 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all mx-auto text-lg mb-4">
+                            <Download size={24} /> Download Node for Windows
+                        </a>
+                        <p className="text-xs text-slate-400 font-medium">Requires Windows 10/11 • 50GB Minimum Storage</p>
+                    </motion.div>
+                </motion.div>
+            )}
 
             {/* ═══════ NODE DETAIL ═══════ */}
             {nodeData && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, type: "spring" }} className="space-y-6">
                     <div className="bg-white rounded-2xl p-6 shadow-lg border border-emerald-100 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -z-10 -mr-20 -mt-20"></div>
                         <div className="flex justify-between items-start mb-6">
@@ -385,8 +444,8 @@ export const NodeDashboard = () => {
                             </div>
                         </div>
 
-                        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm relative overflow-hidden group">
+                        <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }} className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <motion.div variants={{ hidden: { opacity: 0, scale: 0.9 }, visible: { opacity: 1, scale: 1 } }} className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm relative overflow-hidden group">
                                 <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-100 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
                                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1 relative z-10">Uptime</p>
                                 <p className="text-lg font-bold text-slate-700 flex items-center gap-2 relative z-10">
@@ -396,8 +455,8 @@ export const NodeDashboard = () => {
                                         : `${parseFloat(nodeData.uptime_minutes).toFixed(1)} min`
                                     }
                                 </p>
-                            </div>
-                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm relative overflow-hidden group">
+                            </motion.div>
+                            <motion.div variants={{ hidden: { opacity: 0, scale: 0.9 }, visible: { opacity: 1, scale: 1 } }} className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm relative overflow-hidden group">
                                 <div className="absolute -right-4 -top-4 w-16 h-16 bg-blue-100 rounded-full blur-xl group-hover:scale-150 transition-transform"></div>
                                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1 relative z-10">System Identity</p>
                                 <p className="text-lg font-bold text-slate-700 flex items-center gap-2 relative z-10">
@@ -405,24 +464,24 @@ export const NodeDashboard = () => {
                                     <span>{nodeData.os || 'Unknown OS'}</span>
                                     <span className="text-white bg-slate-800 text-[10px] px-2 py-0.5 rounded-full ml-1 font-mono">v{nodeData.version || '1.0'}</span>
                                 </p>
-                            </div>
+                            </motion.div>
 
                             {/* Live Resource Telemetry Display */}
-                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                            <motion.div variants={{ hidden: { opacity: 0, scale: 0.9 }, visible: { opacity: 1, scale: 1 } }} className="bg-blue-50 border border-blue-100 rounded-xl p-5 shadow-sm relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-blue-100">
-                                    <div className="h-full bg-blue-500 transition-all" style={{ width: `${nodeData.cpu_usage_percent || 0}%` }}></div>
+                                    <motion.div initial={{ width: 0 }} animate={{ width: `${nodeData.cpu_usage_percent || 0}%` }} transition={{ duration: 1 }} className="h-full bg-blue-500"></motion.div>
                                 </div>
                                 <p className="text-blue-600/80 text-xs font-bold uppercase tracking-wider mb-1">CPU Usage</p>
                                 <p className="text-2xl font-bold text-blue-700">{(parseFloat(nodeData.cpu_usage_percent || 0)).toFixed(1)}%</p>
-                            </div>
-                            <div className="bg-purple-50 border border-purple-100 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                            </motion.div>
+                            <motion.div variants={{ hidden: { opacity: 0, scale: 0.9 }, visible: { opacity: 1, scale: 1 } }} className="bg-purple-50 border border-purple-100 rounded-xl p-5 shadow-sm relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-purple-100">
-                                    <div className="h-full bg-purple-500 transition-all" style={{ width: `${nodeData.memory_usage_percent || 0}%` }}></div>
+                                    <motion.div initial={{ width: 0 }} animate={{ width: `${nodeData.memory_usage_percent || 0}%` }} transition={{ duration: 1, delay: 0.2 }} className="h-full bg-purple-500"></motion.div>
                                 </div>
                                 <p className="text-purple-600/80 text-xs font-bold uppercase tracking-wider mb-1">Memory Usage</p>
                                 <p className="text-2xl font-bold text-purple-700">{(parseFloat(nodeData.memory_usage_percent || 0)).toFixed(1)}%</p>
-                            </div>
-                        </div>
+                            </motion.div>
+                        </motion.div>
 
                         {/* Advanced Shard Health Visualizer */}
                         <div className="mt-6 border-t border-emerald-100/50 pt-6">
@@ -510,9 +569,8 @@ export const NodeDashboard = () => {
                             </div>
                         </div>
                     )}
-                </div>
+                </motion.div>
             )}
-
             {/* ═══════ LEADERBOARD ═══════ */}
             {stats?.top_nodes?.length > 0 && (
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">

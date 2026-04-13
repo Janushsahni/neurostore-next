@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, RefreshCw, Download, X, FolderPlus, Plus, Cpu, LayoutGrid, List, FileText, Image as ImgIcon, FileSpreadsheet, Play, Trash2, Edit2, Share2 } from 'lucide-react';
+import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, RefreshCw, Download, X, FolderPlus, Plus, Cpu, LayoutGrid, List, FileText, Image as ImgIcon, FileSpreadsheet, Play, Trash2, Edit2, Share2, MoreVertical } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { toast } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 import { API_BASE } from '../lib/config';
 import { getAuthToken, getCsrfToken, getSelectedPlan, getUserDriveBucket, getVaultSecret } from '../lib/authStorage';
 import { decryptDownloadInWorker, encryptUploadInWorker, hashFileInWorker } from '../lib/cryptoWorkerClient';
@@ -21,9 +22,14 @@ export const DriveDashboard = () => {
     const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
+    
+    // Feature States
+    const [isDragging, setIsDragging] = useState(false);
+    const [contextMenu, setContextMenu] = useState(null);
 
     const fileInputRef = useRef(null);
     const folderInputRef = useRef(null);
+    const dashboardRef = useRef(null);
 
     const BUCKET_NAME = getUserDriveBucket();
     const S3_GATEWAY_URL = API_BASE;
@@ -538,8 +544,132 @@ export const DriveDashboard = () => {
     };
 
     return (
-        <div className="flex h-[calc(100dvh-80px-64px)] md:h-[calc(100vh-80px)] overflow-hidden bg-white text-slate-800 font-sans relative">
+        <div 
+            className="flex h-[calc(100dvh-80px-64px)] md:h-[calc(100vh-80px)] overflow-hidden bg-white text-slate-800 font-sans relative"
+            onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); if (e.target === e.currentTarget) setIsDragging(false); }}
+            onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(false);
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    handleFileUpload({ target: { files: e.dataTransfer.files } });
+                }
+            }}
+            onClick={() => setContextMenu(null)}
+        >
             <RecoverySetupModal />
+
+            {/* Drag & Drop Overlay */}
+            <AnimatePresence>
+                {isDragging && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-[100] bg-emerald-500/90 backdrop-blur-sm flex flex-col items-center justify-center border-4 border-dashed border-white m-4 rounded-3xl"
+                    >
+                        <motion.div 
+                            animate={{ y: [0, -10, 0] }} 
+                            transition={{ repeat: Infinity, duration: 2 }}
+                            className="bg-white p-6 rounded-full shadow-2xl mb-4"
+                        >
+                            <UploadCloud size={64} className="text-emerald-500" />
+                        </motion.div>
+                        <h2 className="text-4xl font-display font-extrabold text-white mb-2 shadow-sm">Drop to Securely Upload</h2>
+                        <p className="text-emerald-50 font-medium text-lg">Files will be encrypted before leaving your browser.</p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Custom Right-Click Context Menu */}
+            <AnimatePresence>
+                {contextMenu && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, transformOrigin: "top left" }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.1 }}
+                        style={{ top: contextMenu.y, left: contextMenu.x }}
+                        className="fixed z-[100] w-56 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden py-1"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-3 py-2 border-b border-slate-100 mb-1">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider truncate" title={contextMenu.file.name}>{contextMenu.file.name}</p>
+                        </div>
+                        <button onClick={() => { handleDownload(contextMenu.file.name, 'preview'); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                            <Play size={16} /> Preview Inline
+                        </button>
+                        <button onClick={() => { navigate(explorerPath(contextMenu.file.name)); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                            <Cpu size={16} /> Technical Proof
+                        </button>
+                        <button onClick={() => { handleShare(contextMenu.file.name); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                            <Share2 size={16} /> Share Link
+                        </button>
+                        <button onClick={() => { handleDownload(contextMenu.file.name, 'download'); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                            <Download size={16} /> Download Copy
+                        </button>
+                        <div className="h-px bg-slate-100 my-1"></div>
+                        <button onClick={() => { handleRename(contextMenu.file.name); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors">
+                            <Edit2 size={16} /> Rename
+                        </button>
+                        <button onClick={() => { handleDelete(contextMenu.file.name); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors">
+                            <Trash2 size={16} /> Shred Permanently
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* In-Browser Lightbox Previewer */}
+            <AnimatePresence>
+                {previewFile && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4 md:p-12"
+                    >
+                        <button onClick={closePreview} className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-[120]">
+                            <X size={24} />
+                        </button>
+                        <motion.div 
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            className="w-full max-w-5xl h-full flex flex-col relative"
+                        >
+                            <div className="absolute top-0 inset-x-0 h-16 flex items-center justify-center pointer-events-none">
+                                <span className="bg-slate-900/50 backdrop-blur-md px-4 py-2 rounded-full text-white text-sm font-bold border border-white/10 shadow-lg">
+                                    <ShieldCheck size={16} className="inline mr-2 text-emerald-400" /> Decrypted Locally in Browser
+                                </span>
+                            </div>
+                            
+                            <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden flex items-center justify-center mb-4">
+                                {previewFile.type.startsWith('image/') ? (
+                                    <img src={previewFile.url} alt="Preview" className="max-w-full max-h-full object-contain" />
+                                ) : previewFile.type.startsWith('video/') ? (
+                                    <video src={previewFile.url} controls autoPlay className="max-w-full max-h-full" />
+                                ) : previewFile.type === 'application/pdf' ? (
+                                    <iframe src={previewFile.url} className="w-full h-full bg-white" title="PDF Document" />
+                                ) : previewFile.type.startsWith('text/') ? (
+                                    <iframe src={previewFile.url} className="w-full h-full bg-white p-6 font-mono text-sm" title="Text File Segment" />
+                                ) : (
+                                    <div className="text-center text-slate-400 p-8">
+                                        <FileIcon size={64} className="mx-auto mb-4 opacity-50" />
+                                        <p className="font-medium text-lg">No rich preview available for this format</p>
+                                        <p className="text-sm opacity-70 mt-2">{previewFile.name}</p>
+                                        <a href={previewFile.url} download={previewFile.name} className="inline-block mt-6 px-6 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 transition-colors pointer-events-auto">
+                                            Save to Device
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* ═══════ LEFT SIDEBAR ═══════ */}
             <aside className="w-64 border-r border-slate-200 bg-slate-50 p-4 flex flex-col hidden md:flex shrink-0 z-10">
 
@@ -623,20 +753,32 @@ export const DriveDashboard = () => {
                 </header>
 
                 {/* Upload Indicator */}
-                {isUploading && (
-                    <div className="bg-emerald-50 border-b border-emerald-100 px-6 py-3 flex items-center gap-4 shrink-0">
-                        <RefreshCw className="text-emerald-500 animate-spin shrink-0" size={18} />
-                        <div className="flex-1">
-                            <div className="flex justify-between text-xs font-bold text-emerald-800 mb-1">
-                                <span>{uploadState.text}</span>
-                                <span>{uploadState.progress}%</span>
+                <AnimatePresence>
+                    {isUploading && (
+                        <motion.div 
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="bg-emerald-50 border-b border-emerald-100 px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
+                        >
+                            <RefreshCw className="text-emerald-500 animate-spin shrink-0" size={18} />
+                            <div className="flex-1">
+                                <div className="flex justify-between text-xs font-bold text-emerald-800 mb-1">
+                                    <span>{uploadState.text}</span>
+                                    <span>{uploadState.progress}%</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-emerald-200 rounded-full overflow-hidden">
+                                    <motion.div 
+                                        className="h-full bg-emerald-500" 
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${uploadState.progress}%` }}
+                                        transition={{ ease: "linear", duration: 0.2 }}
+                                    />
+                                </div>
                             </div>
-                            <div className="w-full h-1.5 bg-emerald-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 transition-all duration-200" style={{ width: `${uploadState.progress}%` }}></div>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* File Grid/List View */}
                 <div className="flex-1 overflow-y-auto p-6 md:p-8">
@@ -683,16 +825,26 @@ export const DriveDashboard = () => {
                     )}
 
                     {files.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-center">
-                            <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100 shadow-sm">
-                                <UploadCloud size={40} className="text-emerald-400" />
-                            </div>
-                            <h2 className="text-2xl font-display font-bold text-slate-800 mb-2">Your secure vault is empty</h2>
-                            <p className="text-slate-500 font-medium max-w-sm">Securely back up your photos, documents, and videos directly to the decentralized network.</p>
-                            <button onClick={() => fileInputRef.current?.click()} className="mt-6 btn-primary px-8 py-3 rounded-xl font-bold flex items-center gap-2">
-                                <UploadCloud size={18} /> Upload Now
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="h-full flex flex-col items-center justify-center text-center relative group"
+                        >
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-emerald-50 rounded-full blur-3xl -z-10 group-hover:scale-110 transition-transform duration-1000"></div>
+                            <motion.div 
+                                animate={{ y: [0, -10, 0] }}
+                                transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                                className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mb-6 border border-emerald-100 shadow-xl relative"
+                            >
+                                <div className="absolute inset-0 bg-emerald-400 rounded-3xl animate-ping opacity-20"></div>
+                                <UploadCloud size={40} className="text-emerald-500" />
+                            </motion.div>
+                            <h2 className="text-3xl font-display font-bold text-slate-800 mb-3 tracking-tight">Your secure vault is empty</h2>
+                            <p className="text-slate-500 text-lg font-medium max-w-md">Drag & drop files anywhere, or click below to securely back up to the decentralized network.</p>
+                            <button onClick={() => fileInputRef.current?.click()} className="mt-8 btn-primary px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg hover:shadow-emerald-500/30 transition-all">
+                                <UploadCloud size={20} /> Upload Files Now
                             </button>
-                        </div>
+                        </motion.div>
                     ) : filteredFiles.length === 0 ? (
                         <div className="text-center py-20">
                             <p className="text-slate-500 font-medium">No files found matching your criteria.</p>
@@ -702,9 +854,30 @@ export const DriveDashboard = () => {
                             <h2 className="text-lg font-bold text-slate-800 mb-6">{activeFilter} Files</h2>
 
                             {viewMode === 'grid' ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                                <motion.div 
+                                    initial="hidden"
+                                    animate="visible"
+                                    variants={{
+                                        hidden: { opacity: 0 },
+                                        visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+                                    }}
+                                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+                                >
                                     {filteredFiles.map(file => (
-                                        <div key={file.id} className="group flex flex-col items-center bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-lg hover:border-emerald-200 transition-all cursor-pointer relative overflow-hidden" onClick={() => handleDownload(file.name, 'preview')}>
+                                        <motion.div 
+                                            variants={{
+                                                hidden: { opacity: 0, scale: 0.9 },
+                                                visible: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+                                            }}
+                                            key={file.id} 
+                                            className="group flex flex-col items-center bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-lg hover:border-emerald-200 transition-all cursor-pointer relative overflow-hidden" 
+                                            onClick={() => handleDownload(file.name, 'preview')}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setContextMenu({ x: e.clientX, y: e.clientY, file });
+                                            }}
+                                        >
 
                                             <div className="w-full aspect-square bg-slate-50 rounded-xl mb-3 flex items-center justify-center border border-slate-100 group-hover:bg-emerald-50/30 transition-colors">
                                                 {getFileIcon(file.type)}
@@ -714,27 +887,15 @@ export const DriveDashboard = () => {
                                                 <p className="text-sm font-bold text-slate-700 truncate w-full" title={file.name}>{file.name}</p>
                                                 <p className="text-xs text-slate-400 font-medium mt-1">{file.size}</p>
                                             </div>
-
-                                            <div className="absolute w-max top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-wrap justify-end max-w-[calc(100%-1rem)] gap-1 bg-white/90 backdrop-blur-sm p-1 rounded-lg border border-slate-200 shadow-sm">
-                                                <button onClick={(e) => { e.stopPropagation(); navigate(explorerPath(file.name)); }} className="p-1.5 text-slate-500 hover:text-primary hover:bg-emerald-50 rounded-md transition-colors" title="Technical Proof">
-                                                    <Cpu size={14} />
-                                                </button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleShare(file.name); }} className="p-1.5 text-slate-500 hover:text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="Share Proof">
-                                                    <Share2 size={14} />
-                                                </button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDownload(file.name, 'download'); }} className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors" title="Download">
-                                                    <Download size={14} />
-                                                </button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleRename(file.name); }} className="p-1.5 text-slate-500 hover:text-amber-500 hover:bg-amber-50 rounded-md transition-colors" title="Rename">
-                                                    <Edit2 size={14} />
-                                                </button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDelete(file.name); }} className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors" title="Delete">
-                                                    <Trash2 size={14} />
+                                            
+                                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={(e) => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, file }); }} className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 shadow-sm text-slate-500 hover:text-emerald-600 rounded-lg transition-colors">
+                                                    <MoreVertical size={16} />
                                                 </button>
                                             </div>
-                                        </div>
+                                        </motion.div>
                                     ))}
-                                </div>
+                                </motion.div>
                             ) : (
                                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                                     <table className="w-full text-left border-collapse">
@@ -749,7 +910,16 @@ export const DriveDashboard = () => {
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {filteredFiles.map(file => (
-                                                <tr key={file.id} className="hover:bg-slate-50/80 transition-colors group cursor-pointer" onClick={() => handleDownload(file.name, 'preview')}>
+                                                <tr 
+                                                    key={file.id} 
+                                                    className="hover:bg-slate-50/80 transition-colors group cursor-pointer" 
+                                                    onClick={() => handleDownload(file.name, 'preview')}
+                                                    onContextMenu={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setContextMenu({ x: e.clientX, y: e.clientY, file });
+                                                    }}
+                                                >
                                                     <td className="p-4">{getFileIcon(file.type)}</td>
                                                     <td className="p-4 font-normal not-italic text-slate-700">
                                                         <p className="text-sm font-bold">{file.name}</p>
@@ -762,23 +932,9 @@ export const DriveDashboard = () => {
                                                         </span>
                                                     </td>
                                                     <td className="p-4 text-right not-italic">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <button onClick={(e) => { e.stopPropagation(); navigate(explorerPath(file.name)); }} className="p-2 text-slate-400 hover:text-primary hover:bg-emerald-50 rounded-xl transition-all" title="Technical Proof">
-                                                                <Cpu size={16} />
-                                                            </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); handleShare(file.name); }} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all" title="Share Proof">
-                                                                <Share2 size={16} />
-                                                            </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); handleDownload(file.name, 'download'); }} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="Download">
-                                                                <Download size={16} />
-                                                            </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); handleRename(file.name); }} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-xl transition-all" title="Rename">
-                                                                <Edit2 size={16} />
-                                                            </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); handleDelete(file.name); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Delete">
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </div>
+                                                        <button onClick={(e) => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, file }); }} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all">
+                                                            <MoreVertical size={16} />
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}
