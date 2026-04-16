@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { HardDrive, Mail, Lock, User, ArrowRight, AlertCircle, RefreshCw, ShieldCheck } from "lucide-react";
-import { toast } from "react-hot-toast";
 import { clearAuthSession, setAuthSession, setSelectedPlan, setVaultSecret } from "../lib/authStorage";
 import { apiJson } from "../lib/apiClient";
 import { buildApiUrl } from "../lib/config";
@@ -73,7 +72,7 @@ export const Login = ({ onAuth }) => {
 
         const normalizedUsername = username.trim();
         if (!normalizedUsername || !password) {
-            setError("Username and password are required.");
+            setError("Email and password are required.");
             setIsLoading(false);
             return;
         }
@@ -118,7 +117,7 @@ export const Login = ({ onAuth }) => {
 
         const normalizedUsername = username.trim();
         if (!normalizedUsername || !recoveryPhrase) {
-            setError("Username and Recovery Kit Phrase are required.");
+            setError("Email and Recovery Kit Phrase are required.");
             setIsLoading(false);
             return;
         }
@@ -155,7 +154,7 @@ export const Login = ({ onAuth }) => {
             if (!response.ok) throw new Error(data.error || "Auto-Login with recovered key failed.");
 
             setAuthSession(data.user, data.csrf_token || "", data.token || "");
-            setVaultSecret(password);
+            setVaultSecret(vaultKey);
 
             const isDesktop = searchParams.get("redirect") === "desktop";
             if (isDesktop) {
@@ -224,7 +223,7 @@ export const Login = ({ onAuth }) => {
 
                 <form className="space-y-4" onSubmit={handleSubmit}>
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Username</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Email</label>
                         <div className="relative">
                             <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input
@@ -232,7 +231,7 @@ export const Login = ({ onAuth }) => {
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
-                                placeholder="jane_doe"
+                                placeholder="founder@company.com"
                                 autoComplete="username"
                                 required
                             />
@@ -289,13 +288,13 @@ export const Login = ({ onAuth }) => {
 
                         <form onSubmit={handleRecoverySubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5">Username</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">Email</label>
                                 <input
                                     type="text"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-slate-900 font-medium focus:outline-none focus:border-emerald-500 transition-all shadow-inner"
-                                    placeholder="jane_doe"
+                                    placeholder="founder@company.com"
                                     required
                                 />
                             </div>
@@ -322,7 +321,7 @@ export const Login = ({ onAuth }) => {
                 )}
 
                 <p className="text-center text-sm font-medium text-slate-500 mt-8">
-                    Don&apos;t have an account? <Link to={`/register?intent=${intent}`} className="text-primary hover:text-emerald-600 font-bold hover:underline transition-colors">Sign up</Link>
+                    Don&apos;t have an account? <Link to={`/register?intent=${intent}${searchParams.get("return") ? `&return=${encodeURIComponent(searchParams.get("return"))}` : ""}`} className="text-primary hover:text-emerald-600 font-bold hover:underline transition-colors">Sign up</Link>
                 </p>
             </div>
         </div>
@@ -340,6 +339,8 @@ export const Register = ({ onAuth }) => {
     const [providerNotice, setProviderNotice] = useState("");
 
     const getTargetPath = () => {
+        const returnUrl = searchParams.get("return");
+        if (returnUrl) return decodeURIComponent(returnUrl);
         if (intent === "node") return "/dashboard/node";
         return "/dashboard/drive";
     };
@@ -449,7 +450,7 @@ export const Register = ({ onAuth }) => {
                 <form className="space-y-4" onSubmit={handleSubmit}>
 
                     <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Username</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Email</label>
                         <div className="relative">
                             <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input
@@ -457,7 +458,7 @@ export const Register = ({ onAuth }) => {
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
-                                placeholder="jane_doe"
+                                placeholder="founder@company.com"
                                 autoComplete="username"
                                 required
                             />
@@ -490,7 +491,7 @@ export const Register = ({ onAuth }) => {
                 </form>
 
                 <p className="text-center text-sm text-muted mt-6">
-                    Already have an account? <Link to={`/login?intent=${intent}`} className="text-primary hover:underline">Sign in</Link>
+                    Already have an account? <Link to={`/login?intent=${intent}${searchParams.get("return") ? `&return=${encodeURIComponent(searchParams.get("return"))}` : ""}`} className="text-primary hover:underline">Sign in</Link>
                 </p>
             </div>
         </div>

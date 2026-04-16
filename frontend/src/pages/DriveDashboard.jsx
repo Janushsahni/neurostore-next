@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { HardDrive, UploadCloud, File as FileIcon, Search, ShieldCheck, Zap, RefreshCw, Download, X, FolderPlus, Plus, Cpu, LayoutGrid, List, FileText, Image as ImgIcon, FileSpreadsheet, Play, Trash2, Edit2, Share2, MoreVertical } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { API_BASE } from '../lib/config';
 import { getAuthToken, getCsrfToken, getSelectedPlan, getUserDriveBucket, getVaultSecret } from '../lib/authStorage';
 import { decryptDownloadInWorker, encryptUploadInWorker, hashFileInWorker } from '../lib/cryptoWorkerClient';
@@ -29,8 +29,6 @@ export const DriveDashboard = () => {
 
     const fileInputRef = useRef(null);
     const folderInputRef = useRef(null);
-    const dashboardRef = useRef(null);
-
     const BUCKET_NAME = getUserDriveBucket();
     const S3_GATEWAY_URL = API_BASE;
     const encodeKey = (name) => encodeURIComponent(name);
@@ -564,29 +562,29 @@ export const DriveDashboard = () => {
             {/* Drag & Drop Overlay */}
             <AnimatePresence>
                 {isDragging && (
-                    <motion.div 
+                    <Motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="absolute inset-0 z-[100] bg-emerald-500/90 backdrop-blur-sm flex flex-col items-center justify-center border-4 border-dashed border-white m-4 rounded-3xl"
                     >
-                        <motion.div 
+                        <Motion.div 
                             animate={{ y: [0, -10, 0] }} 
                             transition={{ repeat: Infinity, duration: 2 }}
                             className="bg-white p-6 rounded-full shadow-2xl mb-4"
                         >
                             <UploadCloud size={64} className="text-emerald-500" />
-                        </motion.div>
+                        </Motion.div>
                         <h2 className="text-4xl font-display font-extrabold text-white mb-2 shadow-sm">Drop to Securely Upload</h2>
                         <p className="text-emerald-50 font-medium text-lg">Files will be encrypted before leaving your browser.</p>
-                    </motion.div>
+                    </Motion.div>
                 )}
             </AnimatePresence>
 
             {/* Custom Right-Click Context Menu */}
             <AnimatePresence>
                 {contextMenu && (
-                    <motion.div
+                    <Motion.div
                         initial={{ opacity: 0, scale: 0.95, transformOrigin: "top left" }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
@@ -617,14 +615,14 @@ export const DriveDashboard = () => {
                         <button onClick={() => { handleDelete(contextMenu.file.name); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors">
                             <Trash2 size={16} /> Shred Permanently
                         </button>
-                    </motion.div>
+                    </Motion.div>
                 )}
             </AnimatePresence>
 
             {/* In-Browser Lightbox Previewer */}
             <AnimatePresence>
                 {previewFile && (
-                    <motion.div 
+                    <Motion.div 
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -633,7 +631,7 @@ export const DriveDashboard = () => {
                         <button onClick={closePreview} className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-[120]">
                             <X size={24} />
                         </button>
-                        <motion.div 
+                        <Motion.div 
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
@@ -665,8 +663,8 @@ export const DriveDashboard = () => {
                                     </div>
                                 )}
                             </div>
-                        </motion.div>
-                    </motion.div>
+                        </Motion.div>
+                    </Motion.div>
                 )}
             </AnimatePresence>
 
@@ -755,7 +753,7 @@ export const DriveDashboard = () => {
                 {/* Upload Indicator */}
                 <AnimatePresence>
                     {isUploading && (
-                        <motion.div 
+                        <Motion.div 
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: "auto", opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
@@ -768,7 +766,7 @@ export const DriveDashboard = () => {
                                     <span>{uploadState.progress}%</span>
                                 </div>
                                 <div className="w-full h-1.5 bg-emerald-200 rounded-full overflow-hidden">
-                                    <motion.div 
+                                    <Motion.div 
                                         className="h-full bg-emerald-500" 
                                         initial={{ width: 0 }}
                                         animate={{ width: `${uploadState.progress}%` }}
@@ -776,7 +774,7 @@ export const DriveDashboard = () => {
                                     />
                                 </div>
                             </div>
-                        </motion.div>
+                        </Motion.div>
                     )}
                 </AnimatePresence>
 
@@ -825,26 +823,26 @@ export const DriveDashboard = () => {
                     )}
 
                     {files.length === 0 ? (
-                        <motion.div 
+                        <Motion.div 
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             className="h-full flex flex-col items-center justify-center text-center relative group"
                         >
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-emerald-50 rounded-full blur-3xl -z-10 group-hover:scale-110 transition-transform duration-1000"></div>
-                            <motion.div 
+                            <Motion.div 
                                 animate={{ y: [0, -10, 0] }}
                                 transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                                 className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mb-6 border border-emerald-100 shadow-xl relative"
                             >
                                 <div className="absolute inset-0 bg-emerald-400 rounded-3xl animate-ping opacity-20"></div>
                                 <UploadCloud size={40} className="text-emerald-500" />
-                            </motion.div>
+                            </Motion.div>
                             <h2 className="text-3xl font-display font-bold text-slate-800 mb-3 tracking-tight">Your secure vault is empty</h2>
                             <p className="text-slate-500 text-lg font-medium max-w-md">Drag & drop files anywhere, or click below to securely back up to the decentralized network.</p>
                             <button onClick={() => fileInputRef.current?.click()} className="mt-8 btn-primary px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg hover:shadow-emerald-500/30 transition-all">
                                 <UploadCloud size={20} /> Upload Files Now
                             </button>
-                        </motion.div>
+                        </Motion.div>
                     ) : filteredFiles.length === 0 ? (
                         <div className="text-center py-20">
                             <p className="text-slate-500 font-medium">No files found matching your criteria.</p>
@@ -854,7 +852,7 @@ export const DriveDashboard = () => {
                             <h2 className="text-lg font-bold text-slate-800 mb-6">{activeFilter} Files</h2>
 
                             {viewMode === 'grid' ? (
-                                <motion.div 
+                                <Motion.div 
                                     initial="hidden"
                                     animate="visible"
                                     variants={{
@@ -864,7 +862,7 @@ export const DriveDashboard = () => {
                                     className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
                                 >
                                     {filteredFiles.map(file => (
-                                        <motion.div 
+                                        <Motion.div 
                                             variants={{
                                                 hidden: { opacity: 0, scale: 0.9 },
                                                 visible: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 24 } }
@@ -893,9 +891,9 @@ export const DriveDashboard = () => {
                                                     <MoreVertical size={16} />
                                                 </button>
                                             </div>
-                                        </motion.div>
+                                        </Motion.div>
                                     ))}
-                                </motion.div>
+                                </Motion.div>
                             ) : (
                                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                                     <table className="w-full text-left border-collapse">
@@ -1060,4 +1058,5 @@ export const DriveDashboard = () => {
         </div>
     );
 };
+
 

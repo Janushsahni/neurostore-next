@@ -40,6 +40,7 @@ function App() {
     uptime: 0,
     earnings: '0.0000'
   });
+  const [setupError, setSetupError] = useState<string>('');
 
   // Load config and setup listeners
   useEffect(() => {
@@ -66,7 +67,11 @@ function App() {
           const email = url.searchParams.get('email');
           const token = url.searchParams.get('token');
           if (email && token) {
-            setConfig(prev => ({ ...prev, user_email: email, auth_token: token }));
+            setConfig((prev) => {
+              const nextConfig = { ...prev, user_email: email, auth_token: token };
+              invoke('save_config', { config: nextConfig }).catch(() => null);
+              return nextConfig;
+            });
             setStep('setup');
           }
         } catch (e) {
@@ -90,9 +95,59 @@ function App() {
 
   const handleCompleteSetup = async () => {
     try {
+      setSetupError('');
+      if (!config.storage_path.trim()) {
+        setSetupError('Choose a storage folder before starting the node.');
+        return;
+      }
+      if (config.max_gb < 10) {
+        setSetupError('Allocate at least 10 GB so the node can participate reliably.');
+        return;
+      }
       setLogs(prev => [...prev, "[SYSTEM] Finalizing hardware handshake..."]);
-      setLogs(prev => [...prev, "[SYSTEM] Provisioning secure local partition..."]);
       await invoke('save_config', { config });
+
+      // Native Node Claim Flow (replaces the web wizard)
+      if (config.auth_token) {
+        setLogs(prev => [...prev, "[SYSTEM] Authenticating node with Gateway..."]);
+        try {
+          let jwtToken = config.auth_token;
+          try {
+              const authObj = JSON.parse(config.auth_token);
+              jwtToken = authObj.token || config.auth_token;
+          } catch (e) {
+              // It's a raw JWT string
+          }
+          
+          const ident: any = await invoke('get_identity_info');
+          
+          const claimRes = await fetch(`${config.gateway_url || 'https://neurostore-backend-production.up.railway.app'}/api/node/claim`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${jwtToken}`
+            },
+            body: JSON.stringify({
+              node_id: ident.node_id,
+              claim_token: ident.claim_token,
+              capacity_gb: config.max_gb,
+              storage_path: config.storage_path,
+              wallet_address: config.wallet_address || '0x0000000000000000000000000000000000000000'
+            })
+          });
+
+          if (claimRes.ok) {
+             setLogs(prev => [...prev, "[SUCCESS] Node securely linked to your account!"]);
+          } else {
+             const errData = await claimRes.json();
+             setLogs(prev => [...prev, `[WARNING] Gateway claim note: ${errData.error || errData.message}`]);
+          }
+        } catch (authErr) {
+          setLogs(prev => [...prev, `[ERROR] Failed to claim node on Gateway: ${authErr}`]);
+        }
+      }
+
+      setLogs(prev => [...prev, "[SYSTEM] Provisioning secure local partition..."]);
       setStep('dashboard');
       const success = await invoke('start_node');
       if (success) setIsRunning(true);
@@ -180,6 +235,12 @@ function App() {
               onChange={(v) => setConfig({...config, storage_path: v})}
             />
           </div>
+
+          {setupError && (
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-300">
+              {setupError}
+            </div>
+          )}
 
           <button 
             onClick={handleCompleteSetup}

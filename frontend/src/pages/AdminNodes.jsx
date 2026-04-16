@@ -7,6 +7,7 @@ export default function AdminNodeInventory() {
     const [nodes, setNodes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showSensitive, setShowSensitive] = useState(false);
     const [search, setSearch] = useState('');
     const [filterOS, setFilterOS] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
@@ -18,7 +19,7 @@ export default function AdminNodeInventory() {
             const headers = {};
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const response = await fetch(`${API_BASE}/api/admin/inventory`, { headers });
+            const response = await fetch(`${API_BASE}/api/admin/inventory?include_sensitive=${showSensitive ? 'true' : 'false'}`, { headers });
             if (!response.ok) throw new Error('Failed to load inventory');
             const data = await response.json();
             setNodes(data);
@@ -29,7 +30,7 @@ export default function AdminNodeInventory() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [showSensitive]);
 
     useEffect(() => {
         fetchInventory();
@@ -86,12 +87,25 @@ export default function AdminNodeInventory() {
                             {lastRefresh && <span className="text-xs text-slate-400 ml-2">Updated {lastRefresh.toLocaleTimeString()}</span>}
                         </p>
                     </div>
-                    <button
-                        onClick={fetchInventory}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl hover:border-emerald-300 hover:shadow-sm transition-all text-sm font-bold text-slate-600"
-                    >
-                        <RefreshCw className="w-4 h-4" /> Refresh
-                    </button>
+                    <div className="flex flex-wrap gap-3">
+                        <button
+                            onClick={() => setShowSensitive((value) => !value)}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all text-sm font-bold border ${
+                                showSensitive
+                                    ? 'bg-red-50 border-red-200 text-red-700'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:border-amber-300'
+                            }`}
+                        >
+                            <Shield className="w-4 h-4" />
+                            {showSensitive ? 'Hide Sensitive Telemetry' : 'Reveal Sensitive Telemetry'}
+                        </button>
+                        <button
+                            onClick={fetchInventory}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl hover:border-emerald-300 hover:shadow-sm transition-all text-sm font-bold text-slate-600"
+                        >
+                            <RefreshCw className="w-4 h-4" /> Refresh
+                        </button>
+                    </div>
                 </div>
 
                 {/* Stats */}
@@ -166,6 +180,9 @@ export default function AdminNodeInventory() {
                                         <h3 className="font-mono text-sm text-slate-800 font-bold">{node.node_id.substring(0, 20)}...</h3>
                                         <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-600 uppercase tracking-wider">
                                             {node.os} {node.version}
+                                        </span>
+                                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 uppercase tracking-wider">
+                                            {node.country_code || 'UN'}
                                         </span>
                                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
                                             node.status === 'online' ? 'bg-emerald-50 text-emerald-700' :

@@ -88,6 +88,60 @@ pub fn get_or_create_claim_token(storage_path: &str) -> anyhow::Result<String> {
     Ok(token)
 }
 
+/// Creates a secure storage vault with a cryptographic lock file.
+/// The lock prevents multiple nodes from using the same storage directory
+/// and creates the isolated `vault/` subdirectory for encrypted shard storage.
+pub fn create_storage_vault(storage_path: &str, node_id: &str) -> anyhow::Result<PathBuf> {
+    use std::io::Write;
+
+    let vault_dir = PathBuf::from(storage_path).join("vault");
+    fs::create_dir_all(&vault_dir)?;
+
+    let lock_path = PathBuf::from(storage_path).join("neurostore.lock");
+
+    // If lock exists, validate it belongs to this node
+    if lock_path.exists() {
+        let existing = fs::read_to_string(&lock_path).unwrap_or_default();
+        if let Some(locked_id) = existing.lines().next() {
+            let locked_id = locked_id.trim();
+            if !locked_id.is_empty() && locked_id != node_id {
+                anyhow::bail!(
+                    "Storage directory is locked by another node ({}). \
+                     Use a different --storage-path or remove the lock file: {:?}",
+                    locked_id,
+                    lock_path
+                );
+            }
+        }
+    }
+
+    // Write/refresh lock file with node identity and timestamp
+    let mut lock_file = fs::File::create(&lock_path)?;
+    writeln!(lock_file, "{}", node_id)?;
+    writeln!(lock_file, "locked_at={}", chrono::Utc::now().to_rfc3339())?;
+    writeln!(lock_file, "pid={}", std::process::id())?;
+    lock_file.sync_all()?;
+
+    // Set restrictive permissions on Windows
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        // Restrict the vault directory to the current user only
+        let _ = std::process::Command::new("icacls")
+            .args(&[
+                vault_dir.to_str().unwrap_or("."),
+                "/inheritance:r",
+                "/grant:r",
+                &format!("{}:(OI)(CI)F", whoami::username()),
+            ])
+            .creation_flags(0x08000000)
+            .output();
+    }
+
+    info!("Storage vault secured at {:?} (lock: {})", vault_dir, node_id);
+    Ok(vault_dir)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RegistrationState {
     pub peer_id: String,
@@ -163,8 +217,11 @@ pub async fn run_node_with_shutdown(
     }
     fs::create_dir_all(&final_storage_path)?;
     
+    // Create and lock the storage vault before starting operations
+    let vault_path = create_storage_vault(&final_storage_path.to_string_lossy(), &node_id)?;
+
     let store = Arc::new(SecureBlockStore::new(
-        &final_storage_path.to_string_lossy(),
+        &vault_path.to_string_lossy(),
         runtime.max_gb,
     ));
 
@@ -178,6 +235,7 @@ pub async fn run_node_with_shutdown(
     let node_id_for_heartbeat = node_id.clone();
     let runtime_clone = runtime.clone();
     let store_clone = store.clone();
+    let heartbeat_start = std::time::Instant::now();
     tokio::spawn(async move {
         let client = reqwest::Client::new();
         let gateway_url = runtime_clone.gateway_url.clone()
@@ -187,7 +245,7 @@ pub async fn run_node_with_shutdown(
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
         loop {
-            // FIX #3: Use correct sysinfo 0.30 API methods
+            // Use correct sysinfo 0.30 API methods
             let mut sys = sysinfo::System::new();
             sys.refresh_cpu();
             sys.refresh_memory();
@@ -213,9 +271,9 @@ pub async fn run_node_with_shutdown(
             let max_gb = max_bytes as f64 / 1_073_741_824.0;
             let free_gb = (max_bytes.saturating_sub(used_bytes)) as f64 / 1_073_741_824.0;
 
-            // FIX #1: Send the NEURO-XXXXXXXX node_id, not the raw peer_id.
-            // This is the same ID the browser URL sends to the dashboard,
-            // so the heartbeat cache and the earnings lookup will match.
+            // Track real uptime since the heartbeat loop started
+            let uptime_minutes = heartbeat_start.elapsed().as_secs_f64() / 60.0;
+
             let payload = serde_json::json!({
                 "node_id": node_id_for_heartbeat,
                 "status": "online",
@@ -227,7 +285,7 @@ pub async fn run_node_with_shutdown(
                 "max_gb": max_gb,
                 "free_gb": free_gb,
                 "shard_count": store_clone.get_shard_count(),
-                "uptime_min": 0,
+                "uptime_min": uptime_minutes,
                 "hostname": whoami::fallible::hostname().unwrap_or_default(),
             });
 

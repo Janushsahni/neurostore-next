@@ -1,4 +1,10 @@
-use axum::{extract::State, http::HeaderMap, http::StatusCode, response::IntoResponse, Json};
+use axum::{
+    extract::{Query, State},
+    http::HeaderMap,
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
 use chrono::Utc;
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
@@ -278,6 +284,27 @@ pub async fn register_provider_node(
                 payload.peer_id,
                 payload.declared_location
             );
+
+            // Bridge: seed node_registry with the NEURO-format node_id so
+            // heartbeats and dashboard lookups work immediately.
+            // The heartbeat will later upsert richer telemetry into this row.
+            let neuro_node_id = crate::handlers::nodes::derive_node_id_from_peer(&payload.peer_id);
+            let _ = sqlx::query(
+                r#"INSERT INTO node_registry (node_id, status, version, max_gb, claim_token, country_code)
+                   VALUES ($1, 'pending', $2, $3, $4, $5)
+                   ON CONFLICT (node_id) DO UPDATE SET
+                       claim_token = COALESCE(excluded.claim_token, node_registry.claim_token),
+                       max_gb = GREATEST(node_registry.max_gb, excluded.max_gb)
+                "#
+            )
+            .bind(&neuro_node_id)
+            .bind(payload.version.as_deref().unwrap_or("1.0.0"))
+            .bind(payload.capacity_gb as f64)
+            .bind(payload.claim_token.as_deref())
+            .bind(&payload.declared_location)
+            .execute(&state.db)
+            .await;
+
             let required_stake = (payload.capacity_gb as u64) * 10;
 
             (
@@ -306,6 +333,20 @@ fn is_valid_peer_id(value: &str) -> bool {
         return false;
     }
     value.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+/// Mirrors the node crate's `derive_node_id` function.
+/// Converts a raw libp2p peer ID to the NEURO-XXXXXXXX format used by the dashboard.
+pub fn derive_node_id_from_peer(peer_id: &str) -> String {
+    let suffix: String = peer_id
+        .chars()
+        .rev()
+        .take(8)
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect();
+    format!("NEURO-{}", suffix.to_uppercase())
 }
 
 /// Helper to compare basic semver strings like "0.1.0" vs "0.2.1"
@@ -510,6 +551,7 @@ pub async fn node_heartbeat(
 pub async fn get_admin_inventory(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    Query(query): Query<AdminInventoryQuery>,
 ) -> impl IntoResponse {
     let claims = match crate::handlers::auth::decode_claims_from_request(&headers, &state) {
         Ok(c) => c,
@@ -520,8 +562,10 @@ pub async fn get_admin_inventory(
         return (StatusCode::FORBIDDEN, "Admin role required").into_response();
     }
 
-    let nodes = sqlx::query_as::<_, (String, String, String, String, i32, f64, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, Option<String>, f32, f32, Option<String>)>(
-        r#"SELECT node_id, status, os, version, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, hostname, device_fingerprint, ip_address, cpu_usage_percent, memory_usage_percent, mac_address
+    let include_sensitive = query.include_sensitive.unwrap_or(false);
+
+    let nodes = sqlx::query_as::<_, AdminInventoryRow>(
+        r#"SELECT node_id, status, os, version, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, hostname, device_fingerprint, ip_address, cpu_usage_percent, memory_usage_percent, mac_address, country_code, ingress_url
            FROM node_registry ORDER BY last_heartbeat_at DESC"#,
     )
     .fetch_all(&state.db)
@@ -531,7 +575,7 @@ pub async fn get_admin_inventory(
     let nodes_json: Vec<serde_json::Value> = nodes
         .iter()
         .map(|n| {
-            let last_hb = n.9;
+            let last_hb = n.last_heartbeat_at;
             let status = if let Some(hb) = last_hb {
                 let diff = Utc::now().signed_duration_since(hb).num_seconds();
                 if diff > 120 {
@@ -542,26 +586,29 @@ pub async fn get_admin_inventory(
                     "online"
                 }
             } else {
-                "offline"
+                n.status.as_str()
             };
 
             serde_json::json!({
-                "node_id": n.0,
+                "node_id": n.node_id,
                 "status": status,
-                "os": n.2,
-                "version": n.3,
-                "shard_count": n.4,
-                "used_gb": format!("{:.3}", n.5),
-                "max_gb": format!("{:.1}", n.6),
-                "total_earned_inr": format!("{:.2}", n.7),
-                "uptime_minutes": format!("{:.1}", n.8),
+                "os": n.os,
+                "version": n.version,
+                "shard_count": n.shard_count,
+                "used_gb": format!("{:.3}", n.used_gb),
+                "max_gb": format!("{:.1}", n.max_gb),
+                "total_earned_inr": format!("{:.2}", n.total_earned_inr),
+                "uptime_minutes": format!("{:.1}", n.uptime_minutes),
                 "last_heartbeat_at": last_hb.map(|d| d.to_rfc3339()),
-                "hostname": n.10,
-                "device_fingerprint": n.11,
-                "ip_address": n.12,
-                "cpu_usage_percent": format!("{:.1}", n.13),
-                "memory_usage_percent": format!("{:.1}", n.14),
-                "mac_address": n.15,
+                "hostname": n.hostname,
+                "country_code": n.country_code.clone().unwrap_or_else(|| "UN".to_string()),
+                "ingress_url": if include_sensitive { n.ingress_url.clone() } else { None },
+                "device_fingerprint": if include_sensitive { n.device_fingerprint.clone() } else { mask_sensitive_value(n.device_fingerprint.as_deref(), 6, 4) },
+                "ip_address": if include_sensitive { n.ip_address.clone() } else { None },
+                "cpu_usage_percent": if include_sensitive { Some(format!("{:.1}", n.cpu_usage_percent)) } else { None },
+                "memory_usage_percent": if include_sensitive { Some(format!("{:.1}", n.memory_usage_percent)) } else { None },
+                "mac_address": if include_sensitive { n.mac_address.clone() } else { mask_sensitive_value(n.mac_address.as_deref(), 4, 2) },
+                "sensitive_redacted": !include_sensitive,
             })
         })
         .collect();
@@ -784,7 +831,7 @@ pub async fn node_earnings(
 ) -> impl IntoResponse {
     let claims = match crate::handlers::auth::decode_claims_from_request(&headers, &state) {
         Ok(c) => c,
-        Err(_) => return (StatusCode::UNAUTHORIZED, "Auth required").into_response(),
+        Err(_) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Auth required"}))).into_response(),
     };
 
     if node_id.is_empty() || node_id.len() > 64 {
@@ -1259,6 +1306,53 @@ pub struct ClaimNodeRequest {
     pub wallet_address: Option<String>,
 }
 
+#[derive(Deserialize, Default)]
+pub struct AdminInventoryQuery {
+    pub include_sensitive: Option<bool>,
+}
+
+#[derive(sqlx::FromRow)]
+struct AdminInventoryRow {
+    node_id: String,
+    status: String,
+    os: String,
+    version: String,
+    shard_count: i32,
+    used_gb: f64,
+    max_gb: f64,
+    total_earned_inr: f64,
+    uptime_minutes: f64,
+    last_heartbeat_at: Option<chrono::DateTime<chrono::Utc>>,
+    hostname: Option<String>,
+    device_fingerprint: Option<String>,
+    ip_address: Option<String>,
+    cpu_usage_percent: f32,
+    memory_usage_percent: f32,
+    mac_address: Option<String>,
+    country_code: Option<String>,
+    ingress_url: Option<String>,
+}
+
+fn matches_claimed_node(requested_node_id: &str, actual_node_id: &str) -> bool {
+    requested_node_id.trim().eq_ignore_ascii_case(actual_node_id.trim())
+}
+
+fn mask_sensitive_value(value: Option<&str>, prefix: usize, suffix: usize) -> Option<String> {
+    let raw = value?.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    if raw.len() <= prefix + suffix {
+        return Some("redacted".to_string());
+    }
+
+    Some(format!(
+        "{}...{}",
+        &raw[..prefix],
+        &raw[raw.len().saturating_sub(suffix)..]
+    ))
+}
+
 pub async fn claim_node(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -1282,11 +1376,71 @@ pub async fn claim_node(
     .flatten();
 
     let Some((peer_id,)) = node_row else {
+        // Fallback: search node_registry (heartbeat flush creates entries there even when
+        // the registration pathway via the `nodes` table was skipped in cloud mode)
+        let registry_row: Option<(String,)> = sqlx::query_as(
+            "SELECT node_id FROM node_registry WHERE claim_token = $1 AND claim_token IS NOT NULL"
+        )
+        .bind(&payload.claim_token)
+        .fetch_optional(&state.db)
+        .await
+        .ok()
+        .flatten();
+
+        if let Some((reg_node_id,)) = registry_row {
+            if !matches_claimed_node(&payload.node_id, &reg_node_id) {
+                return (StatusCode::FORBIDDEN, Json(serde_json::json!({
+                    "error": "Claim token does not belong to the requested node"
+                }))).into_response();
+            }
+
+            let node_id = &reg_node_id;
+
+            let insert_res = sqlx::query(
+                "INSERT INTO node_ownership (node_id, owner_email) VALUES ($1, $2) ON CONFLICT (node_id) DO NOTHING"
+            )
+            .bind(node_id)
+            .bind(&claims.email)
+            .execute(&state.db)
+            .await;
+
+            if let Ok(r) = &insert_res {
+                if r.rows_affected() > 0 {
+                    let _ = sqlx::query(
+                        "UPDATE node_registry SET max_gb = COALESCE($1, max_gb), wallet_address = COALESCE($2, wallet_address), claim_token = $3 WHERE node_id = $4"
+                    )
+                    .bind(payload.capacity_gb.map(|v| v as f64))
+                    .bind(&payload.wallet_address)
+                    .bind(Some(&payload.claim_token))
+                    .bind(node_id)
+                    .execute(&state.db)
+                    .await;
+
+                    tracing::info!("Node {} claimed by {} (via registry fallback)", node_id, claims.email);
+                    return (StatusCode::OK, Json(serde_json::json!({"status": "ok", "message": "Node claimed and configured successfully"}))).into_response();
+                }
+            }
+
+            return match insert_res {
+                Ok(_) => (StatusCode::CONFLICT, Json(serde_json::json!({"error": "Node already claimed by another account"}))).into_response(),
+                Err(e) => {
+                    tracing::error!("Claim error (registry fallback): {}", e);
+                    (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Database error during claim"}))).into_response()
+                }
+            };
+        }
+
         return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Node not found. Make sure the node is running and has registered with the network."}))).into_response();
     };
 
-    // Use the NEURO-format node_id from the request for ownership records
-    let node_id = &payload.node_id;
+    let derived_node_id = derive_node_id_from_peer(&peer_id);
+    if !matches_claimed_node(&payload.node_id, &derived_node_id) {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({
+            "error": "Claim token does not belong to the requested node"
+        }))).into_response();
+    }
+
+    let node_id = &derived_node_id;
 
     let insert_res = sqlx::query(
         "INSERT INTO node_ownership (node_id, owner_email) VALUES ($1, $2) ON CONFLICT (node_id) DO NOTHING"
@@ -1329,6 +1483,37 @@ pub async fn claim_node(
             tracing::error!("Claim error: {}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": "Database error during claim"}))).into_response()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{derive_node_id_from_peer, mask_sensitive_value, matches_claimed_node};
+
+    #[test]
+    fn claim_matching_is_case_insensitive() {
+        assert!(matches_claimed_node("NEURO-ABC12345", "neuro-abc12345"));
+        assert!(!matches_claimed_node("NEURO-ABC12345", "NEURO-XYZ12345"));
+    }
+
+    #[test]
+    fn peer_id_derivation_matches_expected_shape() {
+        assert_eq!(
+            derive_node_id_from_peer("12D3KooWABCDEFGH12345678"),
+            "NEURO-12345678"
+        );
+    }
+
+    #[test]
+    fn masking_keeps_only_safe_edges() {
+        assert_eq!(
+            mask_sensitive_value(Some("abcdef1234567890"), 4, 4).as_deref(),
+            Some("abcd...7890")
+        );
+        assert_eq!(
+            mask_sensitive_value(Some("short"), 4, 4).as_deref(),
+            Some("redacted")
+        );
     }
 }
 

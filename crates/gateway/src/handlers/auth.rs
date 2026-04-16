@@ -77,11 +77,7 @@ pub(crate) fn create_jwt(email: &str, secret: &str) -> String {
         .expect("valid timestamp")
         .timestamp() as usize;
 
-    let role = if email.eq_ignore_ascii_case("janushsahni24@gmail.com") {
-        "admin"
-    } else {
-        "user"
-    };
+    let role = role_for_email(email);
 
     let claims = Claims {
         email: email.to_owned(),
@@ -97,6 +93,40 @@ pub(crate) fn create_jwt(email: &str, secret: &str) -> String {
         &EncodingKey::from_secret(secret.as_bytes()),
     )
     .unwrap_or_default()
+}
+
+pub(crate) fn configured_admin_emails() -> Vec<String> {
+    let configured = std::env::var("ADMIN_EMAILS").unwrap_or_default();
+    let mut emails: Vec<String> = configured
+        .split(',')
+        .map(normalize_email)
+        .filter(|value| !value.is_empty())
+        .collect();
+
+    if emails.is_empty() {
+        let legacy_admin = normalize_email("janushsahni24@gmail.com");
+        tracing::warn!("ADMIN_EMAILS not configured; falling back to legacy single-admin mode");
+        emails.push(legacy_admin);
+    }
+
+    emails.sort();
+    emails.dedup();
+    emails
+}
+
+pub(crate) fn is_admin_email(email: &str) -> bool {
+    let normalized = normalize_email(email);
+    configured_admin_emails()
+        .into_iter()
+        .any(|candidate| candidate == normalized)
+}
+
+pub(crate) fn role_for_email(email: &str) -> String {
+    if is_admin_email(email) {
+        "admin".to_string()
+    } else {
+        "user".to_string()
+    }
 }
 
 fn normalize_email(email: &str) -> String {
@@ -286,7 +316,8 @@ pub async fn register(
     match insert_result {
         Ok(_) => {
             let token = create_jwt(&email, &state.jwt_secret);
-            let user = UserProfile { email, name };
+            let role = role_for_email(&email);
+            let user = UserProfile { email, name, role };
             auth_response(StatusCode::CREATED, token, user, state.cookie_secure).into_response()
         }
         Err(e) => {
@@ -369,9 +400,11 @@ pub async fn login(
     let token = create_jwt(&user_row.email, &state.jwt_secret);
     let name = user_row.name.unwrap_or_else(|| user_row.email.clone());
 
+    let role = role_for_email(&user_row.email);
     let user = UserProfile {
         email: user_row.email,
         name,
+        role,
     };
 
     auth_response(StatusCode::OK, token, user, state.cookie_secure).into_response()
@@ -396,16 +429,30 @@ pub async fn session(State(state): State<Arc<AppState>>, headers: HeaderMap) -> 
             .into_response();
     };
 
-    let csrf_token = get_cookie_value(&headers, CSRF_COOKIE).unwrap_or_default();
+    // Generate a fresh JWT token so the frontend can recover lost sessionStorage
+    let token = create_jwt(&user.email, &state.jwt_secret);
+    let csrf_token = generate_csrf_token();
+
+    let user_email = user.email.clone();
     let profile = UserProfile {
-        email: user.email.clone(),
+        email: user_email.clone(),
         name: user.name.unwrap_or(user.email),
+        role: role_for_email(&user_email),
     };
+
+    // Refresh the CSRF cookie to stay in sync
+    let mut response_headers = HeaderMap::new();
+    let csrf_cookie = build_cookie(CSRF_COOKIE, &csrf_token, 24 * 60 * 60, state.cookie_secure, false);
+    if let Ok(v) = HeaderValue::from_str(&csrf_cookie) {
+        response_headers.append(SET_COOKIE, v);
+    }
 
     (
         StatusCode::OK,
+        response_headers,
         Json(serde_json::json!({
             "user": profile,
+            "token": token,
             "csrf_token": csrf_token,
         })),
     )

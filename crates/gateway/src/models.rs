@@ -62,6 +62,7 @@ pub struct AuthResponse {
 pub struct UserProfile {
     pub email: String,
     pub name: String,
+    pub role: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

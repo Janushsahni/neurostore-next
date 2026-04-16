@@ -15,6 +15,7 @@ For production also set:
 - `ENVIRONMENT=production`
 - `ALLOWED_ORIGINS` to your public UI origins only
 - `COOKIE_SECURE=true`
+- `ADMIN_EMAILS` to a comma-separated list of operator accounts that may access admin routes
 
 ### 2. Start the stack
 
@@ -50,6 +51,7 @@ You can contribute storage to the NeuroStore network and earn rewards by running
 3. Double-click `Install-NeuroStore.bat`.
 4. Follow the GUI prompts to select your storage location and capacity.
 5. Once installed, your browser will open the dashboard where you can claim your node and start earning.
+6. After authentication, the desktop app persists its pairing locally and auto-starts with the system so the node can rejoin after reboot.
 
 ## Large Audience Rollout
 
@@ -66,6 +68,13 @@ Re-run readiness and KPI checks after each scale step.
 Node registration requires shared-secret authentication:
 - Header: `x-node-secret: <NODE_SHARED_SECRET>`
 - Endpoint: `POST /api/nodes/register`
+
+Desktop self-onboarding may also register with a per-node `claim_token`, but node claiming now verifies that the token matches the requested `node_id` before ownership is granted.
+
+## Admin Telemetry Protection
+
+- Admin inventory now redacts IP addresses, MAC addresses, device fingerprints, and host resource telemetry by default.
+- Operators must explicitly request sensitive telemetry in the admin UI before those values are exposed.
 
 ## Zero-Knowledge API Uploads
 

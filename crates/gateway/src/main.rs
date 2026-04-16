@@ -286,6 +286,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/nodes/register", post(handlers::nodes::register_provider_node))
         .route("/node/register", post(handlers::nodes::register_provider_node))
         .route("/node/heartbeat", post(handlers::nodes::node_heartbeat))
+        .route("/nodes/heartbeat", post(handlers::nodes::node_heartbeat))
         .route("/nodes/stats", get(handlers::nodes::network_stats))
         .route("/nodes/explorer", get(handlers::nodes::list_public_nodes))
         .route("/node/:node_id/earnings", get(handlers::nodes::node_earnings))
@@ -372,6 +373,9 @@ async fn health_check(State(state): State<Arc<AppState>>) -> Json<serde_json::Va
     }
     if state.node_shared_secret.len() < 32 {
         warnings.push("NODE_SHARED_SECRET is shorter than 32 characters".to_string());
+    }
+    if crate::handlers::auth::configured_admin_emails().is_empty() {
+        warnings.push("ADMIN_EMAILS is not configured".to_string());
     }
     if !state.cookie_secure {
         warnings.push("COOKIE_SECURE is disabled".to_string());
@@ -570,6 +574,7 @@ async fn emergency_controls(request: Request, next: Next) -> Response {
         "/auth/logout",
         "/api/logout",
         "/api/node/heartbeat",
+        "/api/nodes/heartbeat",
         "/zk/submit-proof",
     ];
     let exempt_write = exempt_write_paths.iter().any(|p| path == *p);

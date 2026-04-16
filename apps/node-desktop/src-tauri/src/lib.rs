@@ -25,7 +25,9 @@ struct NodeConfig {
 impl Default for NodeConfig {
     fn default() -> Self {
         #[cfg(windows)]
-        let default_path = "C:\\ProgramData\\NeuroStore\\node-data".to_string();
+        let default_path = std::env::var("LOCALAPPDATA")
+            .map(|root| format!("{}\\NeuroStore\\node-data", root.trim_end_matches('\\')))
+            .unwrap_or_else(|_| "C:\\Users\\Public\\NeuroStore\\node-data".to_string());
         #[cfg(not(windows))]
         let default_path = "/var/lib/neurostore".to_string();
 
@@ -70,7 +72,7 @@ fn save_config(
 }
 
 #[tauri::command]
-fn open_auth_url(app_handle: AppHandle) -> Result<(), String> {
+fn open_auth_url(_app_handle: AppHandle) -> Result<(), String> {
     let auth_url = "https://neurostore.vercel.app/login?redirect=desktop";
     let _ = tauri_plugin_opener::open_url(auth_url, None::<&str>);
     Ok(())
@@ -89,16 +91,19 @@ async fn start_node(app_handle: AppHandle, state: State<'_, AppState>) -> Result
         return Err("Authentication required".to_string());
     }
 
-    let (tx, _rx) = oneshot::channel();
+    let (tx, rx) = oneshot::channel();
     *state.shutdown_tx.lock().unwrap() = Some(tx);
     state.running.store(true, Ordering::SeqCst);
 
     let running_flag = state.running.clone();
     let app_handle_clone = app_handle.clone();
+    let app_handle_err = app_handle.clone();
 
     // Map desktop config to the storage engine's RuntimeConfig
     let identity_dir = app_handle.path().app_config_dir().unwrap_or(PathBuf::from("."));
-    let _runtime = RuntimeConfig {
+    let storage_dir = config.storage_path.clone();
+    
+    let runtime_cfg = RuntimeConfig {
         storage_path: config.storage_path.clone(),
         max_gb: config.max_gb,
         listen: "/ip4/0.0.0.0/tcp/9000".to_string(),
@@ -112,31 +117,67 @@ async fn start_node(app_handle: AppHandle, state: State<'_, AppState>) -> Result
         wallet_address: config.wallet_address.clone(),
         declared_location: "IN".to_string(),
         auto_register: true,
-        identity_dir,
+        identity_dir: identity_dir.clone(),
     };
 
-    // Spawn the ACTUAL Rust Storage Engine
+    let _ = app_handle_clone.emit("node-log", "[SYSTEM] Launching High-Performance Rust Storage Engine...");
+    
+    // Attempt to parse peer_id for vault tracking
+    let peer_id = match neuronode::load_or_create_identity(&identity_dir.to_string_lossy()) {
+        Ok(kp) => kp.public().to_peer_id().to_string(),
+        Err(_) => "UNKNOWN".to_string(),
+    };
+    let node_id = neuronode::derive_node_id(&peer_id);
+    
+    // 1. Spawn ACTUAL Rust Storage Engine
+    let runtime_cfg_clone = runtime_cfg.clone();
     tauri::async_runtime::spawn(async move {
-        let _ = app_handle_clone.emit("node-log", "[SYSTEM] Launching High-Performance Rust Storage Engine...");
-        
+        if let Err(e) = neuronode::run_node_with_shutdown(&runtime_cfg_clone, rx).await {
+            let _ = app_handle_err.emit("node-log", format!("[ERROR] Node Engine Halted: {}", e));
+            // Trigger UI stop state
+            let _ = app_handle_err.emit("node-log", "[SYSTEM] Node stopped gracefully. (CRASH)");
+        }
+    });
+
+    // 2. Spawn Telemetry Monitor (Real Metrics)
+    tauri::async_runtime::spawn(async move {
         let mut sys = sysinfo::System::new_all();
+        let start_time = std::time::Instant::now();
         let mut loop_count = 0;
+
+        let shards_path = PathBuf::from(&storage_dir)
+            .join(if storage_dir.ends_with(&node_id) { "" } else { &node_id })
+            .join("vault")
+            .join("shards");
 
         while running_flag.load(Ordering::SeqCst) {
             sys.refresh_all();
             let cpu = sys.global_cpu_info().cpu_usage();
             let mem = sys.used_memory() / 1024 / 1024; // MB
+            let uptime = start_time.elapsed().as_secs();
+
+            // Count real physical physical encrypted shards
+            let shards = if let Ok(entries) = std::fs::read_dir(&shards_path) {
+                entries.filter_map(Result::ok)
+                    .filter(|e| e.path().is_file() && e.path().extension().and_then(|s| s.to_str()) == Some("neuro"))
+                    .count()
+            } else {
+                0
+            };
+
+            // Estimate earnings based on shards/uptime
+            let earnings = format!("{:.4}", (uptime as f32 / 3600.0) * 0.15 + (shards as f32 * 0.001));
 
             let _ = app_handle_clone.emit("node-stats", serde_json::json!({
                 "cpu": format!("{:.1}", cpu),
                 "mem": format!("{}", mem),
-                "shards": loop_count * 4 + 128,
-                "uptime": loop_count * 5,
-                "earnings": format!("{:.4}", (loop_count as f32) * 0.0008 + 0.1245)
+                "shards": shards,
+                "uptime": uptime,
+                "earnings": earnings
             }));
 
-            if loop_count % 6 == 0 {
-                let _ = app_handle_clone.emit("node-log", format!("[INFO] Shard Verification Loop: {} chunks validated cryptographically.", loop_count * 4));
+            if loop_count % 12 == 1 {
+                let _ = app_handle_clone.emit("node-log", format!("[INFO] Storage Vault Integrity Checked. ({} elements)", shards));
             }
 
             tokio::time::sleep(Duration::from_secs(5)).await;
@@ -156,6 +197,25 @@ fn stop_node(state: State<'_, AppState>) -> Result<bool, String> {
     Ok(true)
 }
 
+#[tauri::command]
+fn get_identity_info(app_handle: AppHandle) -> Result<serde_json::Value, String> {
+    let identity_dir = app_handle.path().app_config_dir().unwrap_or(PathBuf::from("."));
+    fs::create_dir_all(&identity_dir).map_err(|e| e.to_string())?;
+
+    let peer_id = match neuronode::load_or_create_identity(&identity_dir.to_string_lossy()) {
+        Ok(kp) => kp.public().to_peer_id().to_string(),
+        Err(e) => return Err(e.to_string()),
+    };
+    let node_id = neuronode::derive_node_id(&peer_id);
+    let claim_token = neuronode::get_or_create_claim_token(&identity_dir.to_string_lossy())
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({
+        "node_id": node_id,
+        "claim_token": claim_token
+    }))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -172,7 +232,8 @@ pub fn run() {
             stop_node,
             get_config,
             save_config,
-            open_auth_url
+            open_auth_url,
+            get_identity_info
         ])
         .setup(|app| {
             // SINGLE INSTANCE & DEEP LINK HANDLING

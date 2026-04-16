@@ -27,6 +27,14 @@ pub struct ControlPatch {
 }
 
 fn admin_authorized(headers: &HeaderMap) -> bool {
+    if let Some(auth_header) = headers.get(axum::http::header::AUTHORIZATION).and_then(|v| v.to_str().ok()) {
+        let configured = std::env::var("ADMIN_API_TOKEN").unwrap_or_default();
+        let bearer = auth_header.trim().strip_prefix("Bearer ").unwrap_or_default();
+        if !configured.is_empty() && !bearer.is_empty() && bool::from(bearer.as_bytes().ct_eq(configured.as_bytes())) {
+            return true;
+        }
+    }
+
     let configured = std::env::var("ADMIN_API_TOKEN").unwrap_or_default();
     if configured.is_empty() {
         return false;

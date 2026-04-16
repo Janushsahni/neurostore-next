@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Check, Zap, Shield, Building2, GraduationCap, Scale, BadgeIndianRupee, ArrowRight, Sparkles, Heart, BookOpen, X, CreditCard, Lock } from "lucide-react";
+import { Check, Building2, GraduationCap, Scale, BadgeIndianRupee, ArrowRight, Sparkles, Heart, X, CreditCard, Lock } from "lucide-react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion as Motion, AnimatePresence } from "framer-motion";
 
 const plans = [
     {
@@ -124,14 +124,14 @@ const BillingModal = ({ plan, onClose }) => {
     const [step, setStep] = useState(1); // 1=confirm, 2=payment, 3=success
 
     return (
-        <motion.div
+        <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
             onClick={onClose}
         >
-            <motion.div
+            <Motion.div
                 initial={{ scale: 0.92, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.92, opacity: 0, y: 20 }}
@@ -157,11 +157,11 @@ const BillingModal = ({ plan, onClose }) => {
                 <div className="p-6">
                     <AnimatePresence mode="wait">
                         {step === 1 && (
-                            <motion.div key="confirm" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                            <Motion.div key="confirm" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
                                 <p className="text-sm text-slate-600 font-medium mb-4">You're about to activate the <strong className="text-slate-900">{plan.name}</strong> plan with the following benefits:</p>
                                 <ul className="space-y-2.5 mb-6">
                                     {plan.features.map((f, i) => (
-                                        <motion.li
+                                        <Motion.li
                                             key={i}
                                             initial={{ opacity: 0, x: -10 }}
                                             animate={{ opacity: 1, x: 0 }}
@@ -169,7 +169,7 @@ const BillingModal = ({ plan, onClose }) => {
                                             className="flex items-center gap-2.5 text-sm font-medium text-slate-700"
                                         >
                                             <Check size={16} className="text-emerald-500 shrink-0" /> {f}
-                                        </motion.li>
+                                        </Motion.li>
                                     ))}
                                 </ul>
                                 <button
@@ -178,11 +178,11 @@ const BillingModal = ({ plan, onClose }) => {
                                 >
                                     <CreditCard size={18} /> Continue to Payment
                                 </button>
-                            </motion.div>
+                            </Motion.div>
                         )}
 
                         {step === 2 && (
-                            <motion.div key="payment" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                            <Motion.div key="payment" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
                                 <div className="space-y-4">
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Card Number</label>
@@ -208,19 +208,19 @@ const BillingModal = ({ plan, onClose }) => {
                                 >
                                     Pay {plan.price} Now <ArrowRight size={18} />
                                 </button>
-                            </motion.div>
+                            </Motion.div>
                         )}
 
                         {step === 3 && (
-                            <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-6">
-                                <motion.div
+                            <Motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-6">
+                                <Motion.div
                                     initial={{ scale: 0 }}
                                     animate={{ scale: 1 }}
                                     transition={{ type: "spring", stiffness: 300, damping: 15, delay: 0.1 }}
                                     className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5"
                                 >
                                     <Check size={40} className="text-emerald-500" />
-                                </motion.div>
+                                </Motion.div>
                                 <h4 className="text-2xl font-display font-extrabold text-slate-900 mb-2">You're on {plan.name}! 🎉</h4>
                                 <p className="text-sm text-slate-500 font-medium mb-6">Your storage quota has been upgraded immediately. Start uploading to your expanded vault.</p>
                                 <Link
@@ -229,12 +229,12 @@ const BillingModal = ({ plan, onClose }) => {
                                 >
                                     Go to Dashboard <ArrowRight size={18} />
                                 </Link>
-                            </motion.div>
+                            </Motion.div>
                         )}
                     </AnimatePresence>
                 </div>
-            </motion.div>
-        </motion.div>
+            </Motion.div>
+        </Motion.div>
     );
 };
 
@@ -246,7 +246,7 @@ export const Pricing = () => {
         <div className="min-h-[calc(100vh-80px)] px-6 py-16 bg-slate-50 selection:bg-emerald-500/30 text-slate-800">
             <div className="mx-auto max-w-6xl">
                 {/* Hero */}
-                <motion.div
+                <Motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
@@ -261,7 +261,7 @@ export const Pricing = () => {
                     <p className="text-slate-500 font-medium max-w-2xl mx-auto">
                         Pay only for what you use. No hidden fees, no egress surprises. All plans include AES-256 encryption and Indian data residency.
                     </p>
-                </motion.div>
+                </Motion.div>
 
                 {/* Animated Tab Switcher */}
                 <div className="flex justify-center mb-10">
@@ -279,7 +279,7 @@ export const Pricing = () => {
                             Industry Solutions
                         </button>
                         {/* Animated pill indicator */}
-                        <motion.div
+                        <Motion.div
                             layoutId="pricing-tab-pill"
                             className="absolute top-1.5 h-[calc(100%-12px)] bg-emerald-50 rounded-lg border border-emerald-100 shadow-sm"
                             style={{
@@ -294,7 +294,7 @@ export const Pricing = () => {
                 {/* Standard Plans */}
                 <AnimatePresence mode="wait">
                     {tab === "plans" && (
-                        <motion.div
+                        <Motion.div
                             key="plans"
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -303,7 +303,7 @@ export const Pricing = () => {
                             className="grid gap-6 md:grid-cols-3"
                         >
                             {plans.map((plan, i) => (
-                                <motion.div
+                                <Motion.div
                                     key={plan.name}
                                     custom={i}
                                     variants={cardVariants}
@@ -313,14 +313,14 @@ export const Pricing = () => {
                                     className={`rounded-3xl border p-8 relative flex flex-col ${plan.accent} transition-shadow hover:shadow-xl`}
                                 >
                                     {plan.badge && (
-                                        <motion.div
+                                        <Motion.div
                                             initial={{ scale: 0, y: 10 }}
                                             animate={{ scale: 1, y: 0 }}
                                             transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.4 }}
                                             className="absolute -top-3 left-1/2 -translate-x-1/2"
                                         >
                                             <span className="rounded-full bg-emerald-500 px-4 py-1 text-xs font-bold text-white shadow-md shadow-emerald-500/30">{plan.badge}</span>
-                                        </motion.div>
+                                        </Motion.div>
                                     )}
                                     <div className="mb-6">
                                         <h3 className="text-2xl font-bold mb-2 text-slate-800">{plan.name}</h3>
@@ -349,14 +349,14 @@ export const Pricing = () => {
                                             {plan.cta} <ArrowRight size={18} />
                                         </button>
                                     )}
-                                </motion.div>
+                                </Motion.div>
                             ))}
-                        </motion.div>
+                        </Motion.div>
                     )}
 
                     {/* Vertical Solutions */}
                     {tab === "verticals" && (
-                        <motion.div
+                        <Motion.div
                             key="verticals"
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -365,7 +365,7 @@ export const Pricing = () => {
                             className="grid gap-6 md:grid-cols-2"
                         >
                             {verticals.map((v, i) => (
-                                <motion.div
+                                <Motion.div
                                     key={v.name}
                                     custom={i}
                                     variants={cardVariants}
@@ -400,14 +400,14 @@ export const Pricing = () => {
                                     >
                                         Contact Sales <ArrowRight size={18} />
                                     </button>
-                                </motion.div>
+                                </Motion.div>
                             ))}
-                        </motion.div>
+                        </Motion.div>
                     )}
                 </AnimatePresence>
 
                 {/* Enterprise CTA */}
-                <motion.div
+                <Motion.div
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, margin: "-80px" }}
@@ -428,10 +428,10 @@ export const Pricing = () => {
                             Talk to Enterprise Sales <ArrowRight size={20} />
                         </a>
                     </div>
-                </motion.div>
+                </Motion.div>
 
                 {/* Comparison with AWS */}
-                <motion.div
+                <Motion.div
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, margin: "-80px" }}
@@ -458,7 +458,7 @@ export const Pricing = () => {
                             </tbody>
                         </table>
                     </div>
-                </motion.div>
+                </Motion.div>
             </div>
 
             {/* Billing Modal */}
@@ -468,3 +468,4 @@ export const Pricing = () => {
         </div>
     );
 };
+

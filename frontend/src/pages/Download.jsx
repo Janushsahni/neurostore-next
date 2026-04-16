@@ -6,8 +6,6 @@ const GITHUB_RELEASE_BASE = 'https://github.com/Janushsahni/neurostore-next/rele
 export const Download = () => {
     const [activeOS, setActiveOS] = useState('windows');
 
-    const windowsMsiUrl = `${GITHUB_RELEASE_BASE}/neuro-node-windows-x86_64.msi`;
-    const windowsZipUrl = `${GITHUB_RELEASE_BASE}/neuro-node-windows-x86_64.zip`;
     const checksumsUrl = `${GITHUB_RELEASE_BASE}/SHA256SUMS.txt`;
     const macArmUrl = `${GITHUB_RELEASE_BASE}/neuro-node-macos-arm64.tar.gz`;
     const macX64Url = `${GITHUB_RELEASE_BASE}/neuro-node-macos-x86_64.tar.gz`;

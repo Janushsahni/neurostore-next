@@ -1,30 +1,30 @@
-import React, { useState, useEffect, Component } from "react";
+import React, { useState, useEffect, Component, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate, useLocation } from "react-router-dom";
 import {
   ArrowRight, Database, Globe, HardDrive, LogOut, Menu, Server,
   ShieldCheck, Sparkles, X, Zap, Cloud
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion as Motion, AnimatePresence } from "framer-motion";
 
 import { AuthCallback, Login, Register } from "./pages/Auth";
-import { DriveDashboard } from "./pages/DriveDashboard";
-import { NodeDashboard } from "./pages/NodeDashboard";
 import { FAQ } from "./pages/FAQ";
-import { Download } from "./pages/Download";
-import { Pricing } from "./pages/Pricing";
-import { ComplianceDashboard } from "./pages/ComplianceDashboard";
-import { S3Migration } from "./pages/S3Migration";
 import { About } from "./pages/About";
 import { Contact } from "./pages/Contact";
-import { ObjectExplorer } from "./pages/ObjectExplorer";
-import AdminNodes from "./pages/AdminNodes";
 import { clearAuthSession, getAuthUser, isAuthenticated as hasAuthSession, setAuthSession } from "./lib/authStorage";
 import { apiJson } from "./lib/apiClient";
 
+const DriveDashboard = lazy(() => import("./pages/DriveDashboard").then((module) => ({ default: module.DriveDashboard })));
+const NodeDashboard = lazy(() => import("./pages/NodeDashboard").then((module) => ({ default: module.NodeDashboard })));
+const Download = lazy(() => import("./pages/Download").then((module) => ({ default: module.Download })));
+const Pricing = lazy(() => import("./pages/Pricing").then((module) => ({ default: module.Pricing })));
+const ComplianceDashboard = lazy(() => import("./pages/ComplianceDashboard").then((module) => ({ default: module.ComplianceDashboard })));
+const S3Migration = lazy(() => import("./pages/S3Migration").then((module) => ({ default: module.S3Migration })));
+const ObjectExplorer = lazy(() => import("./pages/ObjectExplorer").then((module) => ({ default: module.ObjectExplorer })));
+const AdminNodes = lazy(() => import("./pages/AdminInventoryPage"));
 
 const FeatureCard = ({ icon, title, description, badge, color = "text-primary" }) => (
-  <motion.article 
+  <Motion.article 
     initial={{ opacity: 0, y: 20 }}
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true, margin: "-100px" }}
@@ -39,7 +39,7 @@ const FeatureCard = ({ icon, title, description, badge, color = "text-primary" }
     </div>
     <h3 className="mb-2 text-xl font-bold">{title}</h3>
     <p className="text-sm text-muted leading-relaxed">{description}</p>
-  </motion.article>
+  </Motion.article>
 );
 
 const ProtectedRoute = ({ isAuthenticated, children }) => {
@@ -58,7 +58,7 @@ const AdminRoute = ({ isAuthenticated, children }) => {
     return <Navigate to={`/login?return=${returnUrl}`} replace />;
   }
   const user = getAuthUser();
-  if (user?.email !== 'janushsahni24@gmail.com' && user?.username !== 'janushsahni24@gmail.com') {
+  if (user?.role !== 'admin') {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -165,16 +165,16 @@ const LandingPage = () => (
     {/* ── HERO ── */}
     <section className="relative px-6 pb-20 pt-24 md:pt-32">
       <div className="mx-auto max-w-6xl text-center relative z-10">
-        <motion.div 
+        <Motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="mb-8 inline-flex items-center gap-2 rounded-full glass-card bg-white/60 backdrop-blur-md px-5 py-2.5 text-xs font-bold text-emerald-700 shadow-sm border border-emerald-200/50"
         >
           <Sparkles size={14} className="text-emerald-500" /> The Future of Secure Cloud Storage
-        </motion.div>
+        </Motion.div>
 
-        <motion.h1 
+        <Motion.h1 
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1, ease: "easeOut" }}
@@ -183,19 +183,19 @@ const LandingPage = () => (
           Own Your Data.
           <br />
           <span className="bg-gradient-to-r from-emerald-500 to-emerald-600 bg-clip-text text-transparent">Secure, Fast, Limitless.</span>
-        </motion.h1>
+        </Motion.h1>
 
-        <motion.p 
+        <Motion.p 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
           className="mx-auto mb-14 max-w-2xl text-base text-slate-500 md:text-xl leading-relaxed font-medium"
         >
           Whether you want to earn passive income by sharing your idle storage, or need military-grade encrypted cloud backup for your files — NeuroStore has you covered.
-        </motion.p>
+        </Motion.p>
 
         {/* ── 2 MASSIVE CTA OPTIONS (Glassmorphic) ── */}
-        <motion.div 
+        <Motion.div 
           initial="hidden"
           animate="visible"
           variants={{
@@ -205,7 +205,7 @@ const LandingPage = () => (
           className="mx-auto grid max-w-4xl gap-8 md:grid-cols-2 mt-8"
         >
           {/* Be a Node Card */}
-          <motion.div 
+          <Motion.div 
             variants={{ hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } } }}
             className="glass-card bg-white/70 backdrop-blur-xl rounded-[2rem] p-8 md:p-10 group relative overflow-hidden flex flex-col h-full text-left shadow-xl hover:shadow-2xl border border-white/80 transition-all duration-500 hover:-translate-y-2"
           >
@@ -227,10 +227,10 @@ const LandingPage = () => (
                 Download Software
               </Link>
             </div>
-          </motion.div>
+          </Motion.div>
 
           {/* Subscription Card */}
-          <motion.div 
+          <Motion.div 
             variants={{ hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } } }}
             className="glass-card bg-white/70 backdrop-blur-xl rounded-[2rem] p-8 md:p-10 group relative overflow-hidden flex flex-col h-full text-left shadow-xl hover:shadow-2xl border border-white/80 transition-all duration-500 hover:-translate-y-2"
           >
@@ -247,15 +247,15 @@ const LandingPage = () => (
             <Link to="/login?intent=user" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold bg-slate-900 text-white hover:bg-emerald-500 transition-all shadow-md group-hover:shadow-lg relative z-10">
               Get Cloud Storage <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
             </Link>
-          </motion.div>
-        </motion.div>
+          </Motion.div>
+        </Motion.div>
       </div>
     </section>
 
     {/* ── CORE CAPABILITIES ── */}
     <section className="px-6 py-20 relative">
       <div className="mx-auto max-w-6xl relative z-10">
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
@@ -264,8 +264,8 @@ const LandingPage = () => (
         >
           <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Core Capabilities</span>
           <h2 className="text-3xl md:text-4xl font-display font-extrabold text-slate-900 tracking-tight">Enterprise-grade infrastructure,<br />beautifully simple.</h2>
-        </motion.div>
-        <motion.div 
+        </Motion.div>
+        <Motion.div 
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-80px" }}
@@ -293,7 +293,7 @@ const LandingPage = () => (
             description="Autonomous data reconstruction with Byzantine fault tolerance if nodes go offline."
             badge="99.99% SLA"
           />
-        </motion.div>
+        </Motion.div>
       </div>
     </section>
 
@@ -388,7 +388,7 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
         <div className="hidden items-center gap-4 md:flex">
           {isAuthenticated ? (
             <>
-              {getAuthUser()?.email === 'janushsahni24@gmail.com' && (
+              {getAuthUser()?.role === 'admin' && (
                 <Link to="/admin/inventory" className="text-sm font-bold text-red-500 hover:text-red-600 transition-colors">Admin</Link>
               )}
               <Link to="/dashboard/drive" className="btn-primary px-5 py-2.5 text-sm font-bold hover:shadow-lg transition">Dashboard</Link>
@@ -436,14 +436,23 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
 
 // ═══════ PAGE TRANSITIONS ═══════
 const PageTransition = ({ children }) => (
-  <motion.div
+  <Motion.div
     initial={{ opacity: 0, y: 15 }}
     animate={{ opacity: 1, y: 0 }}
     exit={{ opacity: 0, y: -15 }}
     transition={{ duration: 0.3, ease: "easeInOut" }}
   >
     {children}
-  </motion.div>
+  </Motion.div>
+);
+
+const RouteLoader = () => (
+  <div className="flex min-h-[40vh] items-center justify-center bg-slate-50 px-6 text-slate-600">
+    <div className="glass-card px-6 py-5 text-sm font-medium flex items-center gap-3">
+      <svg className="animate-spin h-4 w-4 text-emerald-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+      Loading workspace...
+    </div>
+  </div>
 );
 
 // ═══════ APP CONTENT ═══════
@@ -458,7 +467,7 @@ const AppContent = () => {
       try {
         const { response, data } = await apiJson("/api/session", { method: "GET", timeoutMs: 9000 });
         if (response.ok && data?.user) {
-          setAuthSession(data.user, data.csrf_token || "");
+          setAuthSession(data.user, data.csrf_token || "", data.token || "");
           setIsAuthenticated(true);
         } else {
           clearAuthSession();
@@ -508,26 +517,28 @@ const AppContent = () => {
       <Toaster position="bottom-right" toastOptions={{ style: { background: "#0f172a", color: "#f8fafc", border: "1px solid rgba(29,211,176,0.3)", fontSize: "13px" } }} />
       <Navbar isAuthenticated={isAuthenticated} onLogout={handleLogout} />
       <main>
-        <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
-            <Route path="/" element={<PageTransition><LandingPage /></PageTransition>} />
-            <Route path="/login" element={<PageTransition><AuthRedirectRoute isAuthenticated={isAuthenticated} component={Login} onAuth={handleLogin} /></PageTransition>} />
-            <Route path="/register" element={<PageTransition><AuthRedirectRoute isAuthenticated={isAuthenticated} component={Register} onAuth={handleLogin} /></PageTransition>} />
-            <Route path="/auth/callback" element={<PageTransition><AuthCallback onAuth={handleLogin} /></PageTransition>} />
-            <Route path="/dashboard/drive" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><DriveDashboard /></ProtectedRoute></PageTransition>} />
-            <Route path="/dashboard/compliance" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><ComplianceDashboard /></ProtectedRoute></PageTransition>} />
-            <Route path="/dashboard/node" element={<PageTransition><NodeDashboard /></PageTransition>} />
-            <Route path="/explorer/:bucket/*" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute></PageTransition>} />
-            <Route path="/s3-migration" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute></PageTransition>} />
-            <Route path="/download" element={<PageTransition><Download /></PageTransition>} />
-            <Route path="/admin/inventory" element={<PageTransition><AdminRoute isAuthenticated={isAuthenticated}><AdminNodes /></AdminRoute></PageTransition>} />
-            <Route path="/pricing" element={<PageTransition><Pricing /></PageTransition>} />
-            <Route path="/about" element={<PageTransition><About /></PageTransition>} />
-            <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
-            <Route path="/faq" element={<PageTransition><FAQ /></PageTransition>} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AnimatePresence>
+        <Suspense fallback={<RouteLoader />}>
+          <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+              <Route path="/" element={<PageTransition><LandingPage /></PageTransition>} />
+              <Route path="/login" element={<PageTransition><AuthRedirectRoute isAuthenticated={isAuthenticated} component={Login} onAuth={handleLogin} /></PageTransition>} />
+              <Route path="/register" element={<PageTransition><AuthRedirectRoute isAuthenticated={isAuthenticated} component={Register} onAuth={handleLogin} /></PageTransition>} />
+              <Route path="/auth/callback" element={<PageTransition><AuthCallback onAuth={handleLogin} /></PageTransition>} />
+              <Route path="/dashboard/drive" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><DriveDashboard /></ProtectedRoute></PageTransition>} />
+              <Route path="/dashboard/compliance" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><ComplianceDashboard /></ProtectedRoute></PageTransition>} />
+              <Route path="/dashboard/node" element={<PageTransition><NodeDashboard /></PageTransition>} />
+              <Route path="/explorer/:bucket/*" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute></PageTransition>} />
+              <Route path="/s3-migration" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute></PageTransition>} />
+              <Route path="/download" element={<PageTransition><Download /></PageTransition>} />
+              <Route path="/admin/inventory" element={<PageTransition><AdminRoute isAuthenticated={isAuthenticated}><AdminNodes /></AdminRoute></PageTransition>} />
+              <Route path="/pricing" element={<PageTransition><Pricing /></PageTransition>} />
+              <Route path="/about" element={<PageTransition><About /></PageTransition>} />
+              <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
+              <Route path="/faq" element={<PageTransition><FAQ /></PageTransition>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AnimatePresence>
+        </Suspense>
       </main>
 
       {/* ═══════ MOBILE BOTTOM NAVIGATION ═══════ */}
@@ -538,12 +549,13 @@ const AppContent = () => {
             { to: "/dashboard/drive", icon: Database, label: "Drive" },
             { to: "/dashboard/node", icon: Server, label: "Node" },
             { to: "/pricing", icon: Zap, label: "Plans" },
-          ].map(({ to, icon: Icon, label }) => {
-            const isActive = location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
+          ].map((item) => {
+            const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));
+            const NavIcon = item.icon;
             return (
-              <Link key={to} to={to} className={`flex flex-col items-center gap-0.5 min-w-[60px] py-1 transition-colors ${isActive ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'}`}>
-                <Icon size={20} />
-                <span className="text-[10px] font-bold">{label}</span>
+              <Link key={item.to} to={item.to} className={`flex flex-col items-center gap-0.5 min-w-[60px] py-1 transition-colors ${isActive ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-600'}`}>
+                <NavIcon size={20} />
+                <span className="text-[10px] font-bold">{item.label}</span>
                 {isActive && <div className="w-1 h-1 rounded-full bg-emerald-500 mt-0.5" />}
               </Link>
             );
