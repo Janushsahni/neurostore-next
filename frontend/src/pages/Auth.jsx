@@ -520,8 +520,14 @@ export const AuthCallback = ({ onAuth }) => {
         clearAuthSession();
         setAuthSession({ email, name }, csrf, token);
         setVaultSecret("mock_oauth_vault_key_123!"); // DEMO: Set a default vault key for OAuth users so encryption works
-        onAuth(target);
-    }, [navigate, onAuth]);
+        
+        // Use a timeout to ensure state updates don't cause infinite re-renders
+        setTimeout(() => {
+            onAuth(target);
+        }, 100);
+        
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-900">
