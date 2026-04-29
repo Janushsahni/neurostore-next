@@ -9,6 +9,7 @@ export const NodeDashboard = () => {
     const [stats, setStats] = useState(null);
     const [nodeId, setNodeId] = useState('');
     const [nodeData, setNodeData] = useState(null);
+    const [nodeStatus, setNodeStatus] = useState(null); // Public status (no auth needed)
     const [isLoading, setIsLoading] = useState(true);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [lookupError, setLookupError] = useState('');
@@ -64,27 +65,39 @@ export const NodeDashboard = () => {
         if (!searchId.trim()) return;
         setLookupLoading(true);
         setLookupError('');
+        setNodeStatus(null);
         try {
-            let { response, data } = await apiJson(`/api/node/${encodeURIComponent(searchId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
-            if (!response.ok) {
-                const fallback = await apiJson(`/node/${encodeURIComponent(searchId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
-                response = fallback.response;
-                data = fallback.data;
+            // Step 1: Always fetch PUBLIC status first (no auth needed)
+            const statusResult = await apiJson(`/api/node/${encodeURIComponent(searchId.trim())}/status`, { method: 'GET', timeoutMs: 10000 });
+            if (statusResult.response.ok) {
+                setNodeStatus(statusResult.data);
+                localStorage.setItem('neuro_node_id', searchId.trim());
             }
+
+            // Step 2: Try to fetch full earnings/telemetry (requires auth)
+            let { response, data } = await apiJson(`/api/node/${encodeURIComponent(searchId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
             if (response.ok) {
                 setNodeData(data);
+                setNodeStatus(null); // Clear public status since we have full data
                 localStorage.setItem('neuro_node_id', searchId.trim());
             } else {
-                if (response.status === 401 || response.status === 403 || data?.error === "Auth required") {
-                    setLookupError('Node Active! Please Log In or Register an account to claim your earnings and view telemetry.');
+                // If status check succeeded but earnings failed (auth required), that's OK
+                if (statusResult.response.ok) {
+                    // Node exists and is active — user just needs to log in for full telemetry
+                    setNodeData(null);
+                    // Don't set error — the nodeStatus card will show instead
+                } else if (response.status === 401 || response.status === 403 || data?.error === "Auth required") {
+                    setLookupError('Node found! Please Log In or Register to view full telemetry and claim earnings.');
+                    setNodeData(null);
                 } else {
-                    setLookupError(data?.error || 'Node not found');
+                    setLookupError(data?.error || statusResult.data?.error || 'Node not found');
+                    setNodeData(null);
                 }
-                setNodeData(null);
             }
         } catch {
             setLookupError('Failed to connect to network');
             setNodeData(null);
+            setNodeStatus(null);
         } finally {
             setLookupLoading(false);
         }
@@ -112,26 +125,8 @@ export const NodeDashboard = () => {
                     setWizardData({ nodeId: queryNodeId, token: claimToken });
                     setShowWizard(true);
                 } else {
-                    // Node ID in URL but no claim token → just look it up
-                    try {
-                        let { response, data } = await apiJson(`/api/node/${encodeURIComponent(queryNodeId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
-                        if (!response.ok) {
-                            const fallback = await apiJson(`/node/${encodeURIComponent(queryNodeId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
-                            response = fallback.response;
-                            data = fallback.data;
-                        }
-                        if (response.ok) {
-                            setNodeData(data);
-                        } else {
-                            if (response.status === 401 || response.status === 403) {
-                                setLookupError('Node Active! Please Log In or Register an account to claim your earnings and view telemetry.');
-                            } else {
-                                setLookupError(data?.error || 'Node not found. It may still be starting up — try again in 30 seconds.');
-                            }
-                        }
-                    } catch {
-                        setLookupError('Failed to connect to network');
-                    }
+                    // Node ID in URL but no claim token → use public status + optional earnings
+                    await lookupNode(queryNodeId);
                 }
                 return;
             }
@@ -139,19 +134,7 @@ export const NodeDashboard = () => {
             const savedNodeId = localStorage.getItem('neuro_node_id');
             if (savedNodeId) {
                 setNodeId(savedNodeId);
-                try {
-                    let { response, data } = await apiJson(`/api/node/${encodeURIComponent(savedNodeId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
-                    if (!response.ok) {
-                        const fallback = await apiJson(`/node/${encodeURIComponent(savedNodeId.trim())}/earnings`, { method: 'GET', timeoutMs: 10000 });
-                        response = fallback.response;
-                        data = fallback.data;
-                    }
-                    if (response.ok) {
-                        setNodeData(data);
-                    }
-                } catch {
-                    // Silent fail for saved node lookup
-                }
+                await lookupNode(savedNodeId);
             }
         };
 
@@ -192,9 +175,12 @@ export const NodeDashboard = () => {
         const interval = setInterval(() => {
             fetchStats();
             fetchPublicNodes();
+            if (nodeId.trim() && !showWizard) {
+                lookupNode(nodeId);
+            }
         }, 30000);
         return () => clearInterval(interval);
-    }, [fetchMyNodes, fetchPublicNodes, fetchStats]);
+    }, [fetchMyNodes, fetchPublicNodes, fetchStats, lookupNode, nodeId, showWizard]);
 
     const formatINR = (value) => {
         const num = parseFloat(value) || 0;
@@ -352,7 +338,74 @@ export const NodeDashboard = () => {
                 )}
             </Motion.div>
 
-            {myNodes.length === 0 && !nodeData && !lookupLoading && (
+            {/* ═══════ PUBLIC NODE STATUS (No Auth Required) ═══════ */}
+            {nodeStatus && !nodeData && (
+                <Motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, type: "spring" }} className="space-y-6">
+                    <div className="bg-white rounded-2xl p-6 shadow-lg border border-emerald-100 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -z-10 -mr-20 -mt-20"></div>
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h2 className="text-3xl font-display font-extrabold text-emerald-600 tracking-tight">{nodeStatus.node_id}</h2>
+                                <p className="text-slate-500 font-medium text-sm mt-1">Node detected on the network</p>
+                            </div>
+                            <div className="text-right">
+                                <span className={`px-4 py-1.5 inline-block rounded-full text-xs font-bold uppercase tracking-wider ${
+                                    nodeStatus.status === 'online' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' :
+                                    nodeStatus.status === 'starting' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                    'bg-red-50 text-red-600 border border-red-200'
+                                }`}>
+                                    {nodeStatus.status === 'online' ? '● Active' : nodeStatus.status === 'starting' ? '◐ Starting' : '○ Offline'}
+                                </span>
+                                {nodeStatus.last_heartbeat_at && (
+                                    <p className="text-slate-400 text-xs font-medium mt-2">
+                                        Last heartbeat: {new Date(nodeStatus.last_heartbeat_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Operating System</p>
+                                <p className="text-lg font-bold text-slate-700 flex items-center gap-2">
+                                    <Server size={16} className="text-blue-500" />
+                                    {nodeStatus.os || 'Unknown'}
+                                </p>
+                            </div>
+                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Version</p>
+                                <p className="text-lg font-bold text-slate-700">v{nodeStatus.version || '1.0'}</p>
+                            </div>
+                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Shards Hosted</p>
+                                <p className="text-lg font-bold text-slate-700">{nodeStatus.shard_count ?? 0}</p>
+                            </div>
+                            <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 shadow-sm">
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Storage</p>
+                                <p className="text-lg font-bold text-slate-700">{nodeStatus.used_gb} / {nodeStatus.max_gb} GB</p>
+                            </div>
+                        </div>
+
+                        {/* Login prompt for full telemetry */}
+                        <div className="mt-6 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200 rounded-xl p-5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                    <Wifi size={20} className="text-emerald-600" />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-800">Node is Active on the Network!</h4>
+                                    <p className="text-sm text-slate-600 mt-0.5">Log in or register an account to view full telemetry, claim earnings, and manage your wallet.</p>
+                                </div>
+                                <a href="/login" className="ml-auto btn-primary px-6 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all">
+                                    Log In
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </Motion.div>
+            )}
+
+            {myNodes.length === 0 && !nodeData && !nodeStatus && !lookupLoading && (
                 <Motion.div 
                     initial={{ opacity: 0, y: 30 }} 
                     animate={{ opacity: 1, y: 0 }} 
@@ -410,8 +463,8 @@ export const NodeDashboard = () => {
                                 <p className="text-slate-500 font-medium text-sm mt-1">Your personal node earnings dashboard</p>
                             </div>
                             <div className="text-right">
-                                <span className={`px-4 py-1.5 inline-block rounded-full text-xs font-bold uppercase tracking-wider ${nodeData.status === 'online' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                                    {nodeData.status === 'online' ? '● ONLINE' : '● OFFLINE'}
+                                <span className={`px-4 py-1.5 inline-block rounded-full text-xs font-bold uppercase tracking-wider ${nodeData.status === 'online' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : nodeData.status === 'stale' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                                    {nodeData.status === 'online' ? 'Active' : nodeData.status === 'stale' ? 'Starting / stale' : 'Offline'}
                                 </span>
                                 {nodeData.last_heartbeat_at && (
                                     <p className="text-slate-400 text-xs font-medium mt-2">

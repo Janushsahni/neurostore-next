@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
     let mut pool_result = None;
     for attempt in 1..=5u32 {
         match PgPoolOptions::new()
-            .max_connections(25)
+            .max_connections(250)
             .acquire_timeout(std::time::Duration::from_secs(10))
             .connect(&database_url)
             .await
@@ -117,7 +117,7 @@ async fn main() -> anyhow::Result<()> {
     sqlx::migrate!("./migrations").run(&pool).await?;
 
     // Phase 10: Ignite the LibP2P Swarm Network (non-fatal on cloud platforms)
-    let (p2p_tx, p2p_rx) = mpsc::channel(100);
+    let (p2p_tx, p2p_rx) = mpsc::channel(10000);
     let geo_manager = geofence::GeoFenceManager::new();
 
     match p2p::P2pNode::new().await {
@@ -290,6 +290,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/nodes/stats", get(handlers::nodes::network_stats))
         .route("/nodes/explorer", get(handlers::nodes::list_public_nodes))
         .route("/node/:node_id/earnings", get(handlers::nodes::node_earnings))
+        .route("/node/:node_id/status", get(handlers::nodes::node_status))
         .route("/admin/inventory", get(handlers::nodes::get_admin_inventory))
         .route("/my/nodes", get(handlers::nodes::my_nodes))
         .route("/node/:node_id/wallet", axum::routing::put(handlers::nodes::update_node_wallet))

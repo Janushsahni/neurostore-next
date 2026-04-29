@@ -87,6 +87,7 @@ The gateway stores client ciphertext as opaque bytes and does not retain a decry
 
 ## Key Paths
 
+- `AI_README.md` - compact project brief for AI agents and future code work
 - `deploy/docker-compose.yml` - main deploy stack
 - `scripts/deploy-readiness.sh` - functional readiness checks
 - `scripts/perf-kpi-gate.sh` - latency and success KPI gate

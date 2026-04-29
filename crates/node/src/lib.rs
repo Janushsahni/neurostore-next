@@ -1,4 +1,7 @@
+pub mod auth;
+pub mod cli;
 pub mod ingress;
+pub mod onboarding;
 pub mod p2p;
 pub mod store;
 
@@ -21,15 +24,44 @@ pub const DEFAULT_RELAY_URL: &str = "wss://neurostore-backend-production.up.rail
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SetupConfig {
     pub storage_path: String,
+    #[serde(default = "default_max_gb")]
     pub max_gb: u64,
+    #[serde(default)]
     pub relay_url: Option<String>,
+    #[serde(default)]
     pub gateway_url: Option<String>,
+    #[serde(default)]
     pub node_secret: Option<String>,
+    #[serde(default = "default_ingress_port")]
     pub ingress_port: u16,
+    #[serde(default)]
     pub public_ingress_url: Option<String>,
+    #[serde(default = "default_wallet_address")]
     pub wallet_address: String,
+    #[serde(default = "default_declared_location")]
     pub declared_location: String,
+    #[serde(default = "default_auto_register")]
     pub auto_register: bool,
+}
+
+fn default_max_gb() -> u64 {
+    50
+}
+
+fn default_ingress_port() -> u16 {
+    9184
+}
+
+fn default_wallet_address() -> String {
+    "0x0000000000000000000000000000000000000000".to_string()
+}
+
+fn default_declared_location() -> String {
+    "IN".to_string()
+}
+
+fn default_auto_register() -> bool {
+    true
 }
 
 #[derive(Debug, Clone)]

@@ -1,7 +1,8 @@
 [Unit]
-Description=NeuroStore Node Service
+Description=NeuroStore Decentralized Storage Node
 After=network-online.target
 Wants=network-online.target
+Documentation=https://neurostore.vercel.app/docs
 
 [Service]
 Type=simple
@@ -9,8 +10,10 @@ User=neurostore
 Group=neurostore
 WorkingDirectory=/var/lib/neurostore
 ExecStart=/usr/local/bin/neuro-node --setup-config-path /etc/neurostore/node-config.json
-Restart=on-failure
-RestartSec=5s
+Restart=always
+RestartSec=3s
+StartLimitBurst=5
+StartLimitIntervalSec=60
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true
@@ -19,6 +22,7 @@ ReadWritePaths=/var/lib/neurostore /etc/neurostore
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=neuro-node
+Environment=RUST_LOG=info,neuronode=debug
 
 [Install]
 WantedBy=multi-user.target

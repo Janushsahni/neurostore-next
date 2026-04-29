@@ -339,11 +339,8 @@ const LandingPage = () => (
     {/* ── END FOOTER ── */}
     <footer className="bg-slate-50 px-6 py-12 border-t border-slate-200">
       <div className="mx-auto max-w-5xl text-center">
-        <div className="flex items-center justify-center gap-2 text-xl font-display font-bold mb-4 text-slate-900">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-md">
-            <HardDrive size={20} />
-          </span>
-          NeuroStore
+        <div className="flex items-center justify-center mb-4">
+          <img src="/logo-full.png" alt="NeuroStore Logo" className="h-8 object-contain" />
         </div>
         <p className="text-sm text-slate-500 font-medium mb-8">Secure. Decentralized. Rewarding.</p>
         <div className="flex items-center justify-center gap-6 text-sm font-bold text-slate-500 flex-wrap">
@@ -369,11 +366,8 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
   return (
     <header className="sticky top-0 z-50">
       <nav className="glass-nav mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-8 mt-4 rounded-2xl">
-        <Link to="/" onClick={closeMobile} className="inline-flex items-center gap-2.5 text-xl font-display font-extrabold text-slate-800 tracking-tight">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-primary text-white shadow-md">
-            <HardDrive size={18} strokeWidth={2.5} />
-          </span>
-          NeuroStore
+        <Link to="/" onClick={closeMobile} className="inline-flex items-center">
+          <img src="/logo-full.png" alt="NeuroStore Logo" className="h-7 object-contain" />
         </Link>
 
         {/* Desktop menu: Home, Pricing, Get Started, Login */}

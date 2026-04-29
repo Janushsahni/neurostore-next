@@ -290,11 +290,13 @@ pub async fn register_provider_node(
             // The heartbeat will later upsert richer telemetry into this row.
             let neuro_node_id = crate::handlers::nodes::derive_node_id_from_peer(&payload.peer_id);
             let _ = sqlx::query(
-                r#"INSERT INTO node_registry (node_id, status, version, max_gb, claim_token, country_code)
-                   VALUES ($1, 'pending', $2, $3, $4, $5)
+                r#"INSERT INTO node_registry (node_id, status, version, max_gb, claim_token, country_code, last_heartbeat_at)
+                   VALUES ($1, 'online', $2, $3, $4, $5, NOW())
                    ON CONFLICT (node_id) DO UPDATE SET
+                       status = CASE WHEN node_registry.status = 'pending' THEN 'online' ELSE node_registry.status END,
                        claim_token = COALESCE(excluded.claim_token, node_registry.claim_token),
-                       max_gb = GREATEST(node_registry.max_gb, excluded.max_gb)
+                       max_gb = GREATEST(node_registry.max_gb, excluded.max_gb),
+                       last_heartbeat_at = COALESCE(node_registry.last_heartbeat_at, NOW())
                 "#
             )
             .bind(&neuro_node_id)
@@ -504,7 +506,7 @@ pub async fn node_heartbeat(
         &state,
         crate::HeartbeatCacheEntry {
             node_id: payload.node_id.clone(),
-            status: actual_status,
+            status: actual_status.clone(),
             os: os.to_string(),
             version: version.to_string(),
             shard_count,
@@ -521,10 +523,48 @@ pub async fn node_heartbeat(
             hostname: payload.hostname.clone(),
             device_fingerprint: payload.device_fingerprint.clone(),
             mac_address: payload.mac_address.clone(),
-            ip_address: Some(caller_ip),
+            ip_address: Some(caller_ip.clone()),
             ingress_url: payload.ingress_url.clone(),
         },
     )
+    .await;
+
+    // Immediate DB upsert: don't rely solely on the flush daemon (60s lag).
+    // This ensures the node appears as 'online' in the frontend within seconds.
+    let _ = sqlx::query(
+        r#"INSERT INTO node_registry (node_id, status, os, version, shard_count, used_gb, max_gb, free_gb,
+               uptime_minutes, last_heartbeat_at, cpu_usage_percent, memory_usage_percent, hostname, ip_address)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, $11, $12, $13)
+           ON CONFLICT (node_id) DO UPDATE SET
+               status = excluded.status,
+               os = excluded.os,
+               version = excluded.version,
+               shard_count = excluded.shard_count,
+               used_gb = excluded.used_gb,
+               max_gb = excluded.max_gb,
+               free_gb = excluded.free_gb,
+               uptime_minutes = excluded.uptime_minutes,
+               last_heartbeat_at = NOW(),
+               cpu_usage_percent = excluded.cpu_usage_percent,
+               memory_usage_percent = excluded.memory_usage_percent,
+               hostname = COALESCE(excluded.hostname, node_registry.hostname),
+               ip_address = COALESCE(excluded.ip_address, node_registry.ip_address)
+        "#,
+    )
+    .bind(&payload.node_id)
+    .bind(&actual_status)
+    .bind(os)
+    .bind(version)
+    .bind(shard_count)
+    .bind(used_gb)
+    .bind(max_gb)
+    .bind(free_gb)
+    .bind(uptime_min)
+    .bind(cpu_usage_percent as f32)
+    .bind(memory_usage_percent as f32)
+    .bind(payload.hostname.as_deref())
+    .bind(&caller_ip)
+    .execute(&state.db)
     .await;
 
     let assigned_max_gb: f64 = sqlx::query_scalar("SELECT max_gb FROM node_registry WHERE node_id = $1")
@@ -732,37 +772,26 @@ pub async fn network_stats(State(state): State<Arc<AppState>>) -> impl IntoRespo
         .collect();
 
     let total_nodes = std::cmp::max(db_total_nodes, cache_snapshot.len() as i64);
-    let active_nodes = if cache_snapshot.is_empty() {
-        db_active_nodes
-    } else {
-        live_entries.len() as i64
-    };
-    let total_storage_gb = if cache_snapshot.is_empty() {
-        db_total_storage_gb
-    } else {
-        live_entries.iter().map(|entry| entry.max_gb).sum()
-    };
-    let used_storage_gb = if cache_snapshot.is_empty() {
-        db_used_storage_gb
-    } else {
-        live_entries.iter().map(|entry| entry.used_gb).sum()
-    };
-    let total_shards = if cache_snapshot.is_empty() {
-        db_total_shards
-    } else {
-        live_entries
-            .iter()
-            .map(|entry| entry.shard_count as i64)
-            .sum()
-    };
-    let total_earnings_inr = if cache_snapshot.is_empty() {
-        db_total_earnings_inr
-    } else {
-        cache_snapshot
-            .iter()
-            .map(|entry| entry.persisted_total_earned_inr + entry.pending_earnings_inr)
-            .sum()
-    };
+    let cache_active_nodes = live_entries.len() as i64;
+    let cache_total_storage_gb: f64 = live_entries.iter().map(|entry| entry.max_gb).sum();
+    let cache_used_storage_gb: f64 = live_entries.iter().map(|entry| entry.used_gb).sum();
+    let cache_total_shards: i64 = live_entries
+        .iter()
+        .map(|entry| entry.shard_count as i64)
+        .sum();
+    let cache_total_earnings_inr: f64 = cache_snapshot
+        .iter()
+        .map(|entry| entry.persisted_total_earned_inr + entry.pending_earnings_inr)
+        .sum();
+
+    // The in-memory heartbeat buffer only contains nodes that have heartbeated
+    // since this gateway replica started. Use it as a freshness overlay, not as
+    // a full replacement for database-backed active inventory.
+    let active_nodes = std::cmp::max(db_active_nodes, cache_active_nodes);
+    let total_storage_gb = db_total_storage_gb.max(cache_total_storage_gb);
+    let used_storage_gb = db_used_storage_gb.max(cache_used_storage_gb);
+    let total_shards = std::cmp::max(db_total_shards, cache_total_shards);
+    let total_earnings_inr = db_total_earnings_inr.max(cache_total_earnings_inr);
 
     if !cache_snapshot.is_empty() {
         let mut ranked = cache_snapshot.clone();
@@ -1608,6 +1637,105 @@ pub async fn list_public_nodes(State(state): State<Arc<AppState>>) -> impl IntoR
 
     (StatusCode::OK, Json(nodes_json))
 }
+
+/// Public node status endpoint — no JWT required.
+/// Returns minimal status information so the frontend can show
+/// "Active/Online" immediately after install, before the user logs in.
+pub async fn node_status(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(node_id): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    if node_id.is_empty() || node_id.len() > 64 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "invalid node_id" })),
+        )
+            .into_response();
+    }
+
+    // Check in-memory heartbeat cache first (freshest data)
+    let cached_entry = {
+        let cache = state.heartbeat_buffer.read().await;
+        cache.get(&node_id).cloned()
+    };
+
+    if let Some(entry) = cached_entry {
+        let live_cutoff = Utc::now() - chrono::Duration::minutes(2);
+        let display_status = if entry.last_heartbeat_at > live_cutoff {
+            entry.status.clone()
+        } else {
+            "offline".to_string()
+        };
+
+        return (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "node_id": node_id,
+                "status": display_status,
+                "os": entry.os,
+                "version": entry.version,
+                "shard_count": entry.shard_count,
+                "used_gb": format!("{:.3}", entry.used_gb),
+                "max_gb": format!("{:.1}", entry.max_gb),
+                "uptime_minutes": format!("{:.1}", entry.uptime_minutes),
+                "last_heartbeat_at": entry.last_heartbeat_at.to_rfc3339(),
+                "cpu_usage_percent": format!("{:.1}", entry.cpu_usage_percent),
+                "memory_usage_percent": format!("{:.1}", entry.memory_usage_percent),
+            })),
+        )
+            .into_response();
+    }
+
+    // Fallback to database
+    let node = sqlx::query_as::<_, (String, String, String, i32, f64, f64, f64, Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>, f32, f32)>(
+        r#"SELECT node_id, status, COALESCE(os, 'Unknown'), shard_count, used_gb, max_gb, uptime_minutes,
+               last_heartbeat_at, os, version
+               , cpu_usage_percent, memory_usage_percent
+           FROM node_registry WHERE node_id = $1"#,
+    )
+    .bind(&node_id)
+    .fetch_optional(&state.db)
+    .await
+    .ok()
+    .flatten();
+
+    let Some(n) = node else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "node not found" })),
+        )
+            .into_response();
+    };
+
+    let mut display_status = n.1.clone();
+    if let Some(hb) = n.7 {
+        if Utc::now().signed_duration_since(hb).num_minutes() > 2 {
+            display_status = "offline".to_string();
+        }
+    } else if display_status == "pending" {
+        // registered but never heartbeated — show as starting
+        display_status = "starting".to_string();
+    }
+
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "node_id": n.0,
+            "status": display_status,
+            "os": n.8.unwrap_or_else(|| "Unknown".to_string()),
+            "version": n.9.unwrap_or_else(|| "1.0.0".to_string()),
+            "shard_count": n.3,
+            "used_gb": format!("{:.3}", n.4),
+            "max_gb": format!("{:.1}", n.5),
+            "uptime_minutes": format!("{:.1}", n.6),
+            "last_heartbeat_at": n.7.map(|d| d.to_rfc3339()),
+            "cpu_usage_percent": format!("{:.1}", n.10),
+            "memory_usage_percent": format!("{:.1}", n.11),
+        })),
+    )
+        .into_response()
+}
+
 #[derive(Deserialize)]
 pub struct WalletUpdateRequest {
     pub wallet_address: String,

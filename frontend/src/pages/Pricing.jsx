@@ -119,9 +119,16 @@ const cardVariants = {
     }),
 };
 
-// ── Billing Modal ──
+// ── Plan Interest Modal (Safe — No raw card collection) ──
 const BillingModal = ({ plan, onClose }) => {
-    const [step, setStep] = useState(1); // 1=confirm, 2=payment, 3=success
+    const [submitted, setSubmitted] = useState(false);
+    const [email, setEmail] = useState("");
+
+    const handleSubmit = () => {
+        if (!email.includes("@")) return;
+        // In production, this would POST to /api/waitlist or trigger Razorpay Checkout
+        setSubmitted(true);
+    };
 
     return (
         <Motion.div
@@ -156,9 +163,9 @@ const BillingModal = ({ plan, onClose }) => {
                 {/* Body */}
                 <div className="p-6">
                     <AnimatePresence mode="wait">
-                        {step === 1 && (
-                            <Motion.div key="confirm" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                                <p className="text-sm text-slate-600 font-medium mb-4">You're about to activate the <strong className="text-slate-900">{plan.name}</strong> plan with the following benefits:</p>
+                        {!submitted ? (
+                            <Motion.div key="details" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                                <p className="text-sm text-slate-600 font-medium mb-4">Activate the <strong className="text-slate-900">{plan.name}</strong> plan:</p>
                                 <ul className="space-y-2.5 mb-6">
                                     {plan.features.map((f, i) => (
                                         <Motion.li
@@ -172,46 +179,31 @@ const BillingModal = ({ plan, onClose }) => {
                                         </Motion.li>
                                     ))}
                                 </ul>
-                                <button
-                                    onClick={() => setStep(2)}
-                                    className="w-full py-3.5 btn-primary rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
-                                >
-                                    <CreditCard size={18} /> Continue to Payment
-                                </button>
-                            </Motion.div>
-                        )}
 
-                        {step === 2 && (
-                            <Motion.div key="payment" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Card Number</label>
-                                        <input type="text" placeholder="4242 4242 4242 4242" maxLength={19} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all" />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Expiry</label>
-                                            <input type="text" placeholder="MM/YY" maxLength={5} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all" />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">CVC</label>
-                                            <input type="text" placeholder="123" maxLength={3} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all" />
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 text-xs text-emerald-700 font-medium">
-                                        <Lock size={14} className="shrink-0" /> Card details are processed securely by Razorpay. We never store your card information.
-                                    </div>
+                                <div className="mb-4">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Work Email</label>
+                                    <input
+                                        type="email"
+                                        placeholder="you@company.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                                    />
                                 </div>
+
+                                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 text-xs text-emerald-700 font-medium mb-5">
+                                    <Lock size={14} className="shrink-0" /> Payments are securely processed via Razorpay. You'll receive a secure checkout link.
+                                </div>
+
                                 <button
-                                    onClick={() => setStep(3)}
-                                    className="w-full mt-5 py-3.5 btn-primary rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                                    onClick={handleSubmit}
+                                    disabled={!email.includes("@")}
+                                    className="w-full py-3.5 btn-primary rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Pay {plan.price} Now <ArrowRight size={18} />
+                                    <CreditCard size={18} /> Get {plan.name} — {plan.price}{plan.period}
                                 </button>
                             </Motion.div>
-                        )}
-
-                        {step === 3 && (
+                        ) : (
                             <Motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-6">
                                 <Motion.div
                                     initial={{ scale: 0 }}
@@ -221,8 +213,8 @@ const BillingModal = ({ plan, onClose }) => {
                                 >
                                     <Check size={40} className="text-emerald-500" />
                                 </Motion.div>
-                                <h4 className="text-2xl font-display font-extrabold text-slate-900 mb-2">You're on {plan.name}! 🎉</h4>
-                                <p className="text-sm text-slate-500 font-medium mb-6">Your storage quota has been upgraded immediately. Start uploading to your expanded vault.</p>
+                                <h4 className="text-2xl font-display font-extrabold text-slate-900 mb-2">You're on the list! 🎉</h4>
+                                <p className="text-sm text-slate-500 font-medium mb-6">We'll send a secure payment link to <strong className="text-slate-800">{email}</strong> within 24 hours. Your {plan.name} plan will activate instantly after payment.</p>
                                 <Link
                                     to="/dashboard/drive"
                                     className="btn-primary px-8 py-3 rounded-xl font-bold text-sm inline-flex items-center gap-2 shadow-lg shadow-emerald-500/20"
@@ -424,7 +416,7 @@ export const Pricing = () => {
                             Need custom SLAs, dedicated infrastructure, white-label API, or ISO 27001 compliance?
                             We build custom solutions for large organizations.
                         </p>
-                        <a href="mailto:sales@secventra.com" className="btn-primary px-8 py-4 rounded-xl inline-flex items-center gap-2 font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30">
+                        <a href="mailto:enterprise@neurostore.io" className="btn-primary px-8 py-4 rounded-xl inline-flex items-center gap-2 font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30">
                             Talk to Enterprise Sales <ArrowRight size={20} />
                         </a>
                     </div>

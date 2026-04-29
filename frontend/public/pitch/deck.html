@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuroStore — Investor Pitch Deck</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0f;--card:#111118;--border:#1e1e2a;--text:#e2e8f0;--muted:#64748b;--green:#10b981;--green-dark:#059669;--green-glow:rgba(16,185,129,0.15)}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif}
+.deck{width:100vw;height:100vh;position:relative}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:60px 80px;opacity:0;pointer-events:none;transition:opacity .5s ease,transform .5s ease;transform:translateY(30px)}
+.slide.active{opacity:1;pointer-events:auto;transform:translateY(0)}
+.slide-number{position:fixed;bottom:30px;right:40px;font-size:13px;font-weight:700;color:var(--muted);z-index:100;font-family:'Sora'}
+.progress{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--green),#34d399);transition:width .4s ease;z-index:100}
+.nav-hint{position:fixed;bottom:30px;left:40px;font-size:12px;color:var(--muted);z-index:100}
+h1{font-family:'Sora';font-size:clamp(36px,5vw,64px);font-weight:800;line-height:1.1;letter-spacing:-0.03em}
+h2{font-family:'Sora';font-size:clamp(28px,3.5vw,48px);font-weight:800;line-height:1.15;letter-spacing:-0.02em}
+h3{font-family:'Sora';font-size:20px;font-weight:700}
+p,.desc{font-size:18px;color:var(--muted);line-height:1.7;max-width:700px;font-weight:500}
+.green{color:var(--green)}
+.badge{display:inline-flex;align-items:center;gap:6px;background:var(--green-glow);border:1px solid rgba(16,185,129,0.3);color:var(--green);font-size:12px;font-weight:700;padding:6px 16px;border-radius:100px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:20px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:30px;width:100%;max-width:1100px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;width:100%;max-width:1100px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;text-align:left}
+.card h3{margin-bottom:8px;color:var(--text)}
+.card p{font-size:15px;color:var(--muted);line-height:1.6}
+.stat{text-align:center}
+.stat .num{font-family:'Sora';font-size:clamp(36px,4vw,56px);font-weight:900;color:var(--green);display:block}
+.stat .label{font-size:14px;color:var(--muted);font-weight:600;margin-top:4px}
+.table-wrap{width:100%;max-width:1000px;overflow:hidden;border-radius:12px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{background:#161620;text-align:left;padding:14px 20px;font-weight:700;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:0.05em}
+td{padding:14px 20px;border-top:1px solid var(--border);font-weight:500}
+.highlight{color:var(--green);font-weight:700}
+.logo-row{display:flex;align-items:center;gap:14px;margin-bottom:30px}
+.logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--green),var(--green-dark));border-radius:12px;display:flex;align-items:center;justify-content:center}
+.logo-icon svg{width:22px;height:22px;color:white}
+.logo-text{font-family:'Sora';font-size:22px;font-weight:800;color:white}
+.flow{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center}
+.flow-step{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;text-align:center;min-width:140px}
+.flow-step .num{font-family:'Sora';font-size:28px;font-weight:800;color:var(--green)}
+.flow-step .txt{font-size:13px;color:var(--muted);font-weight:600;margin-top:4px}
+.flow-arrow{font-size:24px;color:var(--muted)}
+.center{text-align:center}
+.mt{margin-top:24px}
+.mb{margin-bottom:24px}
+.max800{max-width:800px}
+.img-wrap{width:100%;max-width:500px;border-radius:16px;overflow:hidden;border:1px solid var(--border)}
+.img-wrap img{width:100%;display:block}
+ul{list-style:none;padding:0}
+ul li{padding:8px 0;font-size:16px;font-weight:500;color:var(--muted);display:flex;align-items:flex-start;gap:10px}
+ul li::before{content:"✓";color:var(--green);font-weight:800;flex-shrink:0}
+.cta-box{background:linear-gradient(135deg,rgba(16,185,129,0.1),rgba(16,185,129,0.05));border:1px solid rgba(16,185,129,0.25);border-radius:20px;padding:40px;text-align:center;max-width:700px}
+.pill{display:inline-block;background:var(--green);color:white;font-weight:800;padding:12px 32px;border-radius:12px;font-size:16px;margin-top:16px}
+@media(max-width:768px){
+.slide{padding:30px 24px}
+.grid2,.grid3{grid-template-columns:1fr;gap:16px}
+.flow{flex-direction:column}
+.flow-arrow{transform:rotate(90deg)}
+}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="slide-number" id="slideNum"></div>
+<div class="nav-hint">← → Arrow keys or click to navigate</div>
+<div class="deck" id="deck">
+
+<!-- SLIDE 1: Title -->
+<div class="slide active" data-slide="0">
+<div class="logo-row">
+<div class="logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="16" r="1" fill="currentColor"/></svg></div>
+<span class="logo-text">NeuroStore</span>
+</div>
+<h1>India's Decentralized<br>Cloud Storage <span class="green">Infrastructure</span></h1>
+<p class="center mt">40% cheaper than AWS S3 · Zero-knowledge encryption · Built-in DPDP compliance</p>
+<div style="margin-top:40px;font-size:14px;color:var(--muted);font-weight:600">Seed Round · Pre-Revenue · Product Built · ₹4 Crore Ask</div>
+</div>
+
+<!-- SLIDE 2: Problem -->
+<div class="slide" data-slide="1">
+<div class="badge">The Problem</div>
+<h2 class="center mb">India's ₹35,000 Cr cloud storage<br>market is <span class="green">broken</span></h2>
+<div class="grid3">
+<div class="card">
+<h3>💰 Overpriced</h3>
+<p>AWS S3 Mumbai: ₹2,500/TB/mo storage + ₹8,400/TB egress. Indian startups bleed cash on cloud bills.</p>
+</div>
+<div class="card">
+<h3>🔓 No Data Sovereignty</h3>
+<p>DPDP Act 2023 mandates Indian data residency. AWS says "Mumbai region" but offers zero cryptographic proof.</p>
+</div>
+<div class="card">
+<h3>🔒 Vendor Lock-in</h3>
+<p>92% of Indian startups on AWS/GCP/Azure. Switching costs are enormous. They own your infrastructure.</p>
+</div>
+</div>
+</div>
+
+<!-- SLIDE 3: Solution -->
+<div class="slide" data-slide="2">
+<div class="badge">The Solution</div>
+<h2 class="center mb">S3-compatible storage across<br>India's <span class="green">data center network</span></h2>
+<div class="flow">
+<div class="flow-step"><div class="num">1</div><div class="txt">User uploads file</div></div>
+<div class="flow-arrow">→</div>
+<div class="flow-step"><div class="num">🔐</div><div class="txt">AES-256 encrypted<br>in browser</div></div>
+<div class="flow-arrow">→</div>
+<div class="flow-step"><div class="num">✂️</div><div class="txt">Erasure coded<br>into shards</div></div>
+<div class="flow-arrow">→</div>
+<div class="flow-step"><div class="num">🏢</div><div class="txt">Stored across<br>2-3 Indian DCs</div></div>
+<div class="flow-arrow">→</div>
+<div class="flow-step"><div class="num">✅</div><div class="txt">Cryptographic<br>residency proof</div></div>
+</div>
+<p class="center mt" style="font-size:16px">Zero-knowledge: we <strong style="color:white">never</strong> see your plaintext data. Even if hacked, attacker gets meaningless ciphertext.</p>
+</div>
+
+<!-- SLIDE 4: Why Better -->
+<div class="slide" data-slide="3">
+<div class="badge">Why NeuroStore Wins</div>
+<h2 class="center mb">Drop-in AWS S3 replacement.<br><span class="green">40% cheaper.</span></h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Feature</th><th>AWS S3 Mumbai</th><th style="color:var(--green)">NeuroStore</th></tr></thead>
+<tbody>
+<tr><td>Storage (per TB/mo)</td><td>₹2,500</td><td class="highlight">₹1,500</td></tr>
+<tr><td>Egress (per TB)</td><td>₹8,400</td><td class="highlight">₹3,000</td></tr>
+<tr><td>Encryption</td><td>Server-side (AWS has keys)</td><td class="highlight">Client-side zero-knowledge</td></tr>
+<tr><td>DPDP Compliance</td><td>Complex manual setup</td><td class="highlight">Built-in dashboard</td></tr>
+<tr><td>Data Residency Proof</td><td>"Trust us"</td><td class="highlight">Cryptographic certificate</td></tr>
+<tr><td>API Compatibility</td><td>S3 (proprietary)</td><td class="highlight">S3-compatible (drop-in)</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<!-- SLIDE 5: Market -->
+<div class="slide" data-slide="4">
+<div class="badge">Market Opportunity</div>
+<h2 class="center mb">India cloud storage:<br><span class="green">$4.2B</span> by 2027</h2>
+<div class="grid3">
+<div class="stat"><span class="num">$4.2B</span><span class="label">TAM — India Cloud Storage</span></div>
+<div class="stat"><span class="num">$1.2B</span><span class="label">SAM — Startups + Regulated</span></div>
+<div class="stat"><span class="num">$1.5M</span><span class="label">SOM — Year 3 ARR Target</span></div>
+</div>
+<p class="center mt" style="font-size:15px">DPDP Act creates mandatory compliance. 1.4M+ Indian businesses need certified data residency. No good alternative exists today.</p>
+</div>
+
+<!-- SLIDE 6: DC Strategy -->
+<div class="slide" data-slide="5">
+<div class="badge">Infrastructure Strategy</div>
+<h2 class="center mb">Tier 2/3 data centers have<br><span class="green">massive idle capacity</span></h2>
+<div class="grid2">
+<div>
+<ul style="margin-top:16px">
+<li>Revenue-share model: DC keeps 60%, we keep 40%</li>
+<li>DC earns ₹6,640/mo profit per server from racks earning ₹0 today</li>
+<li>Zero capex for us — DC provides hardware + power</li>
+<li>3x replication across cities for 99.9% durability</li>
+<li>Consumer nodes as cold storage tier (network effect moat)</li>
+<li>Start with 3 cities: Pune, Jaipur, Bhubaneswar</li>
+</ul>
+</div>
+<div class="img-wrap"><img src="india-map.png" alt="India DC Network Map"></div>
+</div>
+</div>
+
+<!-- SLIDE 7: Unit Economics -->
+<div class="slide" data-slide="6">
+<div class="badge">Unit Economics</div>
+<h2 class="center mb">60%+ gross margin<br>on <span class="green">every operation</span></h2>
+<div class="grid3">
+<div class="card">
+<h3>📤 Upload 1 GB</h3>
+<p><strong style="color:white">Our cost:</strong> ₹0.10<br><strong style="color:var(--green)">We charge:</strong> ₹1.50/mo<br><strong style="color:var(--green)">Margin: 93%</strong></p>
+</div>
+<div class="card">
+<h3>📥 Retrieve 1 GB</h3>
+<p><strong style="color:white">Our cost:</strong> ₹0.40<br><strong style="color:var(--green)">We charge:</strong> ₹3.00<br><strong style="color:var(--green)">Margin: 87%</strong></p>
+</div>
+<div class="card">
+<h3>🏢 DC Partner Earns</h3>
+<p><strong style="color:white">DC cost:</strong> ₹2,000/mo<br><strong style="color:var(--green)">DC revenue:</strong> ₹8,640/mo<br><strong style="color:var(--green)">DC profit: ₹6,640/mo</strong></p>
+</div>
+</div>
+<p class="center mt" style="font-size:15px">Breakeven at 25 Pro + 5 Business customers = ₹45,000 MRR. Platform cost: ₹8,000/mo.</p>
+</div>
+
+<!-- SLIDE 8: Revenue Model -->
+<div class="slide" data-slide="7">
+<div class="badge">Revenue Model</div>
+<h2 class="center mb">Five revenue streams,<br><span class="green">all recurring</span></h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Stream</th><th>Pricing</th><th>Margin</th><th>Year 1</th></tr></thead>
+<tbody>
+<tr><td>Storage (per TB/mo)</td><td>₹1,500</td><td class="highlight">60%</td><td>₹60L</td></tr>
+<tr><td>Egress (per TB)</td><td>₹3,000</td><td class="highlight">87%</td><td>₹15L</td></tr>
+<tr><td>API Calls (per 10K)</td><td>₹5</td><td class="highlight">90%</td><td>₹5L</td></tr>
+<tr><td>Compliance Add-on</td><td>₹2,000/mo</td><td class="highlight">95%</td><td>₹12L</td></tr>
+<tr><td>Enterprise SLA</td><td>₹10,000+/mo</td><td class="highlight">50%</td><td>₹12L</td></tr>
+<tr style="background:var(--green-glow)"><td><strong>Total Year 1</strong></td><td></td><td></td><td class="highlight"><strong>₹1.04 Cr</strong></td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<!-- SLIDE 9: Security -->
+<div class="slide" data-slide="8">
+<div class="badge">Security Architecture</div>
+<h2 class="center mb">Zero-knowledge.<br><span class="green">Even we can't read your data.</span></h2>
+<div class="grid2">
+<div>
+<ul>
+<li><strong style="color:white">Client-side AES-256-GCM</strong> — encrypted in browser before upload</li>
+<li><strong style="color:white">Double encryption</strong> — node adds second AES-256 layer at rest</li>
+<li><strong style="color:white">Noise Protocol (Ed25519)</strong> — P2P transport encryption</li>
+<li><strong style="color:white">Argon2id</strong> — password hashing (brute-force resistant)</li>
+<li><strong style="color:white">HMAC-SHA256</strong> — scoped, time-limited shard access tokens</li>
+<li><strong style="color:white">Reed-Solomon 4+2</strong> — survives loss of any 2 shards</li>
+</ul>
+</div>
+<div>
+<div class="card" style="border-color:rgba(16,185,129,0.3)">
+<h3 style="color:var(--green)">What if we get hacked?</h3>
+<p>Attacker sees encrypted ciphertext only. No keys on our servers. User data is <strong style="color:white">mathematically unrecoverable</strong> without user's password.</p>
+</div>
+<div class="card mt" style="border-color:rgba(16,185,129,0.3)">
+<h3 style="color:var(--green)">Government data request?</h3>
+<p>We provide ciphertext only. We <strong style="color:white">genuinely cannot decrypt</strong>. Zero-knowledge architecture by design, not policy.</p>
+</div>
+</div>
+</div>
+</div>
+
+<!-- SLIDE 10: Traction -->
+<div class="slide" data-slide="9">
+<div class="badge">Traction</div>
+<h2 class="center mb">Product is <span class="green">fully built</span></h2>
+<div class="grid3">
+<div class="stat"><span class="num">15K</span><span class="label">Lines of Rust (Backend)</span></div>
+<div class="stat"><span class="num">8K</span><span class="label">Lines of React (Frontend)</span></div>
+<div class="stat"><span class="num">1</span><span class="label">Solo Founder (Built Everything)</span></div>
+</div>
+<div class="grid3 mt">
+<div class="card"><h3>✅ Gateway API</h3><p>Live on Railway. Rate limiting, CORS, CSP, PostgreSQL.</p></div>
+<div class="card"><h3>✅ Node Client</h3><p>Cross-platform Rust binary. Windows + Linux. Auto-start service.</p></div>
+<div class="card"><h3>✅ Dashboard</h3><p>React + Vite. Upload, encrypt, distribute, preview, download.</p></div>
+</div>
+</div>
+
+<!-- SLIDE 11: 3-Year Projections -->
+<div class="slide" data-slide="10">
+<div class="badge">Financial Projections</div>
+<h2 class="center mb">Path to <span class="green">₹24 Cr ARR</span></h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Metric</th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr></thead>
+<tbody>
+<tr><td>Paying Customers</td><td>200</td><td>1,500</td><td>5,000</td></tr>
+<tr><td>MRR</td><td>₹8L</td><td>₹50L</td><td class="highlight">₹2 Cr</td></tr>
+<tr><td>ARR</td><td>₹1 Cr</td><td>₹6 Cr</td><td class="highlight">₹24 Cr</td></tr>
+<tr><td>DC Cities</td><td>3</td><td>8</td><td>15</td></tr>
+<tr><td>Storage Managed</td><td>50 TB</td><td>500 TB</td><td>5 PB</td></tr>
+<tr><td>Gross Margin</td><td>55%</td><td>62%</td><td class="highlight">68%</td></tr>
+<tr><td>Team Size</td><td>4</td><td>12</td><td>30</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<!-- SLIDE 12: The Ask -->
+<div class="slide" data-slide="11">
+<div class="badge">The Ask</div>
+<h2 class="center mb">Raising <span class="green">₹4 Crore</span> Seed</h2>
+<div class="grid2" style="max-width:900px">
+<div>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Use of Funds</th><th>Amount</th></tr></thead>
+<tbody>
+<tr><td>Team (4 people, 18 mo)</td><td>₹1.8 Cr</td></tr>
+<tr><td>DC Infrastructure (6 cities)</td><td>₹60L</td></tr>
+<tr><td>Marketing & Sales</td><td>₹40L</td></tr>
+<tr><td>Security Audit</td><td>₹15L</td></tr>
+<tr><td>Cloud + Legal + Buffer</td><td>₹65L</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cta-box">
+<h3 style="color:white;font-size:22px;margin-bottom:12px">What You Get</h3>
+<p style="font-size:15px;text-align:left">
+• 15-20% equity<br>
+• Board observer seat<br>
+• Pro-rata rights for Series A<br>
+• Quarterly reporting<br><br>
+<strong style="color:white">18-month runway to ₹12Cr ARR<br>or profitability</strong>
+</p>
+</div>
+</div>
+</div>
+
+<!-- SLIDE 13: Closing -->
+<div class="slide" data-slide="12">
+<div class="logo-row">
+<div class="logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="16" r="1" fill="currentColor"/></svg></div>
+<span class="logo-text">NeuroStore</span>
+</div>
+<h1 class="center">The product is built.<br>The market is ready.<br>Let's <span class="green">scale.</span></h1>
+<p class="center mt">enterprise@neurostore.io · neurostore.vercel.app</p>
+<div class="pill mt">Request Live Demo →</div>
+</div>
+
+</div>
+
+<script>
+let current=0;
+const slides=document.querySelectorAll('.slide');
+const total=slides.length;
+const numEl=document.getElementById('slideNum');
+const progEl=document.getElementById('progress');
+
+function goTo(n){
+  if(n<0||n>=total)return;
+  slides[current].classList.remove('active');
+  current=n;
+  slides[current].classList.add('active');
+  numEl.textContent=`${current+1} / ${total}`;
+  progEl.style.width=`${((current+1)/total)*100}%`;
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' ')goTo(current+1);
+  if(e.key==='ArrowLeft')goTo(current-1);
+});
+
+document.addEventListener('click',e=>{
+  const x=e.clientX;
+  if(x>window.innerWidth/2)goTo(current+1);
+  else goTo(current-1);
+});
+
+goTo(0);
+</script>
+</body>
+</html>

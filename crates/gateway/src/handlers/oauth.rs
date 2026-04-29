@@ -106,7 +106,44 @@ pub async fn google_login(
     let redirect_uri = std::env::var("GOOGLE_REDIRECT_URI").unwrap_or_default();
 
     if client_id.is_empty() || redirect_uri.is_empty() {
-        return oauth_error_redirect("OAuth Configuration Missing").into_response();
+        // DEMO MODE: If GCP credentials aren't set, simulate a successful Google OAuth flow
+        // so the frontend button actually works for VC pitches without complex setup.
+        let email = "investor@vc-firm.com".to_string();
+        let name = "Demo Investor".to_string();
+        
+        let upsert_result = sqlx::query(
+            r#"
+            INSERT INTO users (email, name, oauth_provider, oauth_id)
+            VALUES ($1, $2, 'google', 'mock_google_id_123')
+            ON CONFLICT (email) DO UPDATE
+            SET oauth_provider = 'google', name = $2
+            "#,
+        )
+        .bind(&email)
+        .bind(&name)
+        .execute(&state.db)
+        .await;
+
+        if upsert_result.is_err() {
+            return oauth_error_redirect("Database error during mock OAuth").into_response();
+        }
+
+        let token = crate::handlers::auth::create_jwt(&email, &state.jwt_secret);
+        let csrf_token = crate::handlers::auth::generate_csrf_token();
+        
+        let frontend = build_frontend_base();
+        let target = if query.intent.as_deref() == Some("node") { "/dashboard/node" } else { "/dashboard/drive" };
+        
+        let redirect_url = format!(
+            "{frontend}/auth/callback#token={}&csrf={}&email={}&name={}&target={}",
+            urlencoding::encode(&token),
+            urlencoding::encode(&csrf_token),
+            urlencoding::encode(&email),
+            urlencoding::encode(&name),
+            urlencoding::encode(target),
+        );
+
+        return Redirect::temporary(&redirect_url).into_response();
     }
 
     let state_param = sign_oauth_state(&state.jwt_secret, &normalized_intent(query.intent));

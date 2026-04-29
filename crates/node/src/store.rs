@@ -6,8 +6,8 @@ use sha2::Digest;
 use sled::Db;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::fs;
-use std::io::{Read, Write as IoWrite};
-use std::path::{Path, PathBuf};
+use std::io::Read;
+use std::path::PathBuf;
 
 const USED_BYTES_KEY: &[u8] = b"__meta:used_bytes";
 const ENCRYPTION_KEY: &[u8] = b"__meta:node_encryption_key";

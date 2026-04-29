@@ -427,8 +427,8 @@ pub async fn put_object(
     while let Some(chunk) = body_stream.next().await {
         match chunk {
             Ok(data) => {
-                if full_body.len() + data.len() > 1024 * 1024 * 500 {
-                    return (StatusCode::PAYLOAD_TOO_LARGE, "Exceeds 500MB Limit").into_response();
+                if full_body.len() + data.len() > 1024 * 1024 * 50 {
+                    return (StatusCode::PAYLOAD_TOO_LARGE, "Payload exceeds 50MB legacy limit. Use Direct-Node-Chunks mode for large files.").into_response();
                 }
                 full_body.extend_from_slice(&data);
             }

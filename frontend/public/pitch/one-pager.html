@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NeuroStore — Investor Summary</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sora:wght@700;800&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:0}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:210mm;height:297mm;font-family:'Inter',system-ui,sans-serif;color:#0f172a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{width:210mm;min-height:297mm;padding:20mm 22mm 16mm;position:relative;overflow:hidden}
+.page::before{content:'';position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#10b981,#059669)}
+
+/* Header */
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:14px;border-bottom:1.5px solid #e2e8f0}
+.logo-area{display:flex;align-items:center;gap:10px}
+.logo-box{width:36px;height:36px;background:linear-gradient(135deg,#10b981,#059669);border-radius:9px;display:flex;align-items:center;justify-content:center}
+.logo-box svg{width:18px;height:18px;color:#fff}
+.logo-text{font-family:'Sora';font-size:20px;font-weight:800;color:#0f172a}
+.contact{text-align:right;font-size:10px;color:#64748b;line-height:1.6}
+.contact a{color:#059669;text-decoration:none;font-weight:600}
+
+/* Tagline */
+.tagline{font-family:'Sora';font-size:15px;font-weight:800;color:#0f172a;margin-bottom:4px}
+.subtitle{font-size:11px;color:#64748b;font-weight:500;margin-bottom:16px;line-height:1.5}
+
+/* Sections */
+.section-title{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#10b981;margin-bottom:6px;margin-top:14px}
+
+/* Grid */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
+
+/* Stat boxes */
+.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;text-align:center}
+.stat .num{font-family:'Sora';font-size:22px;font-weight:800;color:#10b981;display:block;line-height:1.2}
+.stat .label{font-size:9px;color:#64748b;font-weight:600;margin-top:2px;line-height:1.3}
+
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:10px;margin-top:4px}
+th{background:#f8fafc;text-align:left;padding:6px 10px;font-weight:700;color:#64748b;font-size:8.5px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1.5px solid #e2e8f0}
+td{padding:5px 10px;border-bottom:1px solid #f1f5f9;font-weight:500;color:#334155}
+.g{color:#10b981;font-weight:700}
+
+/* Cards */
+.card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px}
+.card h4{font-size:10.5px;font-weight:700;color:#0f172a;margin-bottom:3px}
+.card p{font-size:9.5px;color:#64748b;line-height:1.45;font-weight:500}
+
+/* Bullet list */
+.bullets{font-size:10px;color:#334155;line-height:1.7;font-weight:500;padding-left:14px}
+.bullets li{margin-bottom:1px}
+.bullets li::marker{color:#10b981;font-weight:800}
+
+/* Footer */
+.footer{position:absolute;bottom:12mm;left:22mm;right:22mm;display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid #e2e8f0;font-size:8.5px;color:#94a3b8}
+.footer .conf{font-weight:700;color:#ef4444}
+
+/* Green highlight box */
+.highlight-box{background:linear-gradient(135deg,rgba(16,185,129,0.08),rgba(16,185,129,0.03));border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:10px 14px;margin-top:12px}
+.highlight-box h4{font-size:11px;font-weight:800;color:#059669;margin-bottom:4px}
+.highlight-box p{font-size:10px;color:#334155;line-height:1.5;font-weight:500}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo-area">
+    <div class="logo-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="16" r="1" fill="currentColor"/></svg></div>
+    <span class="logo-text">NeuroStore</span>
+  </div>
+  <div class="contact">
+    Seed Round — Raising ₹4 Crore ($500K)<br>
+    <a href="mailto:enterprise@neurostore.io">enterprise@neurostore.io</a> · <a href="https://neurostore.vercel.app">neurostore.vercel.app</a>
+  </div>
+</div>
+
+<!-- TAGLINE -->
+<div class="tagline">India's Decentralized Cloud Storage Infrastructure</div>
+<div class="subtitle">S3-compatible API · 40% cheaper than AWS · Zero-knowledge encryption · Built-in DPDP compliance · Tier 2/3 DC network</div>
+
+<!-- KEY METRICS -->
+<div class="section-title">Key Metrics</div>
+<div class="grid4">
+  <div class="stat"><span class="num">$4.2B</span><span class="label">India Cloud Storage<br>TAM by 2027</span></div>
+  <div class="stat"><span class="num">40%</span><span class="label">Cheaper Than<br>AWS S3 Mumbai</span></div>
+  <div class="stat"><span class="num">60%+</span><span class="label">Gross Margin<br>Per Operation</span></div>
+  <div class="stat"><span class="num">15K</span><span class="label">Lines of Rust<br>Built Solo</span></div>
+</div>
+
+<!-- PROBLEM + SOLUTION -->
+<div class="grid2" style="margin-top:14px">
+  <div>
+    <div class="section-title">The Problem</div>
+    <ul class="bullets">
+      <li>AWS S3 Mumbai: ₹2,500/TB/mo storage + ₹8,400/TB egress</li>
+      <li>DPDP Act 2023 mandates data residency — no cloud provider offers cryptographic proof</li>
+      <li>92% of Indian startups locked into AWS/GCP/Azure with enormous switching costs</li>
+    </ul>
+  </div>
+  <div>
+    <div class="section-title">The Solution</div>
+    <ul class="bullets">
+      <li>S3-compatible API → drop-in AWS replacement (zero migration effort)</li>
+      <li>AES-256-GCM client-side encryption → zero-knowledge (we never see your data)</li>
+      <li>Data distributed across India's Tier 2/3 DCs with cryptographic residency proof</li>
+    </ul>
+  </div>
+</div>
+
+<!-- COMPARISON TABLE -->
+<div class="section-title">NeuroStore vs AWS S3 (Mumbai Region)</div>
+<table>
+  <thead><tr><th>Feature</th><th>AWS S3</th><th style="color:#10b981">NeuroStore</th></tr></thead>
+  <tbody>
+    <tr><td>Storage cost</td><td>₹2,500/TB/mo</td><td class="g">₹1,500/TB/mo</td></tr>
+    <tr><td>Egress cost</td><td>₹8,400/TB</td><td class="g">₹3,000/TB</td></tr>
+    <tr><td>Encryption</td><td>Server-side (AWS has keys)</td><td class="g">Client-side zero-knowledge</td></tr>
+    <tr><td>DPDP compliance</td><td>Complex manual setup</td><td class="g">Built-in dashboard + proof</td></tr>
+  </tbody>
+</table>
+
+<!-- REVENUE + ECONOMICS -->
+<div class="grid2" style="margin-top:12px">
+  <div>
+    <div class="section-title">Revenue Model (5 Streams)</div>
+    <table>
+      <thead><tr><th>Stream</th><th>Margin</th><th>Year 1</th></tr></thead>
+      <tbody>
+        <tr><td>Storage (₹1,500/TB/mo)</td><td class="g">60%</td><td>₹60L</td></tr>
+        <tr><td>Egress (₹3,000/TB)</td><td class="g">87%</td><td>₹15L</td></tr>
+        <tr><td>API calls + Compliance</td><td class="g">90%+</td><td>₹17L</td></tr>
+        <tr><td>Enterprise SLA</td><td class="g">50%</td><td>₹12L</td></tr>
+        <tr style="background:#f0fdf4"><td><strong>Total Year 1</strong></td><td></td><td class="g"><strong>₹1.04 Cr</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div>
+    <div class="section-title">3-Year Projections</div>
+    <table>
+      <thead><tr><th>Metric</th><th>Y1</th><th>Y2</th><th>Y3</th></tr></thead>
+      <tbody>
+        <tr><td>Paying customers</td><td>200</td><td>1,500</td><td class="g">5,000</td></tr>
+        <tr><td>ARR</td><td>₹1Cr</td><td>₹6Cr</td><td class="g">₹24Cr</td></tr>
+        <tr><td>DC cities</td><td>3</td><td>8</td><td class="g">15</td></tr>
+        <tr><td>Gross margin</td><td>55%</td><td>62%</td><td class="g">68%</td></tr>
+        <tr><td>Team</td><td>4</td><td>12</td><td class="g">30</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- DC STRATEGY + USE OF FUNDS -->
+<div class="grid2" style="margin-top:12px">
+  <div>
+    <div class="section-title">Infrastructure Strategy</div>
+    <ul class="bullets">
+      <li><strong>Revenue-share</strong> with Tier 2/3 DCs (₹0 capex — DC provides hardware)</li>
+      <li>DC earns ₹6,640/mo net profit per server from idle capacity</li>
+      <li>3x replication across cities → 99.9% durability</li>
+      <li>Consumer nodes as cold storage tier (network effect moat)</li>
+      <li>Start: Pune + Jaipur + Bhubaneswar (₹10-20K/mo total)</li>
+    </ul>
+  </div>
+  <div>
+    <div class="section-title">Use of Funds (₹4 Cr / 18 Months)</div>
+    <table>
+      <tbody>
+        <tr><td>Team (4 people)</td><td class="g">₹1.8 Cr (45%)</td></tr>
+        <tr><td>DC infrastructure (6 cities)</td><td class="g">₹60L (15%)</td></tr>
+        <tr><td>Marketing & sales</td><td class="g">₹40L (10%)</td></tr>
+        <tr><td>Security audit + legal</td><td class="g">₹25L (6%)</td></tr>
+        <tr><td>Cloud + buffer</td><td class="g">₹55L (14%)</td></tr>
+      </tbody>
+    </table>
+    <div style="font-size:9px;color:#64748b;margin-top:4px;font-weight:600">→ 15-20% equity · Board observer · Pro-rata rights</div>
+  </div>
+</div>
+
+<!-- HIGHLIGHT BOX -->
+<div class="highlight-box">
+  <h4>Why Now?</h4>
+  <p>India's DPDP Act 2023 creates mandatory data localization. Tier 2/3 DCs have 40-60% idle capacity. Our product is fully built (15K lines of Rust + 8K React, deployed live). We need capital to scale distribution — not to build the product.</p>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span class="conf">CONFIDENTIAL — For intended recipient only</span>
+  <span>NeuroStore · Seed Round · 2026</span>
+</div>
+
+</div>
+</body>
+</html>

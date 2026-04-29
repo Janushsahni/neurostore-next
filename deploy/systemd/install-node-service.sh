@@ -129,7 +129,7 @@ fi
 STORAGE_PATH="$(prompt_default "Storage path for encrypted shard data" "${STORAGE_PATH}")"
 GATEWAY_URL="$(prompt_default "Gateway URL" "${GATEWAY_URL}")"
 RELAY_URL="$(prompt_default "Relay URL" "${RELAY_URL}")"
-NODE_SECRET="$(prompt_default "Node onboarding secret (leave blank to skip auto-registration)" "${NODE_SECRET}")"
+NODE_SECRET="$(prompt_default "Node onboarding secret (leave blank for claim_token flow)" "${NODE_SECRET}")"
 WALLET_ADDRESS="$(prompt_default "Payout wallet address" "${WALLET_ADDRESS}")"
 DECLARED_LOCATION="$(prompt_default "Declared node location" "${DECLARED_LOCATION}")"
 INGRESS_PORT="$(prompt_default "Direct ingress port" "${INGRESS_PORT}")"
@@ -144,30 +144,63 @@ fi
 
 ensure_service_account
 write_config
+
+# Pre-generate identity and claim_token BEFORE starting the service.
+# This ensures the registration payload always has a valid claim_token
+# even when NODE_SHARED_SECRET is empty.
+echo "Generating node identity..."
+sudo -u "${SERVICE_USER}" "${BINARY_PATH}" \
+  --setup-config-path "${CONFIG_PATH}" \
+  --print-peer-id > /dev/null 2>&1 || true
+
+# Now derive the claim token (creates claim_token.txt if missing)
+CLAIM_TOKEN="$(sudo -u "${SERVICE_USER}" "${BINARY_PATH}" \
+  --setup-config-path "${CONFIG_PATH}" \
+  --print-claim-token 2>/dev/null || true)"
+CLAIM_TOKEN="$(printf '%s' "${CLAIM_TOKEN}" | tr -d '\r\n')"
+
 install_unit
 
 NODE_ID="$(derive_node_id || true)"
 if [[ -n "${NODE_ID}" ]]; then
   copy_to_clipboard "${NODE_ID}" || true
+
+  # Build dashboard URL with claim_token for seamless claiming
+  if [[ -n "${CLAIM_TOKEN}" ]]; then
+    DASHBOARD_URL="${FRONTEND_URL%/}/dashboard/node?node_id=${NODE_ID}&claim_token=${CLAIM_TOKEN}"
+  else
+    DASHBOARD_URL="${FRONTEND_URL%/}/dashboard/node?node_id=${NODE_ID}"
+  fi
   open_dashboard "${NODE_ID}" || true
 fi
 
-echo "Installed ${SERVICE_NAME}."
-echo "  binary: ${BINARY_PATH}"
-echo "  config: ${CONFIG_PATH}"
-echo "  storage: ${STORAGE_PATH}"
-echo "  capacity_gb: ${MAX_GB}"
-echo "  declared_location: ${DECLARED_LOCATION}"
-echo "  ingress_port: ${INGRESS_PORT}"
+echo ""
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║           NeuroStore Node Installed Successfully          ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+echo "  binary:          ${BINARY_PATH}"
+echo "  config:          ${CONFIG_PATH}"
+echo "  storage:         ${STORAGE_PATH}"
+echo "  capacity_gb:     ${MAX_GB}"
+echo "  declared_region: ${DECLARED_LOCATION}"
+echo "  ingress_port:    ${INGRESS_PORT}"
 if [[ -n "${NODE_ID}" ]]; then
-  echo "  node_id: ${NODE_ID}"
-  echo "  dashboard: ${FRONTEND_URL%/}/dashboard/node?node_id=${NODE_ID}"
-  echo "  clipboard: attempted"
+  echo ""
+  echo "  ┌─ YOUR NODE ID ─────────────────────────────────────────┐"
+  echo "  │  ${NODE_ID}                                            "
+  echo "  └────────────────────────────────────────────────────────┘"
+  echo ""
+  echo "  Dashboard: ${DASHBOARD_URL}"
+  echo "  (Copied to clipboard)"
 fi
 if [[ -n "${NODE_SECRET}" ]]; then
   echo "  auto_registration: enabled"
 else
-  echo "  auto_registration: skipped (missing node secret)"
+  echo "  auto_registration: enabled (via claim_token)"
 fi
-echo "The node now runs silently in the background."
-echo "Check status with: systemctl status ${SERVICE_NAME}"
+echo ""
+echo "  The node runs silently in the background."
+echo "  Check status:  systemctl status ${SERVICE_NAME}"
+echo "  View logs:     journalctl -u ${SERVICE_NAME} -f"
+echo ""

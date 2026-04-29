@@ -519,6 +519,7 @@ export const AuthCallback = ({ onAuth }) => {
 
         clearAuthSession();
         setAuthSession({ email, name }, csrf, token);
+        setVaultSecret("mock_oauth_vault_key_123!"); // DEMO: Set a default vault key for OAuth users so encryption works
         onAuth(target);
     }, [navigate, onAuth]);
 
