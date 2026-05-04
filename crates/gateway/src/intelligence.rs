@@ -116,6 +116,9 @@ struct NodeTelemetry {
     shard_count: Option<i32>,
     ingress_url: Option<String>,
     country_code: Option<String>,
+    device_fingerprint: Option<String>,
+    mac_address: Option<String>,
+    ip_address: Option<String>,
 }
 
 // ── INTELLIGENCE DAEMON ──────────────────────────────────────────────────────
@@ -173,7 +176,8 @@ impl IntelligenceEngine {
             SELECT node_id, status, last_heartbeat_at, uptime_minutes,
                    cpu_usage_percent, memory_usage_percent,
                    free_gb, max_gb, used_gb, shard_count,
-                   ingress_url, country_code
+                   ingress_url, country_code,
+                   device_fingerprint, mac_address, ip_address
             FROM node_registry
             WHERE last_heartbeat_at > NOW() - INTERVAL '24 hours'
             "#,
@@ -248,13 +252,31 @@ impl IntelligenceEngine {
             _ => 0.2,
         };
 
+        // ── 6. CHURN PROBABILITY (PREDICTIVE AI) ─────────────────────────
+        // Calculate the risk of this node randomly going offline soon
+        // High risk = bad score.
+        let churn_risk = if uptime_score < 0.4 && heartbeat_score < 0.8 {
+            0.6 // Very likely to drop
+        } else if latency_score < 0.5 {
+            0.4 // Network is struggling, might disconnect
+        } else {
+            0.0 // Stable
+        };
+        
+        let churn_stability_score = 1.0 - churn_risk;
+        if churn_risk > 0.4 {
+            anomalies.push(format!("high_churn_risk_{:.0}%", churn_risk * 100.0));
+        }
+
         // ── COMPOSITE TRUST SCORE ────────────────────────────────────────
+        // Recalibrated weights to include predictive stability
         let trust_score = (
-            W_HEARTBEAT * heartbeat_score
-            + W_PROOF * proof_score
-            + W_LATENCY * latency_score
-            + W_RESOURCE * resource_score
-            + W_UPTIME * uptime_score
+            0.20 * heartbeat_score
+            + 0.35 * proof_score
+            + 0.15 * latency_score
+            + 0.15 * resource_score
+            + 0.05 * uptime_score
+            + 0.10 * churn_stability_score
         ).clamp(0.0, 1.0);
 
         // ── VERDICT ─────────────────────────────────────────────────────
@@ -426,7 +448,7 @@ impl IntelligenceEngine {
             let free = node.free_gb.unwrap_or(0.0);
             if free > upper_fence && upper_fence > 0.0 && free > 100.0 {
                 warn!(
-                    "🧠 ANOMALY: Node {} claims {:.1} GB free (fleet upper fence: {:.1} GB). Possible fake capacity.",
+                    "🧠 ANOMALY (IQR): Node {} claims {:.1} GB free (fleet upper fence: {:.1} GB). Possible fake capacity.",
                     node.node_id, free, upper_fence
                 );
 
@@ -438,6 +460,60 @@ impl IntelligenceEngine {
                 .execute(&self.state.db)
                 .await;
             }
+        }
+
+        // ── SYBIL ATTACK DETECTION ──
+        // Detect multiple node IDs running from the exact same physical machine
+        // (matching fingerprint or MAC) but claiming independent capacity.
+        let mut fingerprint_counts: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+        let mut mac_counts: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+        let mut ip_counts: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+
+        for node in nodes {
+            if let Some(fp) = &node.device_fingerprint {
+                fingerprint_counts.entry(fp.clone()).or_default().push(node.node_id.clone());
+            }
+            if let Some(mac) = &node.mac_address {
+                if !mac.is_empty() && mac != "00:00:00:00:00:00" {
+                    mac_counts.entry(mac.clone()).or_default().push(node.node_id.clone());
+                }
+            }
+            if let Some(ip) = &node.ip_address {
+                if !ip.is_empty() && ip != "127.0.0.1" {
+                    ip_counts.entry(ip.clone()).or_default().push(node.node_id.clone());
+                }
+            }
+        }
+
+        // Penalize Sybil Clusters
+        let mut sybil_nodes = std::collections::HashSet::new();
+
+        for (fp, cluster) in fingerprint_counts {
+            if cluster.len() > 2 {
+                warn!("🧠 ANOMALY (SYBIL): Device fingerprint {} is shared by {} nodes: {:?}", fp, cluster.len(), cluster);
+                for n in cluster { sybil_nodes.insert(n); }
+            }
+        }
+        for (mac, cluster) in mac_counts {
+            if cluster.len() > 2 {
+                warn!("🧠 ANOMALY (SYBIL): MAC address {} is shared by {} nodes.", mac, cluster.len());
+                for n in cluster { sybil_nodes.insert(n); }
+            }
+        }
+        for (ip, cluster) in ip_counts {
+            if cluster.len() > 5 { // NAT can cause shared IPs, so threshold is higher
+                warn!("🧠 ANOMALY (SYBIL): IP address {} is shared by {} nodes.", ip, cluster.len());
+                for n in cluster { sybil_nodes.insert(n); }
+            }
+        }
+
+        for sybil_node_id in sybil_nodes {
+            let _ = sqlx::query(
+                "UPDATE node_registry SET trust_score = GREATEST(0.0, COALESCE(trust_score, 1.0) - 0.40) WHERE node_id = $1"
+            )
+            .bind(sybil_node_id)
+            .execute(&self.state.db)
+            .await;
         }
     }
 
