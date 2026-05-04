@@ -265,7 +265,13 @@ impl RepairDaemon {
         // any shards hosted on them to stable nodes BEFORE the node goes offline.
 
         let high_churn_peers_res = sqlx::query(
-            "SELECT peer_id FROM nodes WHERE uptime_percentage < 95.0 AND bandwidth_capacity_mbps < 5 LIMIT 5"
+            r#"
+            SELECT node_id as peer_id, trust_score, trust_verdict, trust_anomalies
+            FROM node_registry 
+            WHERE (trust_verdict = 'warning' OR trust_verdict = 'quarantined' OR trust_score < 0.5)
+              AND status = 'online'
+            LIMIT 10
+            "#
         )
         .fetch_all(&self.state.db)
         .await;
@@ -280,8 +286,10 @@ impl RepairDaemon {
                             continue;
                         }
                     };
+                    let trust_score: f64 = peer.try_get("trust_score").unwrap_or(0.0);
+                    let trust_verdict: String = peer.try_get("trust_verdict").unwrap_or_default();
 
-                    warn!("PREDICTIVE AI: Node {} flagged for proactive migration.", peer_id);
+                    warn!("🧠 PREDICTIVE AI: Node {} flagged for proactive migration. Verdict: {} (Score: {:.2})", peer_id, trust_verdict, trust_score);
 
                     // Find all shards hosted on this high-churn peer
                     let shards_on_peer = sqlx::query_as::<_, (String, String, i32)>(

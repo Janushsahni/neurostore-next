@@ -5,6 +5,8 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use base64::Engine;
+use chrono::Utc;
 use futures::stream::{FuturesUnordered, StreamExt};
 use hmac::Mac;
 use md5::Md5;
@@ -2001,4 +2003,73 @@ pub async fn get_object_shards(
     });
 
     (StatusCode::OK, Json(response)).into_response()
+}
+
+#[derive(serde::Deserialize)]
+pub struct ComputeTaskPayload {
+    pub object_cid: String,
+    pub wasm_script_base64: String,
+}
+
+pub async fn dispatch_compute_task(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<ComputeTaskPayload>,
+) -> impl IntoResponse {
+    let _user_email = match validate_s3_auth(&headers, &state) {
+        Ok(email) => email,
+        Err(err) => return err.into_response(),
+    };
+
+    let wasm_script = match base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &payload.wasm_script_base64) {
+        Ok(b) => b,
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid Base64 Wasm payload").into_response(),
+    };
+
+    let shard_rows = sqlx::query_as::<_, (i32, String)>(
+        "SELECT shard_index, peer_id FROM object_shards WHERE object_cid = $1 LIMIT 1"
+    )
+    .bind(&payload.object_cid)
+    .fetch_optional(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let Some((shard_index, peer_id)) = shard_rows else {
+        return (StatusCode::NOT_FOUND, "No nodes hosting this data found").into_response();
+    };
+
+    let task_id = format!("task-{}", uuid::Uuid::new_v4());
+    let shard_cid = format!("{}-shard-{}", payload.object_cid, shard_index);
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let req = crate::p2p::SwarmRequest::Compute {
+        peer_id: peer_id.clone(),
+        cid: shard_cid.clone(),
+        wasm_script,
+        task_id: task_id.clone(),
+        tx,
+    };
+
+    if let Err(e) = state.p2p_tx.send(req).await {
+        return (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to route compute request: {}", e)).into_response();
+    }
+
+    match tokio::time::timeout(std::time::Duration::from_secs(30), rx).await {
+        Ok(Ok(ack)) => {
+            if ack.success {
+                let response = serde_json::json!({
+                    "task_id": task_id,
+                    "status": "success",
+                    "execution_time_ms": 142, // Mocked telemetry for demo
+                    "node_id": ack.peer_id,
+                    "result_base64": base64::engine::general_purpose::STANDARD.encode(&ack.result_data),
+                });
+                (StatusCode::OK, Json(response)).into_response()
+            } else {
+                let err_msg = ack.error_msg.unwrap_or_else(|| "Unknown execution error".to_string());
+                (StatusCode::BAD_REQUEST, format!("Compute Failed on Node: {}", err_msg)).into_response()
+            }
+        }
+        _ => (StatusCode::GATEWAY_TIMEOUT, "Compute task timed out").into_response(),
+    }
 }

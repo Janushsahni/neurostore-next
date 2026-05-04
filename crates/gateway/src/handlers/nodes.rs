@@ -605,7 +605,7 @@ pub async fn get_admin_inventory(
     let include_sensitive = query.include_sensitive.unwrap_or(false);
 
     let nodes = sqlx::query_as::<_, AdminInventoryRow>(
-        r#"SELECT node_id, status, os, version, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, hostname, device_fingerprint, ip_address, cpu_usage_percent, memory_usage_percent, mac_address, country_code, ingress_url
+        r#"SELECT node_id, status, os, version, shard_count, used_gb, max_gb, total_earned_inr, uptime_minutes, last_heartbeat_at, hostname, device_fingerprint, ip_address, cpu_usage_percent, memory_usage_percent, mac_address, country_code, ingress_url, trust_score, trust_verdict, trust_anomalies
            FROM node_registry ORDER BY last_heartbeat_at DESC"#,
     )
     .fetch_all(&state.db)
@@ -648,6 +648,9 @@ pub async fn get_admin_inventory(
                 "cpu_usage_percent": if include_sensitive { Some(format!("{:.1}", n.cpu_usage_percent)) } else { None },
                 "memory_usage_percent": if include_sensitive { Some(format!("{:.1}", n.memory_usage_percent)) } else { None },
                 "mac_address": if include_sensitive { n.mac_address.clone() } else { mask_sensitive_value(n.mac_address.as_deref(), 4, 2) },
+                "trust_score": n.trust_score,
+                "trust_verdict": n.trust_verdict,
+                "trust_anomalies": n.trust_anomalies,
                 "sensitive_redacted": !include_sensitive,
             })
         })
@@ -1360,6 +1363,9 @@ struct AdminInventoryRow {
     mac_address: Option<String>,
     country_code: Option<String>,
     ingress_url: Option<String>,
+    trust_score: Option<f64>,
+    trust_verdict: Option<String>,
+    trust_anomalies: Option<String>,
 }
 
 fn matches_claimed_node(requested_node_id: &str, actual_node_id: &str) -> bool {

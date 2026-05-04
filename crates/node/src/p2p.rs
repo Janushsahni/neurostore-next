@@ -471,6 +471,22 @@ fn handle_chunk_command(node: &NeuroNode, cmd: ChunkCommand) -> ChunkReply {
                 public_key,
             })
         }
+        ChunkCommand::Compute(req) => {
+            let timestamp_ms = chrono::Utc::now().timestamp_millis() as u64;
+            let payload = neuro_protocol::ComputeTaskResponse::compute_payload(&req.task_id, false, 0, timestamp_ms);
+            let signature = node.keypair.sign(&payload).map(|s| s.to_vec()).unwrap_or_default();
+            let public_key = node.keypair.public().encode_protobuf();
+            
+            ChunkReply::Compute(neuro_protocol::ComputeTaskResponse {
+                task_id: req.task_id,
+                success: false,
+                result_data: vec![],
+                error_msg: Some("Wasm Compute Runtime not fully embedded in this build yet.".into()),
+                timestamp_ms,
+                signature,
+                public_key,
+            })
+        }
     }
 }
 
@@ -530,6 +546,15 @@ fn deny_chunk_command(cmd: ChunkCommand) -> ChunkReply {
             timestamp_ms,
             signature: Vec::new(),
             public_key: Vec::new(),
+        }),
+        ChunkCommand::Compute(req) => ChunkReply::Compute(neuro_protocol::ComputeTaskResponse {
+            task_id: req.task_id,
+            success: false,
+            result_data: vec![],
+            error_msg: Some("Access denied".into()),
+            timestamp_ms,
+            signature: vec![],
+            public_key: vec![],
         }),
     }
 }

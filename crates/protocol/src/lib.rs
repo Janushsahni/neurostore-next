@@ -25,6 +25,13 @@ pub struct AuditChunkRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComputeTaskRequest {
+    pub cid: String,          // The chunk to run computation on
+    pub wasm_script: Vec<u8>, // The compiled WebAssembly binary
+    pub task_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoreChunkResponse {
     pub stored: bool,
     pub timestamp_ms: u64,
@@ -60,11 +67,23 @@ pub struct AuditChunkResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComputeTaskResponse {
+    pub task_id: String,
+    pub success: bool,
+    pub result_data: Vec<u8>, // Output of the Wasm execution
+    pub error_msg: Option<String>,
+    pub timestamp_ms: u64,
+    pub signature: Vec<u8>,
+    pub public_key: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ChunkCommand {
     Store(StoreChunkRequest),
     Retrieve(RetrieveChunkRequest),
     Audit(AuditChunkRequest),
     Delete(DeleteChunkRequest),
+    Compute(ComputeTaskRequest),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +92,7 @@ pub enum ChunkReply {
     Retrieve(RetrieveChunkResponse),
     Audit(AuditChunkResponse),
     Delete(DeleteChunkResponse),
+    Compute(ComputeTaskResponse),
 }
 
 impl StoreChunkResponse {
@@ -168,6 +188,25 @@ impl AuditChunkResponse {
                 &self.response_hash,
                 self.timestamp_ms,
             ),
+        )
+    }
+
+    pub fn is_fresh(&self, now_ms: u64, max_age_ms: u64) -> bool {
+        now_ms.saturating_sub(self.timestamp_ms) <= max_age_ms
+    }
+}
+
+impl ComputeTaskResponse {
+    pub fn compute_payload(task_id: &str, success: bool, result_len: usize, timestamp_ms: u64) -> Vec<u8> {
+        format!("compute:{task_id}:{success}:{result_len}:{timestamp_ms}").into_bytes()
+    }
+
+    pub fn verify_compute(&self, expected_peer_id: &PeerId) -> bool {
+        verify_signature(
+            expected_peer_id,
+            &self.public_key,
+            &self.signature,
+            &Self::compute_payload(&self.task_id, self.success, self.result_data.len(), self.timestamp_ms),
         )
     }
 

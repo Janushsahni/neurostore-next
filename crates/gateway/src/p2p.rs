@@ -41,6 +41,13 @@ pub enum SwarmRequest {
         nonce_hex: String,
         tx: oneshot::Sender<AuditAck>,
     },
+    Compute {
+        peer_id: String,
+        cid: String,
+        wasm_script: Vec<u8>,
+        task_id: String,
+        tx: oneshot::Sender<ComputeAck>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +79,16 @@ pub struct AuditAck {
     pub public_key_hex: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct ComputeAck {
+    pub success: bool,
+    pub peer_id: String,
+    pub result_data: Vec<u8>,
+    pub error_msg: Option<String>,
+    pub signature_valid: bool,
+    pub timestamp_ms: u64,
+}
+
 struct PendingStore {
     tx: oneshot::Sender<StoreAck>,
     deadline: Instant,
@@ -101,6 +118,13 @@ struct PendingAudit {
     cid: String,
     challenge_hex: String,
     nonce_hex: String,
+}
+
+struct PendingCompute {
+    tx: oneshot::Sender<ComputeAck>,
+    deadline: Instant,
+    peer_id: PeerId,
+    task_id: String,
 }
 
 #[derive(Clone, Default)]
@@ -182,6 +206,7 @@ pub struct P2pNode {
     pending_deletions: HashMap<OutboundRequestId, PendingDeletion>,
     pending_stores: HashMap<OutboundRequestId, PendingStore>,
     pending_audits: HashMap<OutboundRequestId, PendingAudit>,
+    pending_computes: HashMap<OutboundRequestId, PendingCompute>,
 }
 
 impl P2pNode {
@@ -261,6 +286,7 @@ impl P2pNode {
             pending_deletions: HashMap::new(),
             pending_stores: HashMap::new(),
             pending_audits: HashMap::new(),
+            pending_computes: HashMap::new(),
         })
     }
 
@@ -479,6 +505,35 @@ impl P2pNode {
                             },
                         );
                     }
+                    SwarmRequest::Compute { peer_id, cid, wasm_script, task_id, tx } => {
+                        let parsed_peer = match peer_id.parse::<PeerId>() {
+                            Ok(p) => p,
+                            Err(_) => {
+                                let _ = tx.send(ComputeAck { success: false, peer_id, result_data: vec![], error_msg: Some("Invalid peer".into()), signature_valid: false, timestamp_ms: 0 });
+                                continue;
+                            }
+                        };
+                        if !self.swarm.is_connected(&parsed_peer) {
+                            let _ = tx.send(ComputeAck { success: false, peer_id: parsed_peer.to_string(), result_data: vec![], error_msg: Some("Not connected".into()), signature_valid: false, timestamp_ms: 0 });
+                            continue;
+                        }
+
+                        let cmd = ChunkCommand::Compute(neuro_protocol::ComputeTaskRequest {
+                            cid,
+                            wasm_script,
+                            task_id: task_id.clone(),
+                        });
+                        let request_id = self.swarm.behaviour_mut().chunk.send_request(&parsed_peer, cmd);
+                        self.pending_computes.insert(
+                            request_id,
+                            PendingCompute {
+                                tx,
+                                deadline: Instant::now() + Duration::from_secs(30), // Wasm compute can take longer
+                                peer_id: parsed_peer,
+                                task_id,
+                            },
+                        );
+                    }
                 },
 
 
@@ -605,16 +660,22 @@ impl P2pNode {
                                     public_key_hex: hex::encode(&res.public_key),
                                 });
                             } else {
-                                let _ = pending.tx.send(AuditAck {
-                                    verified: false,
+                                let _ = pending.tx.send(AuditAck { verified: false, peer_id: pending.peer_id.to_string(), country_code: pending.country_code, response_hash: String::new(), signature_valid: false, timestamp_ms: 0, signature_hex: String::new(), public_key_hex: String::new() });
+                            }
+                        } else if let Some(pending) = self.pending_computes.remove(&request_id) {
+                            if let ChunkReply::Compute(res) = response {
+                                let now_ms = chrono::Utc::now().timestamp_millis() as u64;
+                                let sig_ok = res.verify_compute(&pending.peer_id) && res.is_fresh(now_ms, 60_000);
+                                let _ = pending.tx.send(ComputeAck {
+                                    success: res.success,
                                     peer_id: pending.peer_id.to_string(),
-                                    country_code: pending.country_code,
-                                    response_hash: String::new(),
-                                    signature_valid: false,
-                                    timestamp_ms: 0,
-                                    signature_hex: String::new(),
-                                    public_key_hex: String::new(),
+                                    result_data: res.result_data,
+                                    error_msg: res.error_msg,
+                                    signature_valid: sig_ok,
+                                    timestamp_ms: res.timestamp_ms,
                                 });
+                            } else {
+                                let _ = pending.tx.send(ComputeAck { success: false, peer_id: pending.peer_id.to_string(), result_data: vec![], error_msg: Some("Protocol error".into()), signature_valid: false, timestamp_ms: 0 });
                             }
                         }
                     }
@@ -643,16 +704,10 @@ impl P2pNode {
                             });
                         }
                         if let Some(pending) = self.pending_audits.remove(&request_id) {
-                            let _ = pending.tx.send(AuditAck {
-                                verified: false,
-                                peer_id: pending.peer_id.to_string(),
-                                country_code: pending.country_code,
-                                response_hash: String::new(),
-                                signature_valid: false,
-                                timestamp_ms: 0,
-                                signature_hex: String::new(),
-                                public_key_hex: String::new(),
-                            });
+                            let _ = pending.tx.send(AuditAck { verified: false, peer_id: pending.peer_id.to_string(), country_code: pending.country_code, response_hash: String::new(), signature_valid: false, timestamp_ms: 0, signature_hex: String::new(), public_key_hex: String::new() });
+                        }
+                        if let Some(pending) = self.pending_computes.remove(&request_id) {
+                            let _ = pending.tx.send(ComputeAck { success: false, peer_id: pending.peer_id.to_string(), result_data: vec![], error_msg: Some("Network timeout".into()), signature_valid: false, timestamp_ms: 0 });
                         }
                     }
 
@@ -716,16 +771,15 @@ impl P2pNode {
             .collect();
         for id in audit_expired {
             if let Some(pending) = self.pending_audits.remove(&id) {
-                let _ = pending.tx.send(AuditAck {
-                    verified: false,
-                    peer_id: pending.peer_id.to_string(),
-                    country_code: pending.country_code,
-                    response_hash: String::new(),
-                    signature_valid: false,
-                    timestamp_ms: 0,
-                    signature_hex: String::new(),
-                    public_key_hex: String::new(),
-                });
+                let _ = pending.tx.send(AuditAck { verified: false, peer_id: pending.peer_id.to_string(), country_code: pending.country_code, response_hash: String::new(), signature_valid: false, timestamp_ms: 0, signature_hex: String::new(), public_key_hex: String::new() });
+            }
+        }
+
+        let compute_expired: Vec<_> = self.pending_computes.iter()
+            .filter_map(|(id, pending)| (pending.deadline <= now).then_some(id.clone())).collect();
+        for id in compute_expired {
+            if let Some(pending) = self.pending_computes.remove(&id) {
+                let _ = pending.tx.send(ComputeAck { success: false, peer_id: pending.peer_id.to_string(), result_data: vec![], error_msg: Some("Compute timeout".into()), signature_valid: false, timestamp_ms: 0 });
             }
         }
     }

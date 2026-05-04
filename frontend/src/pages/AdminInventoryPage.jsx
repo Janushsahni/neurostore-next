@@ -305,6 +305,29 @@ export default function AdminInventoryPage() {
                                         </div>
                                         <div>
                                             <p className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                                <Shield className="h-3 w-3 text-indigo-500" />
+                                                AI Trust Engine
+                                            </p>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold uppercase tracking-wider ${
+                                                    node.trust_verdict === 'trusted' ? 'bg-emerald-100 text-emerald-800' :
+                                                    node.trust_verdict === 'warning' ? 'bg-amber-100 text-amber-800' :
+                                                    'bg-rose-100 text-rose-800'
+                                                }`}>
+                                                    {node.trust_verdict || 'PENDING'}
+                                                </span>
+                                                <span className="text-sm font-bold text-slate-700">
+                                                    {(node.trust_score * 100).toFixed(0)}%
+                                                </span>
+                                            </div>
+                                            {node.trust_anomalies && node.trust_anomalies !== '[]' && node.trust_anomalies !== 'null' && (
+                                                <p className="mt-1 text-[10px] text-rose-500 font-medium break-words leading-tight">
+                                                    Flags: {node.trust_anomalies}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                                                 <Shield className="h-3 w-3" />
                                                 Device fingerprint
                                             </p>

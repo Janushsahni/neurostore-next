@@ -8,6 +8,7 @@ use axum::{
     Json, Router,
 };
 use sqlx::postgres::PgPoolOptions;
+use sqlx::Row;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -312,6 +313,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/ai/search", post(handlers::features::ai_semantic_search))
         .route("/ai/hot-objects", get(handlers::features::hot_objects))
         .route("/ai/trust-scores", get(get_trust_scores))
+        .route("/compute/task", post(handlers::s3::dispatch_compute_task))
         .route("/billing/usage", get(handlers::features::get_usage_summary));
 
     let app = Router::new()

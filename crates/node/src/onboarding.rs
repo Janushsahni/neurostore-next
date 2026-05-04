@@ -78,8 +78,24 @@ pub fn run_onboarding() -> Result<Option<OnboardingResult>> {
         println!("  ✓ Will run in foreground only (no auto-start).");
     }
 
+    // Generate Identity and Claim Token FIRST so we can use Node ID for folder
+    let original_dir = std::env::current_dir()?;
+    let identity_dir = config_file_path().parent().unwrap().to_path_buf();
+    std::fs::create_dir_all(&identity_dir)?;
+    std::env::set_current_dir(&identity_dir)?;
+    
+    let keypair = crate::load_or_create_identity(".")?;
+    let peer_id = keypair.public().to_peer_id().to_string();
+    let node_id = crate::derive_node_id(&peer_id);
+    let claim_token = crate::get_or_create_claim_token(".")?;
+    
+    std::env::set_current_dir(original_dir)?;
+
+    // Append Node ID to the user's chosen folder
+    let final_storage_path = storage_path.join(&node_id);
+
     let config = SetupConfig {
-        storage_path: storage_path.to_string_lossy().to_string(),
+        storage_path: final_storage_path.to_string_lossy().to_string(),
         max_gb,
         relay_url: None,
         gateway_url: Some(crate::DEFAULT_GATEWAY_URL.to_string()),
@@ -93,14 +109,37 @@ pub fn run_onboarding() -> Result<Option<OnboardingResult>> {
 
     // Persist config for future runs
     let config_path = config_file_path();
-    std::fs::create_dir_all(config_path.parent().unwrap())?;
     let json = serde_json::to_string_pretty(&config)?;
     std::fs::write(&config_path, &json)?;
     println!("\n  ✓ Configuration saved to {:?}", config_path);
 
-    // Create storage directory
-    std::fs::create_dir_all(&storage_path)?;
-    println!("  ✓ Storage directory ready: {:?}", storage_path);
+    // Create storage directory with the Node ID subfolder
+    std::fs::create_dir_all(&final_storage_path)?;
+    println!("  ✓ Storage directory ready: {:?}", final_storage_path);
+
+    println!("\n  🚀 Setup complete! Opening dashboard securely in your browser...");
+    
+    // Automatically launch dashboard securely
+    let dashboard_url = format!("https://neurostore.vercel.app/dashboard/node?node_id={}&claim_token={}", node_id, claim_token);
+    
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let _ = std::process::Command::new("cmd.exe")
+            .args(&["/C", "start", "", &dashboard_url])
+            .creation_flags(0x08000000)
+            .output();
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(&dashboard_url).output();
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&dashboard_url).output();
+    }
 
     println!("\n  🚀 Starting node...\n");
 

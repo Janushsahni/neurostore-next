@@ -377,7 +377,7 @@ impl IntelligenceEngine {
         let cpu = node.cpu_usage_percent.unwrap_or(0.0);
         let memory = node.memory_usage_percent.unwrap_or(0.0);
 
-        let mut score = 1.0;
+        let mut score: f64 = 1.0;
 
         // Check 1: Does used + free ≈ max? (within 10% tolerance)
         if max_gb > 1.0 {

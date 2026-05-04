@@ -77,101 +77,74 @@ enum NodeCommand {
 }
 
 #[cfg(target_os = "windows")]
-fn handle_windows_lifecycle(uninstall: bool) -> anyhow::Result<bool> {
+fn handle_windows_uninstall() -> anyhow::Result<bool> {
+    use std::process::Command;
+    use std::os::windows::process::CommandExt;
+
+    let app_data = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| "C:\\".to_string());
+    let neuro_dir = Path::new(&app_data).join("NeuroStore");
+
+    // Clear stored credentials
+    let _ = neuronode::auth::clear_tokens_secure();
+
+    // Remove registry key
+    let _ = Command::new("reg.exe")
+        .args(&["delete", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "NeuroStoreNode", "/f"])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output();
+    
+    // Stop any running nodes via taskkill
+    let _ = Command::new("taskkill.exe")
+        .args(&["/F", "/IM", "NeuroStore-Node.exe"])
+        .creation_flags(0x08000000)
+        .output();
+
+    // Optionally, show a msgbox using PowerShell since we have no window
+    let script = "[System.Windows.MessageBox]::Show('NeuroStore Node has been completely uninstalled. You can now delete this file.', 'NeuroStore', 0, 64)";
+    let _ = Command::new("powershell.exe")
+        .args(&["-c", &format!("Add-Type -AssemblyName PresentationFramework; {}", script)])
+        .creation_flags(0x08000000)
+        .output();
+
+    Ok(true)
+}
+
+#[cfg(target_os = "windows")]
+fn install_windows_service() -> anyhow::Result<()> {
     use std::process::Command;
     use std::os::windows::process::CommandExt;
 
     let app_data = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| "C:\\".to_string());
     let neuro_dir = Path::new(&app_data).join("NeuroStore");
     let target_exe = neuro_dir.join("NeuroStore-Node.exe");
-
-    if uninstall {
-        // Clear stored credentials
-        let _ = neuronode::auth::clear_tokens_secure();
-
-        // Remove registry key
-        let _ = Command::new("reg.exe")
-            .args(&["delete", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "NeuroStoreNode", "/f"])
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
-            .output();
-        
-        // Stop any running nodes via taskkill
-        let _ = Command::new("taskkill.exe")
-            .args(&["/F", "/IM", "NeuroStore-Node.exe"])
-            .creation_flags(0x08000000)
-            .output();
-
-        // Optionally, show a msgbox using PowerShell since we have no window
-        let script = "[System.Windows.MessageBox]::Show('NeuroStore Node has been completely uninstalled. You can now delete this file.', 'NeuroStore', 0, 64)";
-        let _ = Command::new("powershell.exe")
-            .args(&["-c", &format!("Add-Type -AssemblyName PresentationFramework; {}", script)])
-            .creation_flags(0x08000000)
-            .output();
-
-        std::process::exit(0);
-    }
-
     let current_exe = std::env::current_exe()?;
-    let is_in_appdata = current_exe.starts_with(&neuro_dir);
 
-    if !is_in_appdata {
-        // 1. Create directory
-        std::fs::create_dir_all(&neuro_dir)?;
-
-        // 2. Copy ourselves there
-        if let Err(e) = std::fs::copy(&current_exe, &target_exe) {
-            tracing::warn!("Failed to install to AppData: {}", e);
-        }
-
-        // 3. Add to Startup Registry
-        let _ = Command::new("reg.exe")
-            .args(&[
-                "add",
-                "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-                "/v", "NeuroStoreNode",
-                "/t", "REG_SZ",
-                "/d", &format!("\"{}\"", target_exe.to_string_lossy()),
-                "/f"
-            ])
-            .creation_flags(0x08000000)
-            .output();
-
-        // 4. Generate a secure Node claim token & Peer ID
-        let original_dir = std::env::current_dir()?;
-        std::env::set_current_dir(&neuro_dir)?;
-        let keypair = load_or_create_identity(".")?;
-        let peer_id = keypair.public().to_peer_id().to_string();
-        // CRITICAL: use the SAME derive_node_id function as lib.rs
-        // so the browser URL matches what the heartbeat sends
-        let node_id = neuronode::derive_node_id(&peer_id);
-        
-        // Use a secure, persistent claim token instead of a static one
-        use neuronode::get_or_create_claim_token;
-        let claim_token = get_or_create_claim_token(".")?;
-        std::env::set_current_dir(original_dir)?;
-
-        // 5. Instantly open browser for the user with the SECURE token
-        let dashboard_url = format!("https://neurostore.vercel.app/dashboard/node?node_id={}&claim_token={}", node_id, claim_token);
-        let _ = Command::new("cmd.exe")
-            .args(&["/C", "start", "", &dashboard_url])
-            .creation_flags(0x08000000)
-            .output();
-
-        // 6. Launch the background AppData version
-        let _ = Command::new(target_exe)
-            .creation_flags(0x08000000) // Detach from console if any
-            .spawn();
-
-        // 7. Exit this frontend process
-        return Ok(true);
+    if current_exe == target_exe {
+        return Ok(());
     }
 
-    Ok(false)
-}
+    std::fs::create_dir_all(&neuro_dir)?;
+    if let Err(e) = std::fs::copy(&current_exe, &target_exe) {
+        tracing::warn!("Failed to install to AppData: {}", e);
+    }
 
-#[cfg(not(target_os = "windows"))]
-fn handle_windows_lifecycle(_uninstall: bool) -> anyhow::Result<bool> {
-    Ok(false)
+    let _ = Command::new("reg.exe")
+        .args(&[
+            "add",
+            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            "/v", "NeuroStoreNode",
+            "/t", "REG_SZ",
+            "/d", &format!("\"{}\"", target_exe.to_string_lossy()),
+            "/f"
+        ])
+        .creation_flags(0x08000000)
+        .output();
+
+    let _ = Command::new(target_exe)
+        .creation_flags(0x08000000)
+        .spawn();
+
+    Ok(())
 }
 
 fn load_setup_config(path: &Path) -> anyhow::Result<SetupConfig> {
@@ -278,8 +251,16 @@ async fn main() -> anyhow::Result<()> {
 
     let _ = (args.run_as_service, args.service_name.as_deref());
 
-    if handle_windows_lifecycle(args.uninstall)? {
-        return Ok(());
+    if args.uninstall {
+        #[cfg(target_os = "windows")]
+        if handle_windows_uninstall()? {
+            return Ok(());
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            println!("Uninstall not supported natively on this OS. Please remove files manually.");
+            return Ok(());
+        }
     }
 
     // First-run interactive onboarding (only when running interactively, not as service)
@@ -297,8 +278,14 @@ async fn main() -> anyhow::Result<()> {
 
         if is_interactive {
             match neuronode::onboarding::run_onboarding()? {
-                Some(_result) => {
-                    // Config is saved; will be loaded by runtime_from_args below
+                Some(result) => {
+                    if result.install_service {
+                        #[cfg(target_os = "windows")]
+                        {
+                            install_windows_service()?;
+                            std::process::exit(0); // The installed background version will run
+                        }
+                    }
                 }
                 None => {
                     // User declined consent

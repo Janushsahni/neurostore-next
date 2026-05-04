@@ -238,22 +238,44 @@ fn cmd_logs(follow: bool, lines: usize) -> Result<()> {
 // ── Login ───────────────────────────────────────────────────────
 
 async fn cmd_login() -> Result<()> {
-    println!("  Starting OAuth authentication flow...\n");
+    println!("  Preparing secure dashboard login...\n");
 
-    match crate::auth::OAuthConfig::from_env() {
-        Ok(config) => {
-            let tokens = crate::auth::run_oauth_flow(&config).await?;
-            println!(
-                "\n  ✅ Authenticated as: {}",
-                tokens.email.as_deref().unwrap_or("unknown")
-            );
-            println!("  Tokens stored securely in OS credential manager.");
-        }
-        Err(e) => {
-            println!("  ⚠️  OAuth not configured: {}", e);
-            println!("  Set GOOGLE_CLIENT_ID environment variable to enable OAuth login.");
-        }
+    let identity_dir = identity_dir();
+    if !identity_dir.exists() {
+        std::fs::create_dir_all(&identity_dir)?;
     }
+
+    let keypair = crate::load_or_create_identity(&identity_dir.to_string_lossy())?;
+    let peer_id = keypair.public().to_peer_id().to_string();
+    let node_id = crate::derive_node_id(&peer_id);
+    let claim_token = crate::get_or_create_claim_token(&identity_dir.to_string_lossy())?;
+
+    let dashboard_url = format!("https://neurostore.vercel.app/dashboard/node?node_id={}&claim_token={}", node_id, claim_token);
+    
+    println!("  🚀 Opening your browser to authenticate and link this node...");
+    println!("  If your browser does not open automatically, click this link:");
+    println!("  {}\n", dashboard_url);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let _ = std::process::Command::new("cmd.exe")
+            .args(&["/C", "start", "", &dashboard_url])
+            .creation_flags(0x08000000)
+            .output();
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(&dashboard_url).output();
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&dashboard_url).output();
+    }
+
+    println!("  ✅ Once you authenticate in the browser, this node will be fully linked to your account.");
 
     Ok(())
 }
