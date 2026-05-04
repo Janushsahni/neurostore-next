@@ -855,7 +855,6 @@ pub async fn plan_upload(
 
     let desired_nodes = payload.desired_nodes.unwrap_or(15).clamp(6, 30);
     let geofence = payload.geofence.unwrap_or_else(|| "GLOBAL".to_string());
-    let country_filter = geofence.split('-').next().unwrap_or("GLOBAL");
     let key = key.trim_start_matches('/').to_string();
     let upload_id = format!(
         "upl_{}",
@@ -866,80 +865,39 @@ pub async fn plan_upload(
         )))
     );
 
-    let rows = if country_filter.eq_ignore_ascii_case("GLOBAL") {
-        sqlx::query_as::<_, (String, String, f64, Option<String>)>(
-            r#"SELECT node_id,
-                      COALESCE(country_code, 'GLOBAL'),
-                      CAST(COALESCE(free_gb, 0) AS DOUBLE PRECISION),
-                      ingress_url
-               FROM node_registry
-               WHERE last_heartbeat_at > NOW() - INTERVAL '2 minutes'
-                 AND ingress_url IS NOT NULL
-                 AND status = 'online'
-               ORDER BY free_gb DESC, uptime_minutes DESC
-               LIMIT $1"#,
-        )
-        .bind(desired_nodes as i64)
-        .fetch_all(&state.db)
-        .await
-    } else {
-        // L. Enterprise Geofencing Enforcement: Strict Data Residency
-        // If a specific country is requested (e.g. India-first INR billing), we MUST NOT fall back
-        // to global nodes. We strictly query only nodes physically verified in that region.
-        sqlx::query_as::<_, (String, String, f64, Option<String>)>(
-            r#"SELECT node_id,
-                      COALESCE(country_code, 'GLOBAL'),
-                      CAST(COALESCE(free_gb, 0) AS DOUBLE PRECISION),
-                      ingress_url
-               FROM node_registry
-               WHERE last_heartbeat_at > NOW() - INTERVAL '2 minutes'
-                 AND country_code = $1
-                 AND ingress_url IS NOT NULL
-                 AND status = 'online'
-               ORDER BY free_gb DESC, uptime_minutes DESC
-               LIMIT $2"#,
-        )
-        .bind(country_filter)
-        .bind(desired_nodes as i64)
-        .fetch_all(&state.db)
-        .await
-    };
-
-    let rows = match rows {
-        Ok(nodes) => nodes,
-        Err(error) => {
-            tracing::error!(?error, "upload planner could not load candidate nodes");
-            Vec::new()
-        }
-    };
+    // ── AI-POWERED SMART PLACEMENT ──────────────────────────────────────
+    // Instead of naively selecting nodes by free_gb, we use the Intelligence
+    // Engine's composite ranking which factors in:
+    //   - Trust score (proof pass rate, behavioral analysis)
+    //   - Available capacity
+    //   - Uptime history
+    // Quarantined and suspicious nodes are automatically excluded.
+    let candidates = crate::intelligence::smart_placement(&state, desired_nodes, &geofence).await;
 
     let mut node_targets = Vec::new();
     let token_secret = std::env::var("NODE_INGRESS_SHARED_SECRET")
         .unwrap_or_else(|_| state.node_shared_secret.clone());
     let token_expires_at = chrono::Utc::now().timestamp() + 900;
-    for (node_id, region, free_gb, ingress_url) in rows {
-        let Some(ingress_url) = ingress_url else {
-            continue;
-        };
+    for candidate in candidates {
         let upload_token = sign_ingress_token(
             &token_secret,
-            &node_id,
+            &candidate.node_id,
             "upload",
             &upload_id,
             token_expires_at,
         );
         let download_token = sign_ingress_token(
             &token_secret,
-            &node_id,
+            &candidate.node_id,
             "download",
             &upload_id,
             token_expires_at,
         );
         node_targets.push(UploadPlanNode {
-            node_id,
-            region,
-            free_gb,
-            ingress_url,
+            node_id: candidate.node_id,
+            region: candidate.region,
+            free_gb: candidate.free_gb,
+            ingress_url: candidate.ingress_url,
             upload_token,
             download_token,
             token_expires_at,
@@ -947,8 +905,8 @@ pub async fn plan_upload(
     }
 
     // Relaxed geofencing for initial network growth: mode becomes gateway-relay if no nodes found.
-    if !country_filter.eq_ignore_ascii_case("GLOBAL") && node_targets.len() < 3 {
-        tracing::warn!("Insufficient compliant nodes in {} ({}) for strict geofence. Falling back to global relay mode.", country_filter, node_targets.len());
+    if !geofence.eq_ignore_ascii_case("GLOBAL") && node_targets.len() < 3 {
+        tracing::warn!("Insufficient compliant nodes in {} ({}) for strict geofence. Falling back to global relay mode.", geofence, node_targets.len());
         // We no longer return 403 here. Instead, we let it fall back to gateway-relay in the response.
     }
 

@@ -27,6 +27,7 @@ pub mod p2p;
 
 pub mod crypto;
 pub mod geofence;
+pub mod intelligence;
 pub mod proofs;
 pub mod repair;
 
@@ -232,6 +233,12 @@ async fn main() -> anyhow::Result<()> {
         repair_daemon.start().await;
     });
 
+    // Phase 19: Ignite the AI Intelligence Engine (Trust Scoring & Fake Node Detection)
+    let intel_engine = intelligence::IntelligenceEngine::new(Arc::clone(&shared_state));
+    tokio::spawn(async move {
+        intel_engine.start().await;
+    });
+
     let heartbeat_state = Arc::clone(&shared_state);
     tokio::spawn(async move {
         handlers::nodes::heartbeat_flush_daemon(heartbeat_state).await;
@@ -304,6 +311,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/ai/auto-tag/:bucket/*key", post(handlers::features::auto_tag_object))
         .route("/ai/search", post(handlers::features::ai_semantic_search))
         .route("/ai/hot-objects", get(handlers::features::hot_objects))
+        .route("/ai/trust-scores", get(get_trust_scores))
         .route("/billing/usage", get(handlers::features::get_usage_summary));
 
     let app = Router::new()
@@ -415,6 +423,72 @@ async fn health_check(State(state): State<Arc<AppState>>) -> Json<serde_json::Va
         "version": "0.3.0",
         "environment": state.environment,
     }))
+}
+
+async fn get_trust_scores(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let rows = sqlx::query(
+        r#"
+        SELECT node_id, status,
+               COALESCE(trust_score, 0.7) as trust_score,
+               COALESCE(trust_verdict, 'pending') as trust_verdict,
+               COALESCE(trust_anomalies, '[]') as trust_anomalies,
+               trust_evaluated_at,
+               COALESCE(country_code, 'GLOBAL') as region,
+               COALESCE(free_gb, 0) as free_gb,
+               uptime_minutes
+        FROM node_registry
+        WHERE last_heartbeat_at > NOW() - INTERVAL '24 hours'
+        ORDER BY trust_score DESC
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(rows) => {
+            let nodes: Vec<serde_json::Value> = rows
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "node_id": r.get::<String, _>("node_id"),
+                        "status": r.get::<String, _>("status"),
+                        "trust_score": r.get::<f64, _>("trust_score"),
+                        "trust_verdict": r.get::<String, _>("trust_verdict"),
+                        "anomalies": serde_json::from_str::<serde_json::Value>(
+                            &r.get::<String, _>("trust_anomalies")
+                        ).unwrap_or(serde_json::json!([])),
+                        "region": r.get::<String, _>("region"),
+                        "free_gb": r.get::<f64, _>("free_gb"),
+                        "uptime_minutes": r.get::<Option<f64>, _>("uptime_minutes"),
+                        "evaluated_at": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("trust_evaluated_at"),
+                    })
+                })
+                .collect();
+
+            let quarantined = nodes.iter().filter(|n| n["trust_verdict"] == "quarantined").count();
+            let warned = nodes.iter().filter(|n| n["trust_verdict"] == "warning").count();
+
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "engine": "neurostore-intelligence-v1",
+                    "total_nodes": nodes.len(),
+                    "trusted": nodes.len() - quarantined - warned,
+                    "warned": warned,
+                    "quarantined": quarantined,
+                    "nodes": nodes,
+                })),
+            )
+                .into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Trust score query failed: {}", e),
+        )
+            .into_response(),
+    }
 }
 
 async fn security_headers(request: Request, next: Next) -> Response {
