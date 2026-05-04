@@ -18,8 +18,8 @@ use tracing::{info, warn, debug};
 use crate::p2p::{build_node, drive_node, parse_listen_multiaddr};
 use crate::store::SecureBlockStore;
 
-pub const DEFAULT_GATEWAY_URL: &str = "https://neurostore-backend-production.up.railway.app";
-pub const DEFAULT_RELAY_URL: &str = "wss://neurostore-backend-production.up.railway.app/v1/nodes/ws";
+pub const DEFAULT_GATEWAY_URL: &str = "https://neurostore-backend-production-61aa.up.railway.app";
+pub const DEFAULT_RELAY_URL: &str = "wss://neurostore-backend-production-61aa.up.railway.app/v1/nodes/ws";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SetupConfig {
