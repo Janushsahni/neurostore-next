@@ -539,7 +539,7 @@ const RegisterModal = ({ onClose, onAuth }) => {
                                         <div className="text-[13px] text-slate-400 leading-tight">Receive NeuroCloud emails and communications including announcements, marketing, recommendations, and updates about NeuroCloud products, services and software.</div>
                                     </div>
                                 </label>
-
+                            </div>
 
                             <hr className="border-white/10 my-6" />
 
