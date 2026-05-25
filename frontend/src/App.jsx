@@ -348,23 +348,33 @@ const LandingPage = () => {
 };
 
 // ═══════ NAVBAR ═══════
+// 🟢 NAVBAR 🟢
 const Navbar = ({ isAuthenticated, onLogout }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
   const isDashboard = location.pathname.startsWith("/dashboard") || location.pathname.startsWith("/admin");
   const isLanding = location.pathname === "/";
 
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   // If not authenticated or on landing page, show the simplified navbar
   if (!isAuthenticated || isLanding) {
       return (
-          <header className="fixed top-4 inset-x-0 z-50 px-4 flex justify-center pointer-events-none">
-            <nav className="pointer-events-auto flex items-center justify-between px-6 py-3 w-full max-w-4xl bg-white/5 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl">
-                <Link to="/" className="inline-flex items-center gap-3">
-                    <img src="/neurocloud_icon_modern.png" alt="NeuroCloud" className="w-7 h-7 rounded-lg shadow-sm" />
-                    <span className="font-display font-bold text-sm text-white tracking-wide">NeuroCloud</span>
+          <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-[#1c1c1e]/80 backdrop-blur-2xl border-b border-white/5 shadow-sm' : 'bg-transparent border-b border-transparent'}`}>
+            <nav className="flex items-center justify-between px-6 py-4 w-full max-w-none">
+                <Link to="/" className="inline-flex items-center gap-3 text-[#f5f5f7] hover:text-white transition-colors">
+                    <img src="/neurocloud_icon_modern.png" alt="NeuroCloud" className="w-6 h-6 rounded-md shadow-sm" />
+                    <span className="font-sans font-semibold text-[16px] tracking-wide">NeuroCloud</span>
                 </Link>
                 <div className="flex items-center">
-                    <Link to="/about" className="text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 px-4 py-2 rounded-full transition-all duration-300">
+                    <Link to="/about" className="text-[14px] font-medium text-[#a1a1a6] hover:text-white hover:bg-white/5 transition-all px-3 py-1.5 rounded-full">
                         About Us
                     </Link>
                 </div>

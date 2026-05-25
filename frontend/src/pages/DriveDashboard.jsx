@@ -8,6 +8,7 @@ import { API_BASE } from '../lib/config';
 import { getAuthToken, getCsrfToken, getSelectedPlan, getUserDriveBucket, getVaultSecret } from '../lib/authStorage';
 import { decryptDownloadInWorker, encryptUploadInWorker, hashFileInWorker } from '../lib/cryptoWorkerClient';
 import { RecoverySetupModal } from '../components/RecoverySetupModal';
+const WINDOWS_NODE_INSTALLER_URL = `https://github.com/Janushsahni/neurostore-next/releases/latest/download/neuro-node-windows-x86_64.msi`;
 
 
 export const DriveDashboard = () => {
