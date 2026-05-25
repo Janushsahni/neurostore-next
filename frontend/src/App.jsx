@@ -2,7 +2,7 @@ import React, { useState, useEffect, Component, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Link, useNavigate, Navigate, useLocation } from "react-router-dom";
 import {
   ArrowRight, Database, Globe, HardDrive, LogOut, Menu, Server,
-  ShieldCheck, Sparkles, X, Zap, Cloud
+  ShieldCheck, Sparkles, X, Zap, Cloud, LayoutGrid, Plus
 } from "lucide-react";
 import { Toaster, toast } from "react-hot-toast";
 import { motion as Motion, AnimatePresence } from "framer-motion";
@@ -22,6 +22,9 @@ const ComplianceDashboard = lazy(() => import("./pages/ComplianceDashboard").the
 const S3Migration = lazy(() => import("./pages/S3Migration").then((module) => ({ default: module.S3Migration })));
 const ObjectExplorer = lazy(() => import("./pages/ObjectExplorer").then((module) => ({ default: module.ObjectExplorer })));
 const AdminNodes = lazy(() => import("./pages/AdminInventoryPage"));
+const AdminCMS = lazy(() => import("./pages/AdminCMS").then((module) => ({ default: module.AdminCMS })));
+const PhotosDashboard = lazy(() => import("./pages/PhotosDashboard").then((module) => ({ default: module.PhotosDashboard })));
+const FilesDashboard = lazy(() => import("./pages/FilesDashboard").then((module) => ({ default: module.FilesDashboard })));
 
 const FeatureCard = ({ icon, title, description, badge, color = "text-primary" }) => (
   <Motion.article 
@@ -153,48 +156,64 @@ const AuthRedirectRoute = ({ isAuthenticated, component, onAuth }) => {
 };
 
 // ═══════ LANDING PAGE ═══════
-const LandingPage = () => (
-  <div className="selection:bg-emerald-500/20 bg-slate-50 text-slate-800 min-h-screen relative overflow-hidden">
-    {/* Animated Floating Background Elements for Glassmorphism */}
-    <div className="absolute top-0 inset-x-0 h-screen bg-slate-50 overflow-hidden pointer-events-none -z-20">
-      <div className="absolute -left-20 top-10 h-[500px] w-[500px] rounded-full bg-emerald-100/60 blur-[100px] animate-[floatOrb_12s_ease-in-out_infinite]" />
-      <div className="absolute right-0 top-60 h-[600px] w-[600px] rounded-full bg-blue-100/40 blur-[120px] animate-[floatOrb_15s_ease-in-out_infinite_reverse]" />
-      <div className="absolute left-1/2 top-1/2 h-[800px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-50/50 blur-[150px] -z-10" />
-    </div>
-
+const LandingPage = () => {
+  const navigate = useNavigate();
+  return (
+  <div className="bg-[#1c1c1e] text-white min-h-screen relative overflow-hidden font-sans">
+    
     {/* ── HERO ── */}
-    <section className="relative px-6 pb-20 pt-24 md:pt-32">
-      <div className="mx-auto max-w-6xl text-center relative z-10">
-        <Motion.div 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className="mb-8 inline-flex items-center gap-2 rounded-full glass-card bg-white/60 backdrop-blur-md px-5 py-2.5 text-xs font-bold text-emerald-700 shadow-sm border border-emerald-200/50"
-        >
-          <Sparkles size={14} className="text-emerald-500" /> The Future of Secure Cloud Storage
-        </Motion.div>
+    <section className="relative px-6 pb-20 pt-16 md:pt-24 flex flex-col items-center">
+      <Motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="mb-8 relative"
+      >
+        {/* Abstract "Apps" Halo representing NeuroCloud */}
+        <div className="relative w-48 h-48 flex items-center justify-center">
+            {/* Center avatar/logo */}
+            <div className="w-24 h-24 rounded-full bg-slate-800 shadow-2xl z-10 flex items-center justify-center border-4 border-[#1c1c1e]">
+                <ShieldCheck size={40} className="text-white" />
+            </div>
+            {/* Orbiting icons */}
+            <div className="absolute top-2 left-6 w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg border-2 border-[#1c1c1e]"><HardDrive size={16} className="text-white"/></div>
+            <div className="absolute top-0 right-10 w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center shadow-lg border-2 border-[#1c1c1e]"><Cloud size={20} className="text-white"/></div>
+            <div className="absolute bottom-6 left-2 w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center shadow-lg border-2 border-[#1c1c1e]"><Sparkles size={16} className="text-white"/></div>
+            <div className="absolute bottom-2 right-8 w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center shadow-lg border-2 border-[#1c1c1e]"><Database size={16} className="text-white"/></div>
+        </div>
+      </Motion.div>
 
-        <Motion.h1 
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.1, ease: "easeOut" }}
-          className="mb-6 font-display text-5xl font-extrabold leading-tight md:text-7xl text-slate-900 tracking-tight drop-shadow-sm"
-        >
-          Own Your Data.
-          <br />
-          <span className="bg-gradient-to-r from-emerald-500 to-emerald-600 bg-clip-text text-transparent">Secure, Fast, Limitless.</span>
-        </Motion.h1>
+      <Motion.h1 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, delay: 0.1, ease: "easeOut" }}
+        className="mb-8 font-display text-5xl md:text-7xl font-semibold tracking-tight"
+      >
+        NeuroCloud
+      </Motion.h1>
 
-        <Motion.p 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
-          className="mx-auto mb-14 max-w-2xl text-base text-slate-500 md:text-xl leading-relaxed font-medium"
-        >
-          Whether you want to earn passive income by sharing your idle storage, or need military-grade encrypted cloud backup for your files — NeuroStore has you covered.
-        </Motion.p>
+      <Motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
+      >
+        <button onClick={() => navigate('/login')} className="bg-white text-black px-6 py-2.5 rounded-full font-bold text-sm hover:scale-105 transition-transform shadow-md">
+            Sign In
+        </button>
+      </Motion.div>
 
-        {/* ── 2 MASSIVE CTA OPTIONS (Glassmorphic) ── */}
+      <Motion.p 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
+        className="mx-auto mt-12 max-w-lg text-center text-lg md:text-xl text-slate-300 font-medium leading-tight"
+      >
+        The best place for all your photos, files, notes, mail, and more.
+      </Motion.p>
+    </section>
+
+    {/* ── BENTO CARDS ── */}
+    <section className="px-6 pb-24 relative max-w-5xl mx-auto">
         <Motion.div 
           initial="hidden"
           animate="visible"
@@ -202,229 +221,107 @@ const LandingPage = () => (
             hidden: {},
             visible: { transition: { staggerChildren: 0.2, delayChildren: 0.4 } }
           }}
-          className="mx-auto grid max-w-4xl gap-8 md:grid-cols-2 mt-8"
+          className="grid gap-6 md:grid-cols-2 mt-8"
         >
-          {/* Be a Node Card */}
+          {/* Card 1: Easily access apps */}
           <Motion.div 
-            variants={{ hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } } }}
-            className="glass-card bg-white/70 backdrop-blur-xl rounded-[2rem] p-8 md:p-10 group relative overflow-hidden flex flex-col h-full text-left shadow-xl hover:shadow-2xl border border-white/80 transition-all duration-500 hover:-translate-y-2"
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } } }}
+            className="bg-[#2c2c2e] rounded-3xl p-10 flex flex-col h-full shadow-lg"
           >
-            <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-emerald-100/50 blur-[50px] group-hover:bg-emerald-200/60 transition-colors duration-500" />
-
-            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm text-emerald-600 border border-emerald-50 relative z-10 group-hover:scale-110 transition-transform duration-500">
-              <HardDrive size={32} strokeWidth={2.5} />
+            <div className="grid grid-cols-4 gap-4 mb-10 px-4">
+                {[...Array(8)].map((_, i) => (
+                    <div key={i} className="aspect-square bg-slate-800 rounded-2xl shadow-inner flex items-center justify-center border border-white/5">
+                        <HardDrive size={24} className="text-white/20" />
+                    </div>
+                ))}
             </div>
-            <h3 className="mb-3 text-3xl font-display font-extrabold text-slate-900 relative z-10">Be a Node</h3>
-            <p className="mb-10 text-slate-500 leading-relaxed font-medium flex-grow relative z-10 text-lg">
-              Turn your computer into a decentralized storage vault. Earn ₹ INR passively every month simply by keeping your device online and sharing empty hard drive space.
+            <h3 className="mb-4 text-2xl font-bold text-white leading-tight">Easily access apps and data from your device on the web</h3>
+            <p className="text-slate-400 leading-relaxed text-[15px]">
+              NeuroCloud is essential for keeping personal information from your devices safe, up to date, and available wherever you are. At neurocloud.com, you can access your photos, files, and more from any web browser. Changes you make will sync to your devices, so you're always up to date.
             </p>
-
-            <div className="flex flex-col gap-3 mt-auto relative z-10 font-bold">
-              <Link to="/login?intent=node" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-md hover:shadow-lg">
-                Start Earning Now <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
-              </Link>
-              <Link to="/download" className="w-full py-3.5 rounded-xl flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all">
-                Download Software
-              </Link>
-            </div>
           </Motion.div>
 
-          {/* Subscription Card */}
+          {/* Card 2: NeuroCloud+ */}
           <Motion.div 
-            variants={{ hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } } }}
-            className="glass-card bg-white/70 backdrop-blur-xl rounded-[2rem] p-8 md:p-10 group relative overflow-hidden flex flex-col h-full text-left shadow-xl hover:shadow-2xl border border-white/80 transition-all duration-500 hover:-translate-y-2"
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } } }}
+            className="bg-[#2c2c2e] rounded-3xl p-10 flex flex-col h-full shadow-lg"
           >
-            <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-blue-100/50 blur-[50px] group-hover:bg-blue-200/60 transition-colors duration-500" />
-
-            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm text-blue-600 border border-blue-50 relative z-10 group-hover:scale-110 transition-transform duration-500">
-              <Cloud size={32} strokeWidth={2.5} />
+            <div className="flex justify-center mb-10 relative h-32">
+                <div className="absolute top-4 w-40 h-40 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-3xl shadow-[0_0_40px_rgba(59,130,246,0.6)]">12TB</div>
+                <div className="absolute top-16 left-12 w-20 h-20 bg-blue-400 rounded-full flex items-center justify-center shadow-lg"><Globe className="text-white" size={30} /></div>
+                <div className="absolute top-10 right-10 w-16 h-16 bg-blue-300 rounded-full flex items-center justify-center shadow-lg"><ShieldCheck className="text-white" size={24} /></div>
             </div>
-            <h3 className="mb-3 text-3xl font-display font-extrabold text-slate-900 relative z-10">Subscription</h3>
-            <p className="mb-10 text-slate-500 leading-relaxed font-medium flex-grow relative z-10 text-lg">
-              Store your photos, documents, and backups in an unhackable, zero-knowledge cloud. Automatically organized, deeply encrypted, and always accessible.
+            <h3 className="mb-4 text-2xl font-bold text-blue-400 text-center">NeuroCloud+</h3>
+            <h3 className="mb-4 text-2xl font-bold text-white leading-tight">More storage, plus features to protect your privacy and connect with friends</h3>
+            <p className="text-slate-400 leading-relaxed text-[15px]">
+              Upgrade to NeuroCloud+ to get more storage, plan events with Invites, and have peace of mind with privacy features like Private Relay, Hide My Email, and Secure Video. You can even share your subscription with your family. Learn more at neurocloud.com.
             </p>
-
-            <Link to="/login?intent=user" className="w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold bg-slate-900 text-white hover:bg-emerald-500 transition-all shadow-md group-hover:shadow-lg relative z-10">
-              Get Cloud Storage <ArrowRight size={18} className="group-hover:translate-x-1.5 transition-transform" />
-            </Link>
           </Motion.div>
         </Motion.div>
-      </div>
     </section>
 
-    {/* ── CORE CAPABILITIES ── */}
-    <section className="px-6 py-20 relative">
-      <div className="mx-auto max-w-6xl relative z-10">
-        <Motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-12"
-        >
-          <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Core Capabilities</span>
-          <h2 className="text-3xl md:text-4xl font-display font-extrabold text-slate-900 tracking-tight">Enterprise-grade infrastructure,<br />beautifully simple.</h2>
-        </Motion.div>
-        <Motion.div 
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          variants={{
-            hidden: {},
-            visible: { transition: { staggerChildren: 0.15 } }
-          }}
-          className="grid gap-6 md:grid-cols-3"
-        >
-          <FeatureCard
-            icon={ShieldCheck}
-            title="P2P Managed Ledger"
-            description="No centralized database of locations. Shard mapping is distributed across the swarm for unbreakable resilience."
-            badge="ZK-Proofs"
-          />
-          <FeatureCard
-            icon={Globe}
-            title="Proof of Residency"
-            description="Verified geographical locations with latency-tether validation for regulatory compliance."
-            badge="DPDP Ready"
-          />
-          <FeatureCard
-            icon={Zap}
-            title="BFT Self-Healing"
-            description="Autonomous data reconstruction with Byzantine fault tolerance if nodes go offline."
-            badge="99.99% SLA"
-          />
-        </Motion.div>
-      </div>
-    </section>
-
-    <section className="px-6 py-24 bg-white relative border-t border-slate-100">
-      <div className="mx-auto max-w-5xl relative z-10">
-        <div className="grid gap-12 md:grid-cols-2 items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 mb-6 text-xs font-bold text-slate-500 uppercase tracking-widest">
-              About NeuroStore
-            </div>
-            <h2 className="text-4xl font-display font-extrabold mb-6 text-slate-900 leading-tight">
-              Built for privacy.<br />Powered by the community.
-            </h2>
-            <div className="space-y-6 text-slate-500 font-medium leading-relaxed">
-              <p>
-                NeuroStore isn't just another tech giant hoarding your personal data in massive warehouses. We are a decentralized movement designed to give control over data back to individuals.
-              </p>
-              <p>
-                By connecting everyday computers into a massive, highly encrypted global network, we bypass the need for centralized servers completely. This means lower prices for users, and fair compensation for those who provide the storage.
-              </p>
-              <p className="font-bold text-slate-800 border-l-4 border-emerald-500 pl-4 bg-emerald-50/50 py-2 pr-2 rounded-r-lg">
-                Our mission is simple: To build the most secure, privacy-respecting cloud layer on the internet, fueled by people, for the people.
-              </p>
-            </div>
-          </div>
-
-          <div className="relative h-full w-full min-h-[400px]">
-            {/* Soft UI decorative element */}
-            <div className="absolute inset-0 bg-emerald-50 rounded-3xl shadow-sm border border-emerald-100 flex items-center justify-center overflow-hidden group">
-              <div className="absolute w-64 h-64 bg-emerald-200/50 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-1000"></div>
-
-              <div className="relative text-center z-10 p-8 bg-white/80 shadow-lg backdrop-blur-md border border-white rounded-2xl max-w-[280px]">
-                <ShieldCheck size={48} className="text-emerald-500 mx-auto mb-4" />
-                <h4 className="text-xl font-bold text-slate-900 mb-2">Military Grade AES-256</h4>
-                <p className="text-sm text-slate-500 font-medium leading-relaxed">Your data is fragmented and encrypted before it ever leaves your device.</p>
-              </div>
-            </div>
-          </div>
+    {/* ── FOOTER ── */}
+    <footer className="bg-[#1c1c1e] px-6 py-6 border-t border-white/10">
+      <div className="mx-auto max-w-5xl flex flex-col md:flex-row items-center justify-between text-[11px] text-slate-500 font-medium">
+        <div className="flex gap-4">
+            <Link to="/status" className="hover:text-white transition-colors">System Status</Link>
+            <span className="text-slate-700">|</span>
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <span className="text-slate-700">|</span>
+            <Link to="/terms" className="hover:text-white transition-colors">Terms & Conditions</Link>
         </div>
-      </div>
-    </section>
-
-    {/* ── END FOOTER ── */}
-    <footer className="bg-slate-50 px-6 py-12 border-t border-slate-200">
-      <div className="mx-auto max-w-5xl text-center">
-        <div className="flex items-center justify-center mb-4">
-          <img src="/logo-full.png" alt="NeuroStore Logo" className="h-8 object-contain" />
-        </div>
-        <p className="text-sm text-slate-500 font-medium mb-8">Secure. Decentralized. Rewarding.</p>
-        <div className="flex items-center justify-center gap-6 text-sm font-bold text-slate-500 flex-wrap">
-          <Link to="/about" className="hover:text-emerald-600 transition-colors">About</Link>
-          <Link to="/pricing" className="hover:text-emerald-600 transition-colors">Pricing</Link>
-          <Link to="/login?intent=node" className="hover:text-emerald-600 transition-colors">Be a Node</Link>
-          <Link to="/faq" className="hover:text-emerald-600 transition-colors">FAQ</Link>
-          <Link to="/contact" className="hover:text-emerald-600 transition-colors">Contact</Link>
-        </div>
-        <div className="mt-12 pt-8 border-t border-slate-200 text-xs text-slate-400 font-medium">
-          © {new Date().getFullYear()} NeuroStore Project. All rights reserved.
+        <div className="mt-4 md:mt-0">
+          Copyright © {new Date().getFullYear()} NeuroCloud Inc. All rights reserved.
         </div>
       </div>
     </footer>
   </div>
-);
+  );
+};
 
 // ═══════ NAVBAR ═══════
 const Navbar = ({ isAuthenticated, onLogout }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const closeMobile = () => setMobileOpen(false);
   const location = useLocation();
-  const isDashboard = location.pathname.startsWith("/dashboard");
+  const isDashboard = location.pathname.startsWith("/dashboard") || location.pathname.startsWith("/admin");
+  const isLanding = location.pathname === "/";
 
+  // Landing page navbar just has About Us and Logo
+  if (isLanding) {
+      return (
+          <header className="absolute top-0 inset-x-0 z-50">
+            <nav className="flex items-center px-6 py-4">
+                <Link to="/" className="inline-flex items-center gap-2">
+                    <Cloud className="text-white" size={20} />
+                    <span className="font-display font-bold text-lg text-white tracking-tight">NeuroCloud</span>
+                </Link>
+                <div className="ml-auto">
+                    <Link to="/about" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">About Us</Link>
+                </div>
+            </nav>
+          </header>
+      );
+  }
+
+  // Dashboard Navbar
   return (
-    <header className="sticky top-0 z-50">
-      <nav className={`${isDashboard ? 'bento-nav' : 'glass-nav'} mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-8 mt-4 rounded-2xl transition-colors`}>
-        <Link to="/" onClick={closeMobile} className="inline-flex items-center">
-          <img src="/logo-full.png" alt="NeuroStore Logo" className="h-7 object-contain" />
+    <header className="sticky top-0 z-[100]">
+      <nav className="bg-[#1c1c1e]/90 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-5 py-3 md:px-6">
+        <Link to="/" className="inline-flex items-center gap-2">
+          <Cloud className="text-white" size={20} />
+          <span className="font-display font-bold text-lg text-white tracking-tight">NeuroCloud</span>
         </Link>
 
-        <div className="hidden items-center gap-8 text-sm font-bold md:flex" style={{ color: isDashboard ? '#f8fafc' : '#475569' }}>
-          <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-          <Link to="/about" className="hover:text-primary transition-colors">About</Link>
-          <Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link>
-          <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
-          <Link to="/contact" className="hover:text-primary transition-colors">Contact</Link>
-        </div>
-
-        <div className="hidden items-center gap-4 md:flex">
-          {isAuthenticated ? (
-            <>
-              {getAuthUser()?.role === 'admin' && (
-                <Link to="/admin/inventory" className="text-sm font-bold text-red-500 hover:text-red-600 transition-colors">Admin</Link>
-              )}
-              <Link to="/dashboard/drive" className="btn-primary px-5 py-2.5 text-sm font-bold hover:shadow-lg transition">Dashboard</Link>
-              <button onClick={onLogout} className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-bold transition-colors rounded-lg ${isDashboard ? 'text-slate-300 hover:text-red-400 bg-white/10 hover:bg-red-500/20' : 'text-slate-400 hover:text-red-500 bg-slate-100/50 hover:bg-red-50'}`}>
-                <LogOut size={16} /> Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login" className={`btn-ghost px-5 py-2.5 text-sm font-bold border transition-colors ${isDashboard ? 'border-slate-600 text-white hover:bg-white/10' : 'border-slate-200 hover:border-slate-300'}`}>Login</Link>
-            </>
-          )}
-        </div>
-
-        {/* Mobile menu toggle */}
-        <button onClick={() => setMobileOpen(s => !s)} className={`inline-flex rounded-xl border p-2 md:hidden transition ${isDashboard ? 'border-slate-600 text-white hover:bg-white/10' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`} aria-label="Toggle menu">
-          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      </nav>
-
-      {/* Mobile nav dropdown */}
-      {mobileOpen && (
-        <div className="glass-nav mx-5 mt-2 rounded-xl border border-slate-200 p-4 shadow-xl md:hidden overflow-hidden">
-          <div className="flex flex-col gap-1 text-sm font-bold text-slate-600">
-            <Link to="/" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">Home</Link>
-            <Link to="/about" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">About</Link>
-            <Link to="/pricing" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">Pricing</Link>
-            <Link to="/faq" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">FAQ</Link>
-            <Link to="/contact" onClick={closeMobile} className="rounded-lg px-4 py-3 hover:bg-emerald-50 hover:text-primary transition">Contact</Link>
-            <div className="h-px w-full bg-slate-100 my-2"></div>
-            {isAuthenticated ? (
-              <>
-                <Link to="/dashboard/drive" onClick={closeMobile} className="rounded-lg px-4 py-3 text-primary bg-emerald-50/50 hover:bg-emerald-100 transition">Dashboard</Link>
-                <button onClick={() => { closeMobile(); onLogout(); }} className="rounded-lg px-4 py-3 text-left text-red-500 hover:bg-red-50 transition">Logout</button>
-              </>
-            ) : (
-              <Link to="/login" onClick={closeMobile} className="rounded-lg px-4 py-3 text-primary bg-emerald-50/50 hover:bg-emerald-100 transition">Login</Link>
-            )}
+        <div className="flex items-center gap-4">
+          <button className="text-slate-400 hover:text-white p-1 transition"><Plus size={18}/></button>
+          <button className="text-slate-400 hover:text-white p-1 transition"><LayoutGrid size={18}/></button>
+          
+          <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden ml-2 cursor-pointer border border-slate-600">
+             {/* Avatar Placeholder */}
+             <div className="w-full h-full bg-gradient-to-tr from-emerald-400 to-blue-500"></div>
           </div>
         </div>
-      )}
+      </nav>
     </header>
   );
 };
@@ -520,12 +417,15 @@ const AppContent = () => {
               <Route path="/register" element={<PageTransition><AuthRedirectRoute isAuthenticated={isAuthenticated} component={Register} onAuth={handleLogin} /></PageTransition>} />
               <Route path="/auth/callback" element={<PageTransition><AuthCallback onAuth={handleLogin} /></PageTransition>} />
               <Route path="/dashboard/drive" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><DriveDashboard /></ProtectedRoute></PageTransition>} />
+              <Route path="/dashboard/photos" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><PhotosDashboard /></ProtectedRoute></PageTransition>} />
+              <Route path="/dashboard/files" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><FilesDashboard /></ProtectedRoute></PageTransition>} />
               <Route path="/dashboard/compliance" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><ComplianceDashboard /></ProtectedRoute></PageTransition>} />
               <Route path="/dashboard/node" element={<PageTransition><NodeDashboard /></PageTransition>} />
               <Route path="/explorer/:bucket/*" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute></PageTransition>} />
               <Route path="/s3-migration" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute></PageTransition>} />
               <Route path="/download" element={<PageTransition><Download /></PageTransition>} />
               <Route path="/admin/inventory" element={<PageTransition><AdminRoute isAuthenticated={isAuthenticated}><AdminNodes /></AdminRoute></PageTransition>} />
+              <Route path="/admin/cms" element={<PageTransition><AdminRoute isAuthenticated={isAuthenticated}><AdminCMS /></AdminRoute></PageTransition>} />
               <Route path="/pricing" element={<PageTransition><Pricing /></PageTransition>} />
               <Route path="/about" element={<PageTransition><About /></PageTransition>} />
               <Route path="/contact" element={<PageTransition><Contact /></PageTransition>} />
@@ -542,7 +442,7 @@ const AppContent = () => {
           {[
             { to: "/", icon: HardDrive, label: "Home" },
             { to: "/dashboard/drive", icon: Database, label: "Drive" },
-            { to: "/dashboard/node", icon: Server, label: "Node" },
+            { to: "/dashboard/photos", icon: Sparkles, label: "Photos" },
             { to: "/pricing", icon: Zap, label: "Plans" },
           ].map((item) => {
             const isActive = location.pathname === item.to || (item.to !== "/" && location.pathname.startsWith(item.to));

@@ -278,17 +278,15 @@ export const DriveDashboard = () => {
             if (csrfToken) {
                 xhr.setRequestHeader('x-csrf-token', csrfToken);
             }
-
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable) {
                     const percentComplete = Math.round((e.loaded / e.total) * 100);
                     const modeLabel = uploadPlan?.mode === 'direct-node-chunks'
-                        ? `Uploading with planned node targets (${uploadPlan.node_targets?.length || 0})`
-                        : 'Uploading through gateway relay';
+                        ? `Encrypting to Tier 2/3 Data Centers (${uploadPlan.node_targets?.length || 0})`
+                        : 'Relaying to Mesh Edge';
                     setUploadState({ progress: percentComplete, text: `${modeLabel}: ${percentComplete}%` });
                 }
             };
-
             xhr.onload = () => {
                 if (xhr.status >= 200 && xhr.status < 300) {
                     resolve(fetchUploadProof(file.name));
@@ -319,7 +317,7 @@ export const DriveDashboard = () => {
                 latestProof = await uploadSingleFile(f);
             }
 
-            setUploadState({ progress: 100, text: 'Finalizing Shards on Ledger...' });
+            setUploadState({ progress: 100, text: 'Distributing Shards to Indian Data Centers...' });
             setTimeout(() => {
                 setIsUploading(false);
                 setUploadState({ progress: 0, text: '' });
@@ -541,9 +539,100 @@ export const DriveDashboard = () => {
         }
     };
 
+    const [showStorageModal, setShowStorageModal] = useState(false);
+
+    // ── STORAGE MODAL COMPONENT ──
+    const StorageModal = () => (
+        <div className="fixed inset-0 z-[120] bg-[#1c1c1e] flex flex-col font-sans">
+            <div className="border-b border-white/10 px-8 py-4 flex items-center gap-8">
+                <button onClick={() => setShowStorageModal(false)} className="text-blue-500 font-medium hover:underline flex items-center gap-1">
+                    <ArrowRight className="rotate-180" size={16}/> Back
+                </button>
+                <div className="flex items-center gap-6 text-sm font-medium text-slate-400">
+                    <button className="hover:text-white transition-colors">Your NeuroCloud Plan</button>
+                    <button className="text-white border-b-2 border-white pb-1">Your NeuroCloud Storage</button>
+                    <button className="hover:text-white transition-colors">Data Recovery</button>
+                    <button className="hover:text-white transition-colors">Settings</button>
+                </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-12 max-w-3xl mx-auto w-full">
+                <h1 className="text-4xl font-bold text-white mb-4">Your NeuroCloud Storage</h1>
+                <p className="text-slate-400 text-lg leading-relaxed mb-12 max-w-2xl">
+                    Use your NeuroCloud storage to keep your most important information—like your photos, files, backups, and more—secure, up to date, and available across all your devices.
+                </p>
+
+                <div className="flex justify-between items-end mb-4">
+                    <div className="bg-white rounded-lg px-4 py-2 text-black font-bold text-xl relative inline-block">
+                        5 GB
+                        <div className="absolute -top-2 -right-2 w-5 h-5 bg-orange-500 rounded-full border-2 border-[#1c1c1e] flex items-center justify-center text-white text-[10px] font-bold">!</div>
+                    </div>
+                    <div className="text-slate-300 font-medium">Free 0 bytes • <span className="text-white font-bold">Used 5 GB</span></div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full h-3 rounded-full flex overflow-hidden mb-8 gap-0.5">
+                    <div className="h-full bg-yellow-500" style={{ width: '60%' }}></div>
+                    <div className="h-full bg-indigo-500" style={{ width: '30%' }}></div>
+                    <div className="h-full bg-blue-500" style={{ width: '8%' }}></div>
+                    <div className="h-full bg-emerald-500" style={{ width: '2%' }}></div>
+                </div>
+
+                {/* Storage is Full Warning */}
+                <div className="bg-[#2c2c2e] border border-white/10 rounded-2xl p-6 flex gap-4 mb-10 items-start shadow-lg">
+                    <div className="w-6 h-6 rounded-full border-2 border-red-500 flex items-center justify-center text-red-500 shrink-0 mt-0.5">!</div>
+                    <div>
+                        <h4 className="text-white font-bold mb-1 text-lg">NeuroCloud Storage is Full</h4>
+                        <p className="text-slate-400 mb-3 text-sm">Upgrade to NeuroCloud+ to make sure your data keeps syncing to NeuroCloud.</p>
+                        <button className="text-blue-500 font-medium hover:underline text-sm">Upgrade for ₹ 75.00/month</button>
+                    </div>
+                </div>
+
+                {/* Breakdown List */}
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                        <div className="flex items-center gap-4 w-1/3">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 via-red-400 to-blue-500 flex items-center justify-center text-white"><ImgIcon size={16}/></div>
+                            <span className="text-white font-bold">Photos</span>
+                        </div>
+                        <div className="w-1/3 text-slate-400 text-sm">79 Photos, 69 Videos</div>
+                        <div className="w-1/3 text-right text-white font-medium flex justify-end items-center gap-2">3.1 GB <div className="w-2 h-2 rounded-full bg-yellow-500"></div></div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                        <div className="flex items-center gap-4 w-1/3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white"><RefreshCw size={16}/></div>
+                            <span className="text-white font-bold">Neuro Backup</span>
+                        </div>
+                        <div className="w-1/3 text-slate-400 text-sm">1 Device</div>
+                        <div className="w-1/3 text-right text-white font-medium flex justify-end items-center gap-2">1.3 GB <div className="w-2 h-2 rounded-full bg-indigo-500"></div></div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                        <div className="flex items-center gap-4 w-1/3">
+                            <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white"><FileIcon size={16}/></div>
+                            <span className="text-white font-bold">Documents</span>
+                        </div>
+                        <div className="w-1/3 text-slate-400 text-sm">All Files</div>
+                        <div className="w-1/3 text-right text-white font-medium flex justify-end items-center gap-2">566.5 MB <div className="w-2 h-2 rounded-full bg-blue-500"></div></div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                        <div className="flex items-center gap-4 w-1/3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white"><Mail size={16}/></div>
+                            <span className="text-white font-bold">Messages</span>
+                        </div>
+                        <div className="w-1/3 text-slate-400 text-sm">All Messages</div>
+                        <div className="w-1/3 text-right text-white font-medium flex justify-end items-center gap-2">50.5 MB <div className="w-2 h-2 rounded-full bg-emerald-500"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div 
-            className="flex min-h-[calc(100vh-100px)] p-4 md:p-8"
+            className="relative flex min-h-screen pt-12 md:pt-16 p-4 md:p-8 font-sans overflow-x-hidden"
             onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
             onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); if (e.target === e.currentTarget) setIsDragging(false); }}
@@ -557,11 +646,28 @@ export const DriveDashboard = () => {
             }}
             onClick={() => setContextMenu(null)}
         >
+            {/* DEEP BLUE ABSTRACT BACKGROUND */}
+            <div className="fixed inset-0 bg-[#002f6c] pointer-events-none -z-20 overflow-hidden">
+                 <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-500 rounded-full blur-[150px] opacity-40 -translate-y-1/2 translate-x-1/3"></div>
+                 <div className="absolute bottom-0 left-0 w-[800px] h-[800px] bg-indigo-600 rounded-full blur-[150px] opacity-40 translate-y-1/3 -translate-x-1/3"></div>
+                 <div className="absolute top-1/2 left-1/2 w-[1200px] h-[400px] bg-blue-400 rounded-full blur-[200px] opacity-20 -translate-x-1/2 -translate-y-1/2 -rotate-45"></div>
+            </div>
+
             <RecoverySetupModal />
+            <AnimatePresence>
+                {showStorageModal && <StorageModal />}
+            </AnimatePresence>
             
             {/* Hidden Native Inputs */}
             <input type="file" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
             <input type="file" multiple webkitdirectory="true" ref={folderInputRef} onChange={handleFileUpload} className="hidden" />
+
+            {/* Top Banner */}
+            <div className="absolute top-0 inset-x-0 h-10 bg-black/40 backdrop-blur-md flex items-center justify-center border-b border-white/5 z-[90]">
+                <p className="text-white text-xs font-medium flex items-center gap-2 tracking-wide">
+                    Get the NeuroCloud for Windows app to sync your data locally. <a href={WINDOWS_NODE_INSTALLER_URL} className="text-blue-300 hover:text-blue-200 hover:underline">Download</a>
+                </p>
+            </div>
 
             {/* Drag & Drop Overlay */}
             <AnimatePresence>
@@ -570,7 +676,7 @@ export const DriveDashboard = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-md flex flex-col items-center justify-center m-4 rounded-3xl border border-white/20 shadow-2xl"
+                        className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center m-4 rounded-3xl border border-white/10 shadow-2xl"
                     >
                         <Motion.div 
                             animate={{ y: [0, -10, 0] }} 
@@ -579,38 +685,28 @@ export const DriveDashboard = () => {
                         >
                             <UploadCloud size={64} className="text-white" />
                         </Motion.div>
-                        <h2 className="text-4xl font-display font-extrabold text-white mb-2 shadow-sm">Drop to Upload</h2>
-                        <p className="text-white/70 font-medium text-lg">Files are client-side encrypted before uploading.</p>
+                        <h2 className="text-4xl font-semibold text-white mb-2 shadow-sm">Drop to Upload</h2>
+                        <p className="text-slate-400 font-medium text-lg">Files are client-side encrypted before uploading.</p>
                     </Motion.div>
                 )}
             </AnimatePresence>
 
             {/* BENTO BOX GRID */}
-            <div className="w-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6">
-                
+            <div className="w-full max-w-6xl mx-auto mt-6 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 auto-rows-min z-10">
                 {/* ── PROFILE WIDGET (Top Left) ── */}
                 <Motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="bento-glass-card col-span-1 md:col-span-2 lg:col-span-3 p-6 flex flex-col items-center justify-center relative overflow-hidden"
+                    className="bg-[#2c2c2e]/90 backdrop-blur-xl rounded-[2rem] p-8 flex flex-col items-center justify-center border border-white/5 shadow-2xl relative col-span-1"
                 >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full blur-3xl -z-10"></div>
-                    <div className="w-24 h-24 rounded-full bg-slate-800/80 border-4 border-slate-700/50 mb-4 flex items-center justify-center overflow-hidden shadow-xl">
-                        <ShieldCheck size={40} className="text-emerald-400" />
+                    <div className="w-24 h-24 rounded-full bg-slate-800 mb-4 flex items-center justify-center overflow-hidden border-2 border-white/10 shadow-lg relative">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Avatar" className="w-full h-full object-cover relative z-10" />
+                        <div className="absolute inset-0 bg-blue-500 mix-blend-overlay opacity-20"></div>
                     </div>
-                    <h3 className="text-2xl font-bold text-white mb-1">{BUCKET_NAME}</h3>
-                    <p className="text-sm text-slate-400 mb-6 truncate max-w-full">Zero-Knowledge Vault</p>
-                    
-                    <div className="w-full bg-slate-900/50 rounded-xl p-3 border border-white/5">
-                        <div className="flex justify-between text-xs text-slate-300 mb-2">
-                            <span>Storage Used</span>
-                            <span>{storageUsed} GB / {getSelectedPlan() === 'pro' ? '1000' : '100'} GB</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${Math.max((storageUsed / (getSelectedPlan() === 'pro' ? 1000 : 100)) * 100, 2)}%` }}></div>
-                        </div>
-                    </div>
+                    <h3 className="text-xl font-bold text-white mb-1 tracking-wide">Janush Sahni</h3>
+                    <p className="text-xs text-slate-400 mb-6 font-medium">janushsahni24@gmail.com</p>
+                    <span className="bg-white/5 px-4 py-1.5 rounded-full text-xs font-semibold text-slate-300 border border-white/5 tracking-wide">NeuroCloud Account</span>
                 </Motion.div>
 
                 {/* ── DRIVE RECENTS WIDGET (Top Right) ── */}
@@ -618,30 +714,31 @@ export const DriveDashboard = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="bento-glass-card col-span-1 md:col-span-2 lg:col-span-9 p-6 flex flex-col"
+                    className="bg-[#2c2c2e]/90 backdrop-blur-xl rounded-[2rem] p-6 flex flex-col border border-white/5 shadow-2xl col-span-1 md:col-span-2 lg:col-span-3"
                 >
-                    <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
-                        <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-blue-500/20 rounded-lg">
-                                <HardDrive size={20} className="text-blue-400" />
+                    <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-500 rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                                <HardDrive size={18} className="text-white" />
                             </div>
-                            <h3 className="text-lg font-bold text-white">Drive Recents</h3>
+                            <h3 className="text-lg font-bold text-white tracking-wide">Drive Recents</h3>
                         </div>
-                        <button onClick={() => fileInputRef.current?.click()} className="text-xs bg-white/10 hover:bg-white/20 border border-white/10 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all">
-                            <Plus size={14} /> Upload
-                        </button>
+                        <div className="flex gap-2">
+                            <button onClick={() => fileInputRef.current?.click()} className="text-slate-400 hover:text-white p-1 transition-colors">
+                                <UploadCloud size={18} />
+                            </button>
+                        </div>
                     </div>
-
-                    <div className="flex-1 overflow-y-auto max-h-[300px] pr-2">
+                    <div className="flex-1 overflow-y-auto max-h-[220px] pr-2 custom-scrollbar">
                         {isUploading && (
-                            <div className="mb-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center gap-4">
+                            <div className="mb-4 bg-emerald-500/20 border border-emerald-500/30 rounded-xl p-3 flex items-center gap-4">
                                 <RefreshCw className="text-emerald-400 animate-spin shrink-0" size={16} />
                                 <div className="flex-1">
-                                    <div className="flex justify-between text-[11px] font-bold text-emerald-300 mb-1">
+                                    <div className="flex justify-between text-[11px] font-bold text-emerald-300 mb-1 tracking-wide">
                                         <span>{uploadState.text}</span>
                                         <span>{uploadState.progress}%</span>
                                     </div>
-                                    <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="w-full h-1 bg-black/40 rounded-full overflow-hidden">
                                         <Motion.div className="h-full bg-emerald-500" initial={{ width: 0 }} animate={{ width: `${uploadState.progress}%` }} />
                                     </div>
                                 </div>
@@ -650,29 +747,33 @@ export const DriveDashboard = () => {
 
                         {files.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
-                                <FileIcon size={40} className="mb-3" />
-                                <p className="text-sm">No files uploaded yet.</p>
+                                <FileIcon size={32} className="mb-3 text-slate-400" />
+                                <p className="text-sm font-medium text-slate-400">No files yet.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {files.slice(0, 12).map((file, i) => (
                                     <Motion.div 
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
                                         transition={{ delay: 0.1 + (i * 0.05) }}
                                         key={file.id} 
                                         onClick={() => handleDownload(file.name, 'preview')}
-                                        className="bg-slate-900/40 hover:bg-slate-800/60 border border-white/5 hover:border-white/20 rounded-xl p-3 flex flex-col gap-2 cursor-pointer transition-all group"
+                                        className="bg-[#1c1c1e] hover:bg-[#3a3a3c] border border-white/5 rounded-2xl p-4 flex flex-col gap-3 cursor-pointer transition-all shadow-md group relative overflow-hidden"
                                     >
-                                        <div className="flex items-start justify-between">
-                                            {getFileIcon(file.type)}
-                                            <button onClick={(e) => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, file }); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-opacity">
+                                        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                                        <div className="flex items-start justify-between relative z-10">
+                                            {/* Stylized File Icon */}
+                                            <div className={`p-2 rounded-xl ${file.name.toLowerCase().endsWith('.pdf') ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                                {getFileIcon(file.type)}
+                                            </div>
+                                            <button onClick={(e) => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, file }); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-opacity bg-black/40 rounded-full">
                                                 <MoreVertical size={14} />
                                             </button>
                                         </div>
-                                        <div className="mt-1">
-                                            <p className="text-sm font-bold text-white truncate" title={file.name}>{file.name}</p>
-                                            <p className="text-xs text-slate-500 mt-0.5">{file.size} • {file.date}</p>
+                                        <div className="relative z-10">
+                                            <p className="text-[13px] font-semibold text-white truncate" title={file.name}>{file.name}</p>
+                                            <p className="text-[11px] font-medium text-slate-500 mt-0.5">{file.size} • {file.date}</p>
                                         </div>
                                     </Motion.div>
                                 ))}
@@ -681,40 +782,38 @@ export const DriveDashboard = () => {
                     </div>
                 </Motion.div>
 
-                {/* ── STATUS / LOGS WIDGET (Bottom Left) ── */}
+                {/* ── STORAGE BREAKDOWN WIDGET (Bottom Left) ── */}
                 <Motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="bento-glass-card col-span-1 md:col-span-2 lg:col-span-8 p-6 flex flex-col relative"
+                    onClick={() => setShowStorageModal(true)}
+                    className="bg-[#2c2c2e]/90 backdrop-blur-xl rounded-[2rem] p-6 flex flex-col relative border border-white/5 shadow-2xl col-span-1 md:col-span-2 cursor-pointer hover:bg-[#3a3a3c]/90 transition-colors"
                 >
-                    <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
-                        <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-yellow-500/20 rounded-lg">
-                                <FileText size={20} className="text-yellow-400" />
-                            </div>
-                            <h3 className="text-lg font-bold text-white">System Status</h3>
+                    <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
+                        <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-bold text-white tracking-wide">Your Storage</h3>
                         </div>
+                        <ArrowRight size={16} className="text-slate-500" />
                     </div>
-                    <div className="flex-1 space-y-3">
-                        <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
-                            <span className="text-slate-400">Vault Security</span>
-                            <span className="text-emerald-400 font-mono font-bold">{vaultPassword ? 'AES-256 Unlocked' : 'Locked'}</span>
+                    
+                    <div className="flex-1 flex flex-col justify-center space-y-4">
+                        <div className="flex justify-between items-end">
+                            <span className="text-white font-bold text-2xl">5 GB</span>
+                            <span className="text-slate-400 text-sm font-medium">Used 5 GB</span>
                         </div>
-                        <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
-                            <span className="text-slate-400">Connected Peers</span>
-                            <span className="text-blue-400 font-mono font-bold">15 Active nodes</span>
+                        <div className="w-full h-2 bg-slate-800 rounded-full flex overflow-hidden">
+                            <div className="h-full bg-yellow-500" style={{ width: '60%' }}></div>
+                            <div className="h-full bg-indigo-500" style={{ width: '30%' }}></div>
+                            <div className="h-full bg-blue-500" style={{ width: '8%' }}></div>
+                            <div className="h-full bg-emerald-500" style={{ width: '2%' }}></div>
                         </div>
-                        <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
-                            <span className="text-slate-400">Last Upload Proof</span>
-                            <span className="text-purple-400 font-mono font-bold truncate max-w-[150px]">{uploadProof ? uploadProof.objectCid : 'None'}</span>
+                        <div className="grid grid-cols-2 gap-2 mt-4">
+                            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-yellow-500"></div><span className="text-[11px] text-slate-400 font-medium">Photos</span></div>
+                            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-indigo-500"></div><span className="text-[11px] text-slate-400 font-medium">Backups</span></div>
+                            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div><span className="text-[11px] text-slate-400 font-medium">Documents</span></div>
+                            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-[11px] text-slate-400 font-medium">Messages</span></div>
                         </div>
-                        {uploadProof && (
-                            <div className="mt-4 p-3 bg-slate-900/50 rounded-lg border border-emerald-500/20">
-                                <p className="text-xs text-emerald-400 font-bold mb-1 flex items-center gap-1"><ShieldCheck size={12}/> Verified Shard Placement</p>
-                                <p className="text-[10px] text-slate-400 font-mono">{uploadProof.nodeCount} nodes • {uploadProof.regions.join(', ') || 'Global'}</p>
-                            </div>
-                        )}
                     </div>
                 </Motion.div>
 
@@ -723,44 +822,40 @@ export const DriveDashboard = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
-                    className="bento-glass-card col-span-1 md:col-span-2 lg:col-span-4 p-6"
+                    className="col-span-1 md:col-span-2 p-6"
                 >
-                    <div className="grid grid-cols-3 gap-4 h-full content-start">
-                        <button onClick={() => navigate('/dashboard/node')} className="flex flex-col items-center gap-2 group">
-                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-indigo-400 to-indigo-600 shadow-[0_4px_15px_rgba(79,70,229,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
-                                <Server size={24} />
-                            </div>
-                            <span className="text-[11px] font-medium text-slate-300">Node</span>
+                    <div className="grid grid-cols-4 gap-y-6 gap-x-2 content-start">
+                        <button onClick={() => navigate('/dashboard/photos')} className="flex flex-col items-center gap-2 group">
+                            <div className="w-12 h-12 rounded-[0.9rem] bg-gradient-to-br from-yellow-400 via-red-400 to-blue-500 shadow-md flex items-center justify-center text-white group-hover:scale-105 transition-transform"><ImgIcon size={22} /></div>
+                            <span className="text-[10px] font-medium text-slate-300">Photos</span>
                         </button>
-                        <button onClick={() => navigate('/s3-migration')} className="flex flex-col items-center gap-2 group">
-                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-blue-400 to-blue-600 shadow-[0_4px_15px_rgba(59,130,246,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
-                                <Cloud size={24} />
-                            </div>
-                            <span className="text-[11px] font-medium text-slate-300">Migration</span>
+                        <button onClick={() => navigate('/dashboard/files')} className="flex flex-col items-center gap-2 group">
+                            <div className="w-12 h-12 rounded-[0.9rem] bg-blue-500 shadow-md flex items-center justify-center text-white group-hover:scale-105 transition-transform"><FileIcon size={22} /></div>
+                            <span className="text-[10px] font-medium text-slate-300">Drive</span>
                         </button>
-                        <button onClick={() => navigate('/pricing')} className="flex flex-col items-center gap-2 group">
-                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-[0_4px_15px_rgba(16,185,129,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
-                                <Zap size={24} />
-                            </div>
-                            <span className="text-[11px] font-medium text-slate-300">Upgrade</span>
-                        </button>
-                        <button onClick={() => navigate('/dashboard/compliance')} className="flex flex-col items-center gap-2 group">
-                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-slate-600 to-slate-800 shadow-[0_4px_15px_rgba(71,85,105,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
-                                <Globe size={24} />
-                            </div>
-                            <span className="text-[11px] font-medium text-slate-300">Compliance</span>
+                        <button onClick={() => navigate('/admin/cms')} className="flex flex-col items-center gap-2 group">
+                            <div className="w-12 h-12 rounded-[0.9rem] bg-slate-700 shadow-md flex items-center justify-center text-white group-hover:scale-105 transition-transform"><ShieldCheck size={22} /></div>
+                            <span className="text-[10px] font-medium text-slate-300">Admin</span>
                         </button>
                         <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center gap-2 group">
-                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-rose-400 to-rose-600 shadow-[0_4px_15px_rgba(225,29,72,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
-                                <UploadCloud size={24} />
-                            </div>
-                            <span className="text-[11px] font-medium text-slate-300">Upload</span>
+                            <div className="w-12 h-12 rounded-[0.9rem] bg-slate-200 shadow-md flex items-center justify-center text-blue-500 group-hover:scale-105 transition-transform"><UploadCloud size={22} /></div>
+                            <span className="text-[10px] font-medium text-slate-300">Upload</span>
                         </button>
                         <button onClick={() => {}} className="flex flex-col items-center gap-2 group">
-                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-amber-400 to-amber-600 shadow-[0_4px_15px_rgba(217,119,6,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
-                                <Search size={24} />
-                            </div>
-                            <span className="text-[11px] font-medium text-slate-300">Find My</span>
+                            <div className="w-12 h-12 rounded-[0.9rem] bg-amber-500 shadow-md flex items-center justify-center text-white group-hover:scale-105 transition-transform"><FileText size={22} /></div>
+                            <span className="text-[10px] font-medium text-slate-300">Notes</span>
+                        </button>
+                        <button onClick={() => {}} className="flex flex-col items-center gap-2 group">
+                            <div className="w-12 h-12 rounded-[0.9rem] bg-emerald-500 shadow-md flex items-center justify-center text-white group-hover:scale-105 transition-transform"><Search size={22} /></div>
+                            <span className="text-[10px] font-medium text-slate-300">Find My</span>
+                        </button>
+                        <button onClick={() => {}} className="flex flex-col items-center gap-2 group">
+                            <div className="w-12 h-12 rounded-[0.9rem] bg-blue-400 shadow-md flex items-center justify-center text-white group-hover:scale-105 transition-transform"><Mail size={22} /></div>
+                            <span className="text-[10px] font-medium text-slate-300">Mail</span>
+                        </button>
+                        <button onClick={() => navigate('/dashboard/node')} className="flex flex-col items-center gap-2 group">
+                            <div className="w-12 h-12 rounded-[0.9rem] bg-indigo-500 shadow-md flex items-center justify-center text-white group-hover:scale-105 transition-transform"><HardDrive size={22} /></div>
+                            <span className="text-[10px] font-medium text-slate-300">Nodes</span>
                         </button>
                     </div>
                 </Motion.div>
