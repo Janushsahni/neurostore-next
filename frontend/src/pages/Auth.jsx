@@ -47,7 +47,7 @@ export const Login = ({ onAuth, initialRegister = false }) => {
     const getTargetPath = () => {
         const returnUrl = searchParams.get("return");
         if (returnUrl) return decodeURIComponent(returnUrl);
-        if (intent === "node") return "/dashboard/node";
+
         return "/dashboard/drive";
     };
 
@@ -433,7 +433,7 @@ const RegisterModal = ({ onClose, onAuth }) => {
             
             const returnUrl = searchParams.get("return");
             if (returnUrl) onAuth(decodeURIComponent(returnUrl));
-            else if (intent === "node") onAuth("/dashboard/node");
+
             else onAuth("/dashboard/drive");
         } catch (err) {
             setError(err?.message || "Verification failed");

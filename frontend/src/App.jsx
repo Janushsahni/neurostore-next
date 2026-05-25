@@ -15,7 +15,7 @@ import { clearAuthSession, getAuthUser, isAuthenticated as hasAuthSession, setAu
 import { apiJson } from "./lib/apiClient";
 
 const DriveDashboard = lazy(() => import("./pages/DriveDashboard").then((module) => ({ default: module.DriveDashboard })));
-const NodeDashboard = lazy(() => import("./pages/NodeDashboard").then((module) => ({ default: module.NodeDashboard })));
+
 const Download = lazy(() => import("./pages/Download").then((module) => ({ default: module.Download })));
 const Pricing = lazy(() => import("./pages/Pricing").then((module) => ({ default: module.Pricing })));
 const ComplianceDashboard = lazy(() => import("./pages/ComplianceDashboard").then((module) => ({ default: module.ComplianceDashboard })));
@@ -149,7 +149,7 @@ const AuthRedirectRoute = ({ isAuthenticated, component, onAuth }) => {
     const params = new URLSearchParams(window.location.search);
     const returnUrl = params.get('return');
     if (returnUrl) return <Navigate to={decodeURIComponent(returnUrl)} replace />;
-    if (params.get('intent') === 'node') return <Navigate to="/dashboard/node" replace />;
+
     return <Navigate to="/dashboard/drive" replace />;
   }
   return React.createElement(component, { onAuth });
@@ -499,7 +499,7 @@ const AppContent = () => {
               <Route path="/dashboard/photos" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><PhotosDashboard /></ProtectedRoute></PageTransition>} />
               <Route path="/dashboard/files" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><FilesDashboard /></ProtectedRoute></PageTransition>} />
               <Route path="/dashboard/compliance" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><ComplianceDashboard /></ProtectedRoute></PageTransition>} />
-              <Route path="/dashboard/node" element={<PageTransition><NodeDashboard /></PageTransition>} />
+
               <Route path="/explorer/:bucket/*" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><ObjectExplorer /></ProtectedRoute></PageTransition>} />
               <Route path="/s3-migration" element={<PageTransition><ProtectedRoute isAuthenticated={isAuthenticated}><S3Migration /></ProtectedRoute></PageTransition>} />
               <Route path="/download" element={<PageTransition><Download /></PageTransition>} />
