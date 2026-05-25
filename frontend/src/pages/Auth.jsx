@@ -158,7 +158,6 @@ export const Login = ({ onAuth, initialRegister = false }) => {
             {/* Top Logo (iCloud equivalent) */}
             <div className="absolute top-6 left-6 flex items-center gap-2">
                 <Cloud size={20} className="text-white" />
-                <span className="font-semibold text-lg tracking-tight">NeuroCloud</span>
             </div>
 
             {/* Main Login Card */}
