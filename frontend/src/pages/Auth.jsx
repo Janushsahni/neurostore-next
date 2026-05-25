@@ -155,10 +155,7 @@ export const Login = ({ onAuth, initialRegister = false }) => {
 
     return (
         <div className="min-h-screen bg-[#1c1c1e] flex flex-col items-center pt-24 p-6 text-white font-sans">
-            {/* Top Logo (iCloud equivalent) */}
-            <div className="absolute top-6 left-6 flex items-center gap-2">
-                <Cloud size={20} className="text-white" />
-            </div>
+            
 
             {/* Main Login Card */}
             <div className="w-full max-w-[460px] bg-[#2c2c2e] rounded-3xl p-10 flex flex-col items-center animate-in fade-in zoom-in-95 duration-300 shadow-2xl relative">
