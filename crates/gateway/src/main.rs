@@ -59,6 +59,7 @@ pub struct HeartbeatCacheEntry {
 
 pub struct AppState {
     pub db: sqlx::PgPool,
+    pub redis_pool: Option<deadpool_redis::Pool>,
     pub p2p_tx: mpsc::Sender<SwarmRequest>,
     // CDN Layer: Maps CID -> Raw Bytes
     pub edge_cache: Cache<String, axum::body::Bytes>,
@@ -176,8 +177,26 @@ async fn main() -> anyhow::Result<()> {
 
     let edge_cache: Cache<String, axum::body::Bytes> = Cache::new(10_000);
 
+    // Initialize Redis (optional, gracefully degrade)
+    let redis_pool = if let Ok(redis_url) = std::env::var("REDIS_URL") {
+        match deadpool_redis::Config::from_url(redis_url).create_pool(Some(deadpool_redis::Runtime::Tokio1)) {
+            Ok(pool) => {
+                tracing::info!("Redis pool initialized");
+                Some(pool)
+            },
+            Err(e) => {
+                tracing::warn!("Failed to initialize Redis pool: {}", e);
+                None
+            }
+        }
+    } else {
+        tracing::info!("REDIS_URL not set, continuing without Redis");
+        None
+    };
+
     let shared_state = Arc::new(AppState {
         db: pool,
+        redis_pool,
         p2p_tx,
         edge_cache,
         geo: geo_manager,
@@ -274,7 +293,6 @@ async fn main() -> anyhow::Result<()> {
         .route("/logout", post(handlers::auth::logout))
         .route("/session", get(handlers::auth::session))
         .route("/auth/logout", post(handlers::auth::logout))
-        .route("/auth/captcha", get(handlers::auth::get_captcha))
         .route("/auth/login/verify-2fa", post(handlers::auth::verify_login_2fa))
         .route("/auth/send-otp", post(handlers::auth::send_otp))
         .route("/auth/register/verify", post(handlers::auth::verify_otp))
@@ -282,10 +300,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/recovery-kit/public", get(handlers::auth::get_recovery_kit_public))
         .route("/auth/sso/saml", post(handlers::auth::sso_saml_login))
         .route("/auth/sso/oauth", post(handlers::auth::sso_oauth_login))
-        .route("/auth/google/login", get(handlers::oauth::google_login))
-        .route("/auth/google/callback", get(handlers::oauth::google_callback))
-        .route("/auth/apple/login", get(handlers::oauth::apple_login))
-        .route("/auth/microsoft/login", get(handlers::oauth::microsoft_login))
+
         .route("/auth/forgot-password/init", post(handlers::auth::forgot_password_init))
         .route("/auth/forgot-password/confirm-phone", post(handlers::auth::forgot_password_confirm_phone))
         .route("/auth/forgot-password/reset", post(handlers::auth::forgot_password_reset))
@@ -338,6 +353,12 @@ async fn main() -> anyhow::Result<()> {
         .route("/zk/store/:bucket/*key", post(handlers::zk::zk_store))
         .route("/zk/issue-challenge", post(proofs::issue_zk_challenge))
         .route("/zk/submit-proof", post(proofs::verify_zk_proof))
+        // OAuth top-level explicitly to bypass any nest conflicts
+        .route("/api/auth/google/login", get(handlers::oauth::google_login))
+        .route("/api/auth/google/callback", get(handlers::oauth::google_callback))
+        .route("/api/auth/apple/login", get(handlers::oauth::apple_login))
+        .route("/api/auth/microsoft/login", get(handlers::oauth::microsoft_login))
+        .route("/api/auth/captcha", get(handlers::auth::get_captcha))
         // S3-Compatible API (Path Style) - Moved to bottom to prevent shadowing
         // We exclude /api from the bucket match in the handler if needed,
         // but Axum precedence will now favor the nested /api router.

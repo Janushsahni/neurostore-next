@@ -539,21 +539,16 @@ const RegisterModal = ({ onClose, onAuth }) => {
                                         <div className="text-[13px] text-slate-400 leading-tight">Receive NeuroCloud emails and communications including announcements, marketing, recommendations, and updates about NeuroCloud products, services and software.</div>
                                     </div>
                                 </label>
-                                <label className="flex items-start gap-3 cursor-pointer">
-                                    <input type="checkbox" checked={appsMusic} onChange={(e) => setAppsMusic(e.target.checked)} className="mt-1 w-4 h-4 rounded accent-[#007aff] bg-[#007aff] border-white/20 focus:ring-[#007aff]" />
-                                    <div>
-                                        <div className="text-[15px] font-medium text-white">Apps, Music, TV, and More</div>
-                                        <div className="text-[13px] text-slate-400 leading-tight">Receive NeuroCloud emails and communications including new releases, exclusive content, special offers, and marketing and recommendations for apps, music, movies, TV, books, podcasts, and more.</div>
-                                    </div>
-                                </label>
-                            </div>
+
 
                             <hr className="border-white/10 my-6" />
 
                             <div className="flex gap-4 items-center">
                                 <div className="w-32 h-12 bg-white flex items-center justify-center relative overflow-hidden shrink-0 border border-white/20 rounded">
                                     {captchaSvg ? (
-                                        <div className="w-full h-full [&>svg]:w-full [&>svg]:h-full" dangerouslySetInnerHTML={{ __html: captchaSvg }} />
+                                        <div className="w-full h-full flex items-center justify-center cursor-pointer" onClick={fetchCaptcha}>
+                                            <img src={captchaSvg} alt="Captcha" className="h-[46px] object-contain" />
+                                        </div>
                                     ) : (
                                         <RefreshCw className="animate-spin text-black" size={20} />
                                     )}

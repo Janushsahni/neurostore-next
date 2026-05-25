@@ -25,6 +25,8 @@ sha2 = "0.10"
 hex = "0.4"
 bytes = "1"
 libp2p-identity = { version = "0.2", features = ["peerid"] }
+redis = { version = "0.25.3", features = ["tokio-comp"] }
+deadpool-redis = "0.15"
 
 [profile.release]
 opt-level = 3
