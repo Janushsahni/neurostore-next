@@ -1,0 +1,10 @@
+S:\neurostore-next\neurostore-next\crates\gateway\target-codex-verify\debug\deps\quick_protobuf-67cdb4fbbae6cb4b.d: C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\lib.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\errors.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\message.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\reader.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\sizeofs.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\writer.rs
+
+S:\neurostore-next\neurostore-next\crates\gateway\target-codex-verify\debug\deps\libquick_protobuf-67cdb4fbbae6cb4b.rmeta: C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\lib.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\errors.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\message.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\reader.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\sizeofs.rs C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\writer.rs
+
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\lib.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\errors.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\message.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\reader.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\sizeofs.rs:
+C:\Users\Janyshh\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\quick-protobuf-0.8.1\src\writer.rs:

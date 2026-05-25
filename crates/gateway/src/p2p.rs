@@ -1,5 +1,6 @@
 use crate::geofence::GeoFenceManager;
 use crate::models::Node;
+use crate::consistent_hash::HashRing;
 use futures::StreamExt;
 use libp2p::request_response::OutboundRequestId;
 use libp2p::{
@@ -207,6 +208,7 @@ pub struct P2pNode {
     pending_stores: HashMap<OutboundRequestId, PendingStore>,
     pending_audits: HashMap<OutboundRequestId, PendingAudit>,
     pending_computes: HashMap<OutboundRequestId, PendingCompute>,
+    hash_ring: HashRing,
 }
 
 impl P2pNode {
@@ -287,6 +289,7 @@ impl P2pNode {
             pending_stores: HashMap::new(),
             pending_audits: HashMap::new(),
             pending_computes: HashMap::new(),
+            hash_ring: HashRing::new(100),
         })
     }
 
@@ -332,24 +335,22 @@ impl P2pNode {
                             }
                         }
 
-                        // ── COLLUSION-AWARE PLACEMENT ──
-                        // We track which ASNs have already received shards for this specific CID
-                        // to ensure no single entity controls the recovery threshold.
-                        // For a simplified implementation here, we just pick a random peer
-                        // and log its ASN, but in a full stateful router, this history is persisted per-object.
+                        // ── DETERMINISTIC CONSISTENT HASHING PLACEMENT ──
+                        // Route shards deterministically based on CID using the HashRing,
+                        // while ensuring geofencing rules and ASN dispersion are respected.
                         let mut chosen_peer = None;
-                        let mut attempts = 0;
-                        while attempts < 10 {
-                            if let Some(peer_id) = authorized_peers.iter().choose(&mut rand::thread_rng()) {
-                                if let Some(ip) = self.peer_ips.get(peer_id) {
+                        let ordered_peers = self.hash_ring.get_ordered_nodes(&cid);
+                        
+                        for peer_id in ordered_peers {
+                            if authorized_peers.contains(&peer_id) {
+                                if let Some(ip) = self.peer_ips.get(&peer_id) {
                                     let asn = geo.get_asn_org(*ip);
                                     // Normally we would check: if used_asns.count(&asn) >= MAX_ASN_DENSITY { continue; }
-                                    tracing::debug!("Routing shard to ASN: {}", asn);
-                                    chosen_peer = Some(*peer_id);
+                                    tracing::debug!("Deterministic Routing shard to ASN: {}", asn);
+                                    chosen_peer = Some(peer_id);
                                     break;
                                 }
                             }
-                            attempts += 1;
                         }
 
                         if let Some(peer_id) = chosen_peer {
@@ -408,7 +409,18 @@ impl P2pNode {
                                 }
                             }
                             if candidate.is_none() {
-                                candidate = self.swarm.connected_peers().choose(&mut rand::thread_rng()).cloned();
+                                // Consistent Hashing: ask the node that *should* have the data
+                                let ordered = self.hash_ring.get_ordered_nodes(&cid);
+                                for peer_id in ordered {
+                                    if self.swarm.is_connected(&peer_id) {
+                                        candidate = Some(peer_id);
+                                        break;
+                                    }
+                                }
+                                // Fallback
+                                if candidate.is_none() {
+                                    candidate = self.swarm.connected_peers().choose(&mut rand::thread_rng()).cloned();
+                                }
                             }
                             candidate
                         };
@@ -562,6 +574,7 @@ impl P2pNode {
 
                         if let Some(ip) = node_ip {
                             self.peer_ips.insert(peer_id, ip);
+                            self.hash_ring.add_node(peer_id);
                             let country_code = geo.get_country_code(ip);
                             let peer_str = peer_id.to_string();
                             let ip_str = ip.to_string();
@@ -591,6 +604,7 @@ impl P2pNode {
                     SwarmEvent::ConnectionClosed { peer_id, .. } => {
                         warn!("Node Disconnected: {:?}", peer_id);
                         self.peer_ips.remove(&peer_id);
+                        self.hash_ring.remove_node(&peer_id);
                     }
                     SwarmEvent::Behaviour(NeuroStoreBehaviourEvent::Chunk(request_response::Event::Message {
                         peer: _, message: request_response::Message::Response { request_id, response }

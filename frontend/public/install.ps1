@@ -5,7 +5,7 @@ Write-Host "========================================="
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$DownloadUrl = "https://neurostore-backend-production.up.railway.app/api/downloads/node/windows-portable/x86_64"
+$DownloadUrl = "https://neurostore-backend-production-61aa.up.railway.app/api/downloads/node/windows-portable/x86_64"
 $InstallDir = "$env:USERPROFILE\.neurostore\bin"
 $ZipPath = "$InstallDir\neuro-node.zip"
 $Executable = "$InstallDir\neuro-node.exe"

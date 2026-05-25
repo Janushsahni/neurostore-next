@@ -21,6 +21,7 @@ use tracing_subscriber::FmtSubscriber;
 
 use moka::future::Cache;
 
+pub mod consistent_hash;
 pub mod erasure;
 pub mod handlers;
 pub mod models;

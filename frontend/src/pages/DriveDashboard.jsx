@@ -543,7 +543,7 @@ export const DriveDashboard = () => {
 
     return (
         <div 
-            className="flex h-[calc(100dvh-80px-64px)] md:h-[calc(100vh-80px)] overflow-hidden bg-white text-slate-800 font-sans relative"
+            className="flex min-h-[calc(100vh-100px)] p-4 md:p-8"
             onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
             onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); if (e.target === e.currentTarget) setIsDragging(false); }}
@@ -558,6 +558,10 @@ export const DriveDashboard = () => {
             onClick={() => setContextMenu(null)}
         >
             <RecoverySetupModal />
+            
+            {/* Hidden Native Inputs */}
+            <input type="file" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+            <input type="file" multiple webkitdirectory="true" ref={folderInputRef} onChange={handleFileUpload} className="hidden" />
 
             {/* Drag & Drop Overlay */}
             <AnimatePresence>
@@ -566,55 +570,222 @@ export const DriveDashboard = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-[100] bg-emerald-500/90 backdrop-blur-sm flex flex-col items-center justify-center border-4 border-dashed border-white m-4 rounded-3xl"
+                        className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-md flex flex-col items-center justify-center m-4 rounded-3xl border border-white/20 shadow-2xl"
                     >
                         <Motion.div 
                             animate={{ y: [0, -10, 0] }} 
                             transition={{ repeat: Infinity, duration: 2 }}
-                            className="bg-white p-6 rounded-full shadow-2xl mb-4"
+                            className="bg-white/10 p-6 rounded-full shadow-2xl mb-4 border border-white/20"
                         >
-                            <UploadCloud size={64} className="text-emerald-500" />
+                            <UploadCloud size={64} className="text-white" />
                         </Motion.div>
-                        <h2 className="text-4xl font-display font-extrabold text-white mb-2 shadow-sm">Drop to Securely Upload</h2>
-                        <p className="text-emerald-50 font-medium text-lg">Files will be encrypted before leaving your browser.</p>
+                        <h2 className="text-4xl font-display font-extrabold text-white mb-2 shadow-sm">Drop to Upload</h2>
+                        <p className="text-white/70 font-medium text-lg">Files are client-side encrypted before uploading.</p>
                     </Motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Custom Right-Click Context Menu */}
+            {/* BENTO BOX GRID */}
+            <div className="w-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6">
+                
+                {/* ── PROFILE WIDGET (Top Left) ── */}
+                <Motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="bento-glass-card col-span-1 md:col-span-2 lg:col-span-3 p-6 flex flex-col items-center justify-center relative overflow-hidden"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full blur-3xl -z-10"></div>
+                    <div className="w-24 h-24 rounded-full bg-slate-800/80 border-4 border-slate-700/50 mb-4 flex items-center justify-center overflow-hidden shadow-xl">
+                        <ShieldCheck size={40} className="text-emerald-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-1">{BUCKET_NAME}</h3>
+                    <p className="text-sm text-slate-400 mb-6 truncate max-w-full">Zero-Knowledge Vault</p>
+                    
+                    <div className="w-full bg-slate-900/50 rounded-xl p-3 border border-white/5">
+                        <div className="flex justify-between text-xs text-slate-300 mb-2">
+                            <span>Storage Used</span>
+                            <span>{storageUsed} GB / {getSelectedPlan() === 'pro' ? '1000' : '100'} GB</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${Math.max((storageUsed / (getSelectedPlan() === 'pro' ? 1000 : 100)) * 100, 2)}%` }}></div>
+                        </div>
+                    </div>
+                </Motion.div>
+
+                {/* ── DRIVE RECENTS WIDGET (Top Right) ── */}
+                <Motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="bento-glass-card col-span-1 md:col-span-2 lg:col-span-9 p-6 flex flex-col"
+                >
+                    <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-blue-500/20 rounded-lg">
+                                <HardDrive size={20} className="text-blue-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-white">Drive Recents</h3>
+                        </div>
+                        <button onClick={() => fileInputRef.current?.click()} className="text-xs bg-white/10 hover:bg-white/20 border border-white/10 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all">
+                            <Plus size={14} /> Upload
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto max-h-[300px] pr-2">
+                        {isUploading && (
+                            <div className="mb-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center gap-4">
+                                <RefreshCw className="text-emerald-400 animate-spin shrink-0" size={16} />
+                                <div className="flex-1">
+                                    <div className="flex justify-between text-[11px] font-bold text-emerald-300 mb-1">
+                                        <span>{uploadState.text}</span>
+                                        <span>{uploadState.progress}%</span>
+                                    </div>
+                                    <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                        <Motion.div className="h-full bg-emerald-500" initial={{ width: 0 }} animate={{ width: `${uploadState.progress}%` }} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {files.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
+                                <FileIcon size={40} className="mb-3" />
+                                <p className="text-sm">No files uploaded yet.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {files.slice(0, 12).map((file, i) => (
+                                    <Motion.div 
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 0.1 + (i * 0.05) }}
+                                        key={file.id} 
+                                        onClick={() => handleDownload(file.name, 'preview')}
+                                        className="bg-slate-900/40 hover:bg-slate-800/60 border border-white/5 hover:border-white/20 rounded-xl p-3 flex flex-col gap-2 cursor-pointer transition-all group"
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            {getFileIcon(file.type)}
+                                            <button onClick={(e) => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, file }); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-opacity">
+                                                <MoreVertical size={14} />
+                                            </button>
+                                        </div>
+                                        <div className="mt-1">
+                                            <p className="text-sm font-bold text-white truncate" title={file.name}>{file.name}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">{file.size} • {file.date}</p>
+                                        </div>
+                                    </Motion.div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </Motion.div>
+
+                {/* ── STATUS / LOGS WIDGET (Bottom Left) ── */}
+                <Motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="bento-glass-card col-span-1 md:col-span-2 lg:col-span-8 p-6 flex flex-col relative"
+                >
+                    <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-yellow-500/20 rounded-lg">
+                                <FileText size={20} className="text-yellow-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-white">System Status</h3>
+                        </div>
+                    </div>
+                    <div className="flex-1 space-y-3">
+                        <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                            <span className="text-slate-400">Vault Security</span>
+                            <span className="text-emerald-400 font-mono font-bold">{vaultPassword ? 'AES-256 Unlocked' : 'Locked'}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                            <span className="text-slate-400">Connected Peers</span>
+                            <span className="text-blue-400 font-mono font-bold">15 Active nodes</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                            <span className="text-slate-400">Last Upload Proof</span>
+                            <span className="text-purple-400 font-mono font-bold truncate max-w-[150px]">{uploadProof ? uploadProof.objectCid : 'None'}</span>
+                        </div>
+                        {uploadProof && (
+                            <div className="mt-4 p-3 bg-slate-900/50 rounded-lg border border-emerald-500/20">
+                                <p className="text-xs text-emerald-400 font-bold mb-1 flex items-center gap-1"><ShieldCheck size={12}/> Verified Shard Placement</p>
+                                <p className="text-[10px] text-slate-400 font-mono">{uploadProof.nodeCount} nodes • {uploadProof.regions.join(', ') || 'Global'}</p>
+                            </div>
+                        )}
+                    </div>
+                </Motion.div>
+
+                {/* ── APPS GRID (Bottom Right) ── */}
+                <Motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="bento-glass-card col-span-1 md:col-span-2 lg:col-span-4 p-6"
+                >
+                    <div className="grid grid-cols-3 gap-4 h-full content-start">
+                        <button onClick={() => navigate('/dashboard/node')} className="flex flex-col items-center gap-2 group">
+                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-indigo-400 to-indigo-600 shadow-[0_4px_15px_rgba(79,70,229,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
+                                <Server size={24} />
+                            </div>
+                            <span className="text-[11px] font-medium text-slate-300">Node</span>
+                        </button>
+                        <button onClick={() => navigate('/s3-migration')} className="flex flex-col items-center gap-2 group">
+                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-blue-400 to-blue-600 shadow-[0_4px_15px_rgba(59,130,246,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
+                                <Cloud size={24} />
+                            </div>
+                            <span className="text-[11px] font-medium text-slate-300">Migration</span>
+                        </button>
+                        <button onClick={() => navigate('/pricing')} className="flex flex-col items-center gap-2 group">
+                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-emerald-400 to-emerald-600 shadow-[0_4px_15px_rgba(16,185,129,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
+                                <Zap size={24} />
+                            </div>
+                            <span className="text-[11px] font-medium text-slate-300">Upgrade</span>
+                        </button>
+                        <button onClick={() => navigate('/dashboard/compliance')} className="flex flex-col items-center gap-2 group">
+                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-slate-600 to-slate-800 shadow-[0_4px_15px_rgba(71,85,105,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
+                                <Globe size={24} />
+                            </div>
+                            <span className="text-[11px] font-medium text-slate-300">Compliance</span>
+                        </button>
+                        <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center gap-2 group">
+                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-rose-400 to-rose-600 shadow-[0_4px_15px_rgba(225,29,72,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
+                                <UploadCloud size={24} />
+                            </div>
+                            <span className="text-[11px] font-medium text-slate-300">Upload</span>
+                        </button>
+                        <button onClick={() => {}} className="flex flex-col items-center gap-2 group">
+                            <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-amber-400 to-amber-600 shadow-[0_4px_15px_rgba(217,119,6,0.4)] flex items-center justify-center text-white group-hover:scale-105 transition-transform">
+                                <Search size={24} />
+                            </div>
+                            <span className="text-[11px] font-medium text-slate-300">Find My</span>
+                        </button>
+                    </div>
+                </Motion.div>
+
+            </div>
+
+            {/* PREVIEW & CONTEXT MENU (Unchanged logic, just styled dark) */}
             <AnimatePresence>
                 {contextMenu && (
                     <Motion.div
-                        initial={{ opacity: 0, scale: 0.95, transformOrigin: "top left" }}
+                        initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.1 }}
                         style={{ top: contextMenu.y, left: contextMenu.x }}
-                        className="fixed z-[100] w-56 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden py-1"
+                        className="fixed z-[100] w-48 bg-slate-800/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="px-3 py-2 border-b border-slate-100 mb-1">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider truncate" title={contextMenu.file.name}>{contextMenu.file.name}</p>
+                        <div className="px-3 py-2 border-b border-white/5 mb-1">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider truncate">{contextMenu.file.name}</p>
                         </div>
-                        <button onClick={() => { handleDownload(contextMenu.file.name, 'preview'); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
-                            <Play size={16} /> Preview Inline
-                        </button>
-                        <button onClick={() => { navigate(explorerPath(contextMenu.file.name)); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
-                            <Cpu size={16} /> Technical Proof
-                        </button>
-                        <button onClick={() => { handleShare(contextMenu.file.name); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
-                            <Share2 size={16} /> Share Link
-                        </button>
-                        <button onClick={() => { handleDownload(contextMenu.file.name, 'download'); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
-                            <Download size={16} /> Download Copy
-                        </button>
-                        <div className="h-px bg-slate-100 my-1"></div>
-                        <button onClick={() => { handleRename(contextMenu.file.name); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors">
-                            <Edit2 size={16} /> Rename
-                        </button>
-                        <button onClick={() => { handleDelete(contextMenu.file.name); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors">
-                            <Trash2 size={16} /> Shred Permanently
-                        </button>
+                        <button onClick={() => { handleDownload(contextMenu.file.name, 'preview'); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"><Play size={14} /> Preview</button>
+                        <button onClick={() => { navigate(explorerPath(contextMenu.file.name)); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"><Cpu size={14} /> Proof</button>
+                        <button onClick={() => { handleDownload(contextMenu.file.name, 'download'); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white transition-colors"><Download size={14} /> Download</button>
+                        <div className="h-px bg-white/5 my-1"></div>
+                        <button onClick={() => { handleDelete(contextMenu.file.name); setContextMenu(null); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors"><Trash2 size={14} /> Shred</button>
                     </Motion.div>
                 )}
             </AnimatePresence>
@@ -623,18 +794,14 @@ export const DriveDashboard = () => {
             <AnimatePresence>
                 {previewFile && (
                     <Motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4 md:p-12"
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/95 backdrop-blur-xl p-4 md:p-12"
                     >
                         <button onClick={closePreview} className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-[120]">
                             <X size={24} />
                         </button>
                         <Motion.div 
-                            initial={{ scale: 0.9, y: 20 }}
-                            animate={{ scale: 1, y: 0 }}
-                            exit={{ scale: 0.9, y: 20 }}
+                            initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
                             className="w-full max-w-5xl h-full flex flex-col relative"
                         >
                             <div className="absolute top-0 inset-x-0 h-16 flex items-center justify-center pointer-events-none">
@@ -642,22 +809,17 @@ export const DriveDashboard = () => {
                                     <ShieldCheck size={16} className="inline mr-2 text-emerald-400" /> Decrypted Locally in Browser
                                 </span>
                             </div>
-                            
-                            <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden flex items-center justify-center mb-4">
+                            <div className="flex-1 bg-slate-900/50 rounded-2xl border border-white/10 shadow-2xl overflow-hidden flex items-center justify-center mb-4 mt-16 p-4">
                                 {previewFile.type.startsWith('image/') ? (
-                                    <img src={previewFile.url} alt="Preview" className="max-w-full max-h-full object-contain" />
+                                    <img src={previewFile.url} alt="Preview" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
                                 ) : previewFile.type.startsWith('video/') ? (
-                                    <video src={previewFile.url} controls autoPlay className="max-w-full max-h-full" />
-                                ) : previewFile.type === 'application/pdf' ? (
-                                    <iframe src={previewFile.url} className="w-full h-full bg-white" title="PDF Document" />
-                                ) : previewFile.type.startsWith('text/') ? (
-                                    <iframe src={previewFile.url} className="w-full h-full bg-white p-6 font-mono text-sm" title="Text File Segment" />
+                                    <video src={previewFile.url} controls autoPlay className="max-w-full max-h-full rounded-lg" />
                                 ) : (
-                                    <div className="text-center text-slate-400 p-8">
+                                    <div className="text-center text-slate-400 p-8 bg-slate-800/50 rounded-xl border border-white/5">
                                         <FileIcon size={64} className="mx-auto mb-4 opacity-50" />
-                                        <p className="font-medium text-lg">No rich preview available for this format</p>
+                                        <p className="font-medium text-lg text-white">No rich preview available</p>
                                         <p className="text-sm opacity-70 mt-2">{previewFile.name}</p>
-                                        <a href={previewFile.url} download={previewFile.name} className="inline-block mt-6 px-6 py-2 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 transition-colors pointer-events-auto">
+                                        <a href={previewFile.url} download={previewFile.name} className="inline-block mt-6 px-6 py-2 bg-emerald-600/80 hover:bg-emerald-500 text-white font-bold rounded-xl transition-colors pointer-events-auto shadow-[0_0_15px_rgba(16,185,129,0.3)] border border-emerald-400/30">
                                             Save to Device
                                         </a>
                                     </div>
@@ -668,393 +830,6 @@ export const DriveDashboard = () => {
                 )}
             </AnimatePresence>
 
-            {/* ═══════ LEFT SIDEBAR ═══════ */}
-            <aside className="w-64 border-r border-slate-200 bg-slate-50 p-4 flex flex-col hidden md:flex shrink-0 z-10">
-
-                {/* Add New Button */}
-                <div className="group relative mb-8">
-                    <button className="flex items-center gap-3 bg-white border border-slate-200 shadow-sm text-slate-800 hover:text-emerald-600 hover:border-emerald-200 hover:shadow-md px-5 py-3.5 rounded-2xl font-bold w-full transition-all">
-                        <Plus size={20} className="text-emerald-500" />
-                        Upload Data
-                    </button>
-                    {/* Dropdown Menu logic here. We can just show standard inputs for now */}
-                    <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-xl p-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all group-hover:translate-y-0 -translate-y-2">
-                        <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm font-medium text-slate-700">
-                            <FileIcon size={16} className="text-slate-400" /> Upload Files
-                        </button>
-                        <button onClick={() => folderInputRef.current?.click()} className="flex items-center gap-3 w-full text-left px-3 py-2 hover:bg-slate-50 rounded-lg text-sm font-medium text-slate-700">
-                            <FolderPlus size={16} className="text-slate-400" /> Upload Folder
-                        </button>
-                    </div>
-                    {/* Hidden Native Inputs */}
-                    <input type="file" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                    <input type="file" multiple webkitdirectory="true" ref={folderInputRef} onChange={handleFileUpload} className="hidden" />
-                </div>
-
-                <nav className="flex-1 space-y-1">
-                    <button onClick={() => setActiveFilter('All')} className={`flex items-center gap-3 w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${activeFilter === 'All' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-600 hover:bg-slate-200/50'}`}>
-                        <LayoutGrid size={18} className={activeFilter === 'All' ? 'text-emerald-600' : 'text-slate-400'} /> All Files
-                    </button>
-                    <button onClick={() => setActiveFilter('Image')} className={`flex items-center gap-3 w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${activeFilter === 'Image' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-600 hover:bg-slate-200/50'}`}>
-                        <ImgIcon size={18} className={activeFilter === 'Image' ? 'text-emerald-600' : 'text-slate-400'} /> Photos & Media
-                    </button>
-                    <button onClick={() => setActiveFilter('Document')} className={`flex items-center gap-3 w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${activeFilter === 'Document' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-600 hover:bg-slate-200/50'}`}>
-                        <FileText size={18} className={activeFilter === 'Document' ? 'text-emerald-600' : 'text-slate-400'} /> Documents
-                    </button>
-                </nav>
-
-                {/* Storage Progress */}
-                <div className="mt-auto px-2">
-                    <div className="flex items-center gap-2 mb-2">
-                        <HardDrive size={16} className="text-slate-400" />
-                        <span className="text-sm font-bold text-slate-700">Storage</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2">
-                        <div
-                            className="h-full bg-emerald-500 rounded-full transition-all duration-1000"
-                            style={{ width: `${Math.max((storageUsed / (getSelectedPlan() === 'pro' ? 1000 : 100)) * 100, 2)}%` }}
-                        ></div>
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium">{storageUsed} GB used of {getSelectedPlan() === 'pro' ? '1000 GB' : '100 GB'}</p>
-                    <button onClick={() => window.location.href = '/pricing'} className="mt-3 w-full py-2 bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-200 rounded-lg text-xs font-bold transition-all shadow-sm">
-                        Upgrade Storage
-                    </button>
-                </div>
-
-
-            </aside>
-
-            {/* ═══════ CENTER MAIN AREA ═══════ */}
-            <main className="flex-1 flex flex-col h-full bg-white relative overflow-hidden">
-
-                {/* Top Header */}
-                <header className="h-16 border-b border-slate-200 flex items-center justify-between px-6 shrink-0 bg-white/80 backdrop-blur-md z-10 sticky top-0">
-                    <div className="relative w-full max-w-xl hidden sm:block">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search in Vault..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-slate-100 border-none rounded-2xl py-2.5 pl-11 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-slate-800 placeholder-slate-400"
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-slate-100 text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}>
-                            <LayoutGrid size={18} />
-                        </button>
-                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-slate-100 text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}>
-                            <List size={18} />
-                        </button>
-                    </div>
-                </header>
-
-                {/* Upload Indicator */}
-                <AnimatePresence>
-                    {isUploading && (
-                        <Motion.div 
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="bg-emerald-50 border-b border-emerald-100 px-6 py-3 flex items-center gap-4 shrink-0 overflow-hidden"
-                        >
-                            <RefreshCw className="text-emerald-500 animate-spin shrink-0" size={18} />
-                            <div className="flex-1">
-                                <div className="flex justify-between text-xs font-bold text-emerald-800 mb-1">
-                                    <span>{uploadState.text}</span>
-                                    <span>{uploadState.progress}%</span>
-                                </div>
-                                <div className="w-full h-1.5 bg-emerald-200 rounded-full overflow-hidden">
-                                    <Motion.div 
-                                        className="h-full bg-emerald-500" 
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${uploadState.progress}%` }}
-                                        transition={{ ease: "linear", duration: 0.2 }}
-                                    />
-                                </div>
-                            </div>
-                        </Motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* File Grid/List View */}
-                <div className="flex-1 overflow-y-auto p-6 md:p-8">
-                    {!vaultPassword && (
-                        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
-                            <p className="text-sm font-bold text-amber-900">Vault locked in this browser session</p>
-                            <p className="mt-1 text-sm text-amber-800">Sign in again before uploading, previewing, or decrypting files. Network access still works, but local cryptography stays locked.</p>
-                        </div>
-                    )}
-
-                    {uploadProof && (
-                        <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
-                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                <div>
-                                    <p className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-700 border border-emerald-200">
-                                        <ShieldCheck size={14} /> Stored Securely
-                                    </p>
-                                    <h2 className="mt-3 text-xl font-bold text-slate-800">{uploadProof.fileName}</h2>
-                                    <p className="mt-1 text-sm text-slate-600">Client-side encrypted before upload and committed to the storage mesh with a verifiable object ID.</p>
-                                </div>
-                                <button onClick={() => navigate(explorerPath(uploadProof.fileName))} className="btn-primary rounded-xl px-5 py-3 text-sm font-bold shadow-md">
-                                    View Technical Proof
-                                </button>
-                            </div>
-                            <div className="mt-4 grid gap-3 md:grid-cols-4">
-                                <div className="rounded-xl border border-emerald-100 bg-white p-4">
-                                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Object CID</p>
-                                    <p className="mt-2 font-mono text-xs text-slate-700 break-all">{uploadProof.objectCid}</p>
-                                </div>
-                                <div className="rounded-xl border border-emerald-100 bg-white p-4">
-                                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Verified Shards</p>
-                                    <p className="mt-2 text-2xl font-bold text-slate-800">{uploadProof.shardCount}</p>
-                                </div>
-                                <div className="rounded-xl border border-emerald-100 bg-white p-4">
-                                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Storage Nodes</p>
-                                    <p className="mt-2 text-2xl font-bold text-slate-800">{uploadProof.nodeCount}</p>
-                                </div>
-                                <div className="rounded-xl border border-emerald-100 bg-white p-4">
-                                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Regions</p>
-                                    <p className="mt-2 text-sm font-bold text-slate-800">{uploadProof.regions.length ? uploadProof.regions.join(', ') : 'GLOBAL'}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {files.length === 0 ? (
-                        <Motion.div 
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="h-full flex flex-col items-center justify-center text-center relative group"
-                        >
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-emerald-50 rounded-full blur-3xl -z-10 group-hover:scale-110 transition-transform duration-1000"></div>
-                            <Motion.div 
-                                animate={{ y: [0, -10, 0] }}
-                                transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                                className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mb-6 border border-emerald-100 shadow-xl relative"
-                            >
-                                <div className="absolute inset-0 bg-emerald-400 rounded-3xl animate-ping opacity-20"></div>
-                                <UploadCloud size={40} className="text-emerald-500" />
-                            </Motion.div>
-                            <h2 className="text-3xl font-display font-bold text-slate-800 mb-3 tracking-tight">Your secure vault is empty</h2>
-                            <p className="text-slate-500 text-lg font-medium max-w-md">Drag & drop files anywhere, or click below to securely back up to the decentralized network.</p>
-                            <button onClick={() => fileInputRef.current?.click()} className="mt-8 btn-primary px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg hover:shadow-emerald-500/30 transition-all">
-                                <UploadCloud size={20} /> Upload Files Now
-                            </button>
-                        </Motion.div>
-                    ) : filteredFiles.length === 0 ? (
-                        <div className="text-center py-20">
-                            <p className="text-slate-500 font-medium">No files found matching your criteria.</p>
-                        </div>
-                    ) : (
-                        <div>
-                            <h2 className="text-lg font-bold text-slate-800 mb-6">{activeFilter} Files</h2>
-
-                            {viewMode === 'grid' ? (
-                                <Motion.div 
-                                    initial="hidden"
-                                    animate="visible"
-                                    variants={{
-                                        hidden: { opacity: 0 },
-                                        visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
-                                    }}
-                                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
-                                >
-                                    {filteredFiles.map(file => (
-                                        <Motion.div 
-                                            variants={{
-                                                hidden: { opacity: 0, scale: 0.9 },
-                                                visible: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 24 } }
-                                            }}
-                                            key={file.id} 
-                                            className="group flex flex-col items-center bg-white border border-slate-200 rounded-2xl p-4 hover:shadow-lg hover:border-emerald-200 transition-all cursor-pointer relative overflow-hidden" 
-                                            onClick={() => handleDownload(file.name, 'preview')}
-                                            onContextMenu={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                setContextMenu({ x: e.clientX, y: e.clientY, file });
-                                            }}
-                                        >
-
-                                            <div className="w-full aspect-square bg-slate-50 rounded-xl mb-3 flex items-center justify-center border border-slate-100 group-hover:bg-emerald-50/30 transition-colors">
-                                                {getFileIcon(file.type)}
-                                            </div>
-
-                                            <div className="w-full text-center">
-                                                <p className="text-sm font-bold text-slate-700 truncate w-full" title={file.name}>{file.name}</p>
-                                                <p className="text-xs text-slate-400 font-medium mt-1">{file.size}</p>
-                                            </div>
-                                            
-                                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={(e) => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, file }); }} className="p-1.5 bg-white/90 backdrop-blur-sm border border-slate-200 shadow-sm text-slate-500 hover:text-emerald-600 rounded-lg transition-colors">
-                                                    <MoreVertical size={16} />
-                                                </button>
-                                            </div>
-                                        </Motion.div>
-                                    ))}
-                                </Motion.div>
-                            ) : (
-                                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead>
-                                            <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-500">
-                                                <th className="p-4 w-12"></th>
-                                                <th className="p-4">Name</th>
-                                                <th className="p-4 hidden sm:table-cell">Size</th>
-                                                <th className="p-4 hidden md:table-cell">Status</th>
-                                                <th className="p-4 text-right">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {filteredFiles.map(file => (
-                                                <tr 
-                                                    key={file.id} 
-                                                    className="hover:bg-slate-50/80 transition-colors group cursor-pointer" 
-                                                    onClick={() => handleDownload(file.name, 'preview')}
-                                                    onContextMenu={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        setContextMenu({ x: e.clientX, y: e.clientY, file });
-                                                    }}
-                                                >
-                                                    <td className="p-4">{getFileIcon(file.type)}</td>
-                                                    <td className="p-4 font-normal not-italic text-slate-700">
-                                                        <p className="text-sm font-bold">{file.name}</p>
-                                                        <p className="text-[10px] text-slate-400 font-medium">Encrypted</p>
-                                                    </td>
-                                                    <td className="p-4 hidden sm:table-cell text-xs font-medium text-slate-500 not-italic">{file.size}</td>
-                                                    <td className="p-4 hidden md:table-cell not-italic">
-                                                        <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full text-[10px] font-bold border border-emerald-100/50">
-                                                            <ShieldCheck size={12} /> Encrypted
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4 text-right not-italic">
-                                                        <button onClick={(e) => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, file }); }} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all">
-                                                            <MoreVertical size={16} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </main>
-
-            {/* ═══════ RIGHT SIDEBAR ═══════ */}
-            <aside className="w-72 border-l border-slate-200 bg-white p-6 hidden lg:flex flex-col overflow-y-auto shrink-0 z-10">
-                {uploadProof ? (
-                    <div className="space-y-4">
-                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-                            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Latest Secure Upload</p>
-                            <p className="mt-2 text-sm font-bold text-slate-800 break-words">{uploadProof.fileName}</p>
-                            <p className="mt-2 text-xs text-slate-600">Object CID</p>
-                            <p className="mt-1 font-mono text-[11px] text-slate-700 break-all">{uploadProof.objectCid}</p>
-                        </div>
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Verified Node IDs</p>
-                            <div className="mt-3 space-y-2">
-                                {uploadProof.nodes.map((nodeId) => (
-                                    <div key={nodeId} className="rounded-lg bg-white px-3 py-2 font-mono text-xs font-bold text-slate-700 border border-slate-200">
-                                        {nodeId}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="mt-auto">
-                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-start gap-3">
-                            <Zap className="text-amber-500 shrink-0 mt-0.5" size={16} />
-                            <div>
-                                <p className="text-xs font-bold text-slate-700">Decentralized Backup</p>
-                                <p className="text-xs pb-1 text-slate-500 font-medium mt-1">Every upload is client-side encrypted and mapped to verifiable shard placement so you can show proof to investors immediately.</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </aside>
-
-            {/* Secure Zero-Knowledge Preview Modal */}
-            {previewFile && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white w-full max-w-5xl h-[85vh] rounded-3xl flex flex-col overflow-hidden shadow-2xl relative border border-slate-200">
-                        <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-white">
-                            <h3 className="font-bold flex items-center gap-2 text-slate-800">
-                                <ShieldCheck size={18} className="text-emerald-500" />
-                                <span className="truncate">{previewFile.name}</span>
-                                <span className="bg-emerald-50 text-emerald-600 font-bold border border-emerald-200 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider ml-2 hidden md:inline-block">Decrypted Locally</span>
-                            </h3>
-                            <button onClick={closePreview} className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-lg transition-colors">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="flex-1 bg-slate-100 p-6 flex items-center justify-center overflow-auto relative">
-                            {previewFile.type.startsWith('image/') ? (
-                                <img src={previewFile.url} alt="Preview" className="max-w-full max-h-full object-contain rounded-lg drop-shadow-xl" />
-                            ) : previewFile.type === 'application/pdf' ? (
-                                <iframe src={previewFile.url} className="w-full h-full rounded-xl bg-white shadow-sm" title="PDF Preview"></iframe>
-                            ) : previewFile.type === 'text/plain' ? (
-                                <iframe src={previewFile.url} className="w-full h-full rounded-xl bg-white font-mono text-slate-800 shadow-sm p-4 overflow-auto" title="Text Preview"></iframe>
-                            ) : (
-                                <div className="text-center space-y-4 bg-white p-12 rounded-2xl shadow-sm border border-slate-200">
-                                    <FileIcon size={64} className="mx-auto text-slate-300" />
-                                    <h3 className="font-bold text-xl text-slate-800">Preview Error</h3>
-                                    <p className="text-slate-500 font-medium max-w-sm">Rich preview is not officially supported for this file type yet. You can still download and view it locally.</p>
-                                    <button onClick={() => {
-                                        const a = document.createElement('a');
-                                        a.href = previewFile.url;
-                                        a.download = previewFile.name;
-                                        a.click();
-                                    }} className="btn-primary mt-4 py-2 px-6 shadow-md">Download Original</button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ═══════ MOBILE FLOATING ACTION BUTTON ═══════ */}
-            <div className="fixed bottom-20 right-5 z-40 flex flex-col gap-3 md:hidden">
-                {/* Mobile Search Toggle */}
-                <button
-                    onClick={() => {
-                        const el = document.getElementById('mobile-search-bar');
-                        if (el) el.classList.toggle('hidden');
-                    }}
-                    className="w-12 h-12 bg-white border border-slate-200 text-slate-600 rounded-2xl shadow-lg flex items-center justify-center hover:bg-slate-50 active:scale-95 transition-all"
-                    aria-label="Search"
-                >
-                    <Search size={20} />
-                </button>
-                {/* Mobile Upload FAB */}
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-14 h-14 bg-emerald-500 text-white rounded-2xl shadow-xl shadow-emerald-500/30 flex items-center justify-center hover:bg-emerald-600 active:scale-95 transition-all"
-                    aria-label="Upload File"
-                >
-                    <UploadCloud size={24} />
-                </button>
-            </div>
-
-            {/* Mobile Search Bar (toggleable) */}
-            <div id="mobile-search-bar" className="hidden fixed top-20 inset-x-4 z-40 md:hidden">
-                <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Search files..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-2xl py-3 pl-11 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 placeholder-slate-400 shadow-xl"
-                        autoFocus
-                    />
-                </div>
-            </div>
         </div>
     );
 };

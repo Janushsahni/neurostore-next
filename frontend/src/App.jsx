@@ -362,16 +362,17 @@ const LandingPage = () => (
 const Navbar = ({ isAuthenticated, onLogout }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const closeMobile = () => setMobileOpen(false);
+  const location = useLocation();
+  const isDashboard = location.pathname.startsWith("/dashboard");
 
   return (
     <header className="sticky top-0 z-50">
-      <nav className="glass-nav mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-8 mt-4 rounded-2xl">
+      <nav className={`${isDashboard ? 'bento-nav' : 'glass-nav'} mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-8 mt-4 rounded-2xl transition-colors`}>
         <Link to="/" onClick={closeMobile} className="inline-flex items-center">
           <img src="/logo-full.png" alt="NeuroStore Logo" className="h-7 object-contain" />
         </Link>
 
-        {/* Desktop menu: Home, Pricing, Get Started, Login */}
-        <div className="hidden items-center gap-8 text-sm font-bold text-slate-600 md:flex">
+        <div className="hidden items-center gap-8 text-sm font-bold md:flex" style={{ color: isDashboard ? '#f8fafc' : '#475569' }}>
           <Link to="/" className="hover:text-primary transition-colors">Home</Link>
           <Link to="/about" className="hover:text-primary transition-colors">About</Link>
           <Link to="/pricing" className="hover:text-primary transition-colors">Pricing</Link>
@@ -386,19 +387,19 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
                 <Link to="/admin/inventory" className="text-sm font-bold text-red-500 hover:text-red-600 transition-colors">Admin</Link>
               )}
               <Link to="/dashboard/drive" className="btn-primary px-5 py-2.5 text-sm font-bold hover:shadow-lg transition">Dashboard</Link>
-              <button onClick={onLogout} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400 hover:text-red-500 transition-colors bg-slate-100/50 hover:bg-red-50 rounded-lg">
+              <button onClick={onLogout} className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-bold transition-colors rounded-lg ${isDashboard ? 'text-slate-300 hover:text-red-400 bg-white/10 hover:bg-red-500/20' : 'text-slate-400 hover:text-red-500 bg-slate-100/50 hover:bg-red-50'}`}>
                 <LogOut size={16} /> Logout
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className="btn-ghost px-5 py-2.5 text-sm font-bold border border-slate-200 hover:border-slate-300">Login</Link>
+              <Link to="/login" className={`btn-ghost px-5 py-2.5 text-sm font-bold border transition-colors ${isDashboard ? 'border-slate-600 text-white hover:bg-white/10' : 'border-slate-200 hover:border-slate-300'}`}>Login</Link>
             </>
           )}
         </div>
 
         {/* Mobile menu toggle */}
-        <button onClick={() => setMobileOpen(s => !s)} className="inline-flex rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 md:hidden transition" aria-label="Toggle menu">
+        <button onClick={() => setMobileOpen(s => !s)} className={`inline-flex rounded-xl border p-2 md:hidden transition ${isDashboard ? 'border-slate-600 text-white hover:bg-white/10' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`} aria-label="Toggle menu">
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </nav>
@@ -507,7 +508,7 @@ const AppContent = () => {
   }
 
   return (
-    <div className="min-h-screen font-sans text-white">
+    <div className={`min-h-screen font-sans ${location.pathname.startsWith('/dashboard') ? 'bento-bg text-white' : 'text-slate-800'}`}>
       <Toaster position="bottom-right" toastOptions={{ style: { background: "#0f172a", color: "#f8fafc", border: "1px solid rgba(29,211,176,0.3)", fontSize: "13px" } }} />
       <Navbar isAuthenticated={isAuthenticated} onLogout={handleLogout} />
       <main>

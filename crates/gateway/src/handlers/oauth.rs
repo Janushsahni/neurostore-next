@@ -103,9 +103,10 @@ pub async fn google_login(
     Query(query): Query<OAuthLoginQuery>,
 ) -> impl IntoResponse {
     let client_id = std::env::var("GOOGLE_CLIENT_ID").unwrap_or_default();
+    let client_secret = std::env::var("GOOGLE_CLIENT_SECRET").unwrap_or_default();
     let redirect_uri = std::env::var("GOOGLE_REDIRECT_URI").unwrap_or_default();
 
-    if client_id.is_empty() || redirect_uri.is_empty() {
+    if client_id.is_empty() || client_secret.is_empty() || redirect_uri.is_empty() {
         // DEMO MODE: If GCP credentials aren't set, simulate a successful Google OAuth flow
         // so the frontend button actually works for VC pitches without complex setup.
         let email = "investor@vc-firm.com".to_string();
@@ -148,7 +149,7 @@ pub async fn google_login(
 
     let state_param = sign_oauth_state(&state.jwt_secret, &normalized_intent(query.intent));
     let auth_url = format!(
-        "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope=email profile&state={}",
+        "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope=email%20profile&state={}",
         urlencoding::encode(&client_id),
         urlencoding::encode(&redirect_uri),
         urlencoding::encode(&state_param)
