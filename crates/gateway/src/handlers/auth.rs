@@ -11,7 +11,7 @@ use axum::{
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use rand::RngCore;
-use sqlx::Row;
+use sqlx::{PgPool, Row};
 use std::sync::Arc;
 use tokio::task;
 
@@ -397,6 +397,20 @@ pub async fn login(
             .into_response();
     }
 
+    if user_row.two_factor_enabled.unwrap_or(false) {
+        // Trigger 2FA OTP here if needed, or rely on a separate endpoint
+        // For simplicity, we just return the requirement
+        return (
+            StatusCode::ACCEPTED,
+            Json(serde_json::json!({
+                "requires_2fa": true,
+                "email": user_row.email,
+                "message": "Two-factor authentication required."
+            })),
+        )
+            .into_response();
+    }
+
     let token = create_jwt(&user_row.email, &state.jwt_secret);
     let name = user_row.name.unwrap_or_else(|| user_row.email.clone());
 
@@ -630,4 +644,446 @@ pub async fn sso_oauth_login() -> impl IntoResponse {
         "OAuth2/OIDC Provider not configured in this environment",
     )
         .into_response()
+}
+
+pub async fn get_captcha(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    use captcha::{Captcha, filters::{Noise, Wave, Dots}};
+    
+    let mut captcha = Captcha::new();
+    captcha
+        .add_chars(5)
+        .apply_filter(Noise::new(0.1))
+        .apply_filter(Wave::new(2.0, 20.0))
+        .view(220, 120);
+
+    let solution = captcha.chars_as_string();
+    let png = captcha.as_png().unwrap_or_default();
+    
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    let base64_png = STANDARD.encode(&png);
+    let image_data_uri = format!("data:image/png;base64,{}", base64_png);
+
+    let expiration = Utc::now()
+        .checked_add_signed(Duration::minutes(5)) // 5 minute validity
+        .expect("valid timestamp")
+        .timestamp() as usize;
+        
+    let claims = crate::models::CaptchaClaims {
+        text: solution.to_lowercase(),
+        exp: expiration,
+    };
+    
+    let token = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(state.jwt_secret.as_bytes()),
+    ).unwrap_or_default();
+    
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "svg": image_data_uri,
+            "token": token
+        }))
+    ).into_response()
+}
+
+pub async fn send_otp(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<crate::models::SendOtpRequest>,
+) -> impl IntoResponse {
+    let email = normalize_email(&payload.email);
+    if !is_reasonable_email(&email) {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Invalid email format" }))).into_response();
+    }
+    
+    // Verify Captcha
+    let mut validation = jsonwebtoken::Validation::default();
+    validation.validate_exp = true;
+    let token_data = match jsonwebtoken::decode::<crate::models::CaptchaClaims>(
+        &payload.captcha_token,
+        &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &validation,
+    ) {
+        Ok(c) => c,
+        Err(_) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Invalid or expired CAPTCHA token" }))).into_response(),
+    };
+    
+    if token_data.claims.text != payload.captcha_solution.to_lowercase() {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Incorrect CAPTCHA solution" }))).into_response();
+    }
+    
+    // Check if user already exists
+    let existing = sqlx::query_scalar::<_, i64>("SELECT 1 FROM users WHERE email = $1")
+        .bind(&email)
+        .fetch_optional(&state.db)
+        .await;
+        
+    if let Ok(Some(_)) = existing {
+        return (StatusCode::CONFLICT, Json(serde_json::json!({ "error": "User already exists" }))).into_response();
+    }
+
+    // Generate 6 digit OTP
+    let otp_code = format!("{:06}", rand::thread_rng().next_u32() % 1000000);
+    let expires_at = Utc::now() + Duration::minutes(15);
+    
+    // Hash OTP before storing
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(otp_code.as_bytes());
+    let hashed_otp = hex::encode(hasher.finalize());
+    
+    let insert_result = sqlx::query(
+        "INSERT INTO otps (identifier, otp_code, expires_at) VALUES ($1, $2, $3)"
+    )
+    .bind(&email)
+    .bind(&hashed_otp)
+    .bind(expires_at)
+    .execute(&state.db)
+    .await;
+    
+    if insert_result.is_err() {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Database error" }))).into_response();
+    }
+    
+    // Simulate or send email/sms
+    if payload.verify_method == "text" || payload.verify_method == "call" {
+        tracing::info!("📞 MOCK SMS to {}: Your NeuroCloud verification code is {}", email, otp_code);
+        // SMS typically requires a paid provider like Twilio, AWS SNS, etc.
+    } else {
+        use lettre::{Message, SmtpTransport, Transport, transport::smtp::authentication::Credentials};
+        
+        let smtp_host = std::env::var("SMTP_HOST").unwrap_or_default();
+        let smtp_user = std::env::var("SMTP_USER").unwrap_or_default();
+        let smtp_pass = std::env::var("SMTP_PASS").unwrap_or_default();
+        
+        if !smtp_host.is_empty() && !smtp_user.is_empty() && !smtp_pass.is_empty() {
+            let email_msg = Message::builder()
+                .from(format!("NeuroCloud <{}>", smtp_user).parse().unwrap())
+                .to(email.parse().unwrap())
+                .subject("Your NeuroCloud Verification Code")
+                .body(format!("Your verification code is: {}\n\nThis code will expire in 15 minutes.", otp_code))
+                .unwrap();
+                
+            let creds = Credentials::new(smtp_user, smtp_pass);
+            let mailer = SmtpTransport::relay(&smtp_host)
+                .unwrap()
+                .credentials(creds)
+                .build();
+                
+            match mailer.send(&email_msg) {
+                Ok(_) => tracing::info!("📧 Email sent successfully to {}", email),
+                Err(e) => tracing::error!("Failed to send email: {:?}", e),
+            }
+        } else {
+            tracing::info!("📧 MOCK EMAIL to {}: Your NeuroCloud verification code is {}", email, otp_code);
+        }
+    }
+
+    (StatusCode::OK, Json(serde_json::json!({ "success": true, "message": "OTP sent successfully" }))).into_response()
+}
+
+pub async fn verify_otp(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<crate::models::VerifyOtpRequest>,
+) -> impl IntoResponse {
+    let email = normalize_email(&payload.email);
+    
+    // Hash incoming OTP to match DB
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(payload.otp_code.as_bytes());
+    let hashed_otp = hex::encode(hasher.finalize());
+    
+    // Verify OTP
+    let otp_record = sqlx::query(
+        "SELECT id, expires_at FROM otps WHERE identifier = $1 AND otp_code = $2 ORDER BY created_at DESC LIMIT 1"
+    )
+    .bind(&email)
+    .bind(&hashed_otp)
+    .fetch_optional(&state.db)
+    .await;
+    
+    let row = match otp_record {
+        Ok(Some(r)) => r,
+        Ok(None) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Invalid OTP code" }))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Database error" }))).into_response(),
+    };
+    
+    let expires_at: chrono::DateTime<Utc> = row.get("expires_at");
+    if Utc::now() > expires_at {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "OTP has expired" }))).into_response();
+    }
+    
+    // Delete used OTP
+    let id: uuid::Uuid = row.get("id");
+    let _ = sqlx::query("DELETE FROM otps WHERE id = $1").bind(id).execute(&state.db).await;
+
+    // Hash password
+    let password = payload.password.clone();
+    let hash_result = match task::spawn_blocking(move || {
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        argon2.hash_password(password.as_bytes(), &salt).map(|hash| hash.to_string())
+    }).await {
+        Ok(result) => result,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Password hashing worker failed" }))).into_response(),
+    };
+    
+    let password_hash = match hash_result {
+        Ok(h) => h,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Password hashing failed" }))).into_response(),
+    };
+    
+    let name = payload.name.unwrap_or_else(|| email.clone()).trim().chars().take(128).collect::<String>();
+    
+    // Encrypt sensitive PII
+    let enc_phone = payload.phone.as_ref().and_then(|p| state.metadata_protector.encrypt(p).ok());
+    let enc_country = payload.country.as_ref().and_then(|c| state.metadata_protector.encrypt(c).ok());
+    let enc_birthday = payload.birthday.as_ref().and_then(|b| state.metadata_protector.encrypt(b).ok());
+    
+    // Insert User
+    let insert_result = sqlx::query(
+        "INSERT INTO users (email, password_hash, name, phone, country, birthday, verify_method, receives_announcements, receives_apps_music) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+    )
+    .bind(&email)
+    .bind(&password_hash)
+    .bind(&name)
+    .bind(&enc_phone)
+    .bind(&enc_country)
+    .bind(&enc_birthday)
+    .bind(&payload.verify_method)
+    .bind(payload.receives_announcements.unwrap_or(true))
+    .bind(payload.receives_apps_music.unwrap_or(true))
+    .execute(&state.db)
+    .await;
+    
+    match insert_result {
+        Ok(_) => {
+            let token = create_jwt(&email, &state.jwt_secret);
+            let role = role_for_email(&email);
+            let user = UserProfile { email, name, role };
+            auth_response(StatusCode::CREATED, token, user, state.cookie_secure).into_response()
+        },
+        Err(e) => {
+            tracing::error!("DB Insert Error: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Database error" }))).into_response()
+        }
+    }
+}
+
+pub async fn forgot_password_init(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<crate::models::ForgotPasswordInitRequest>,
+) -> impl IntoResponse {
+    let identifier = normalize_email(&payload.email);
+    
+    // Verify Captcha
+    let mut validation = jsonwebtoken::Validation::default();
+    validation.validate_exp = true;
+    let token_data = match jsonwebtoken::decode::<crate::models::CaptchaClaims>(
+        &payload.captcha_token,
+        &jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &validation,
+    ) {
+        Ok(c) => c,
+        Err(_) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Invalid or expired CAPTCHA token" }))).into_response(),
+    };
+    
+    if token_data.claims.text != payload.captcha_solution.to_lowercase() {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Incorrect CAPTCHA solution" }))).into_response();
+    }
+    
+    // Check if user exists
+    let user_record = sqlx::query(
+        "SELECT phone FROM users WHERE email = $1"
+    )
+    .bind(&identifier)
+    .fetch_optional(&state.db)
+    .await;
+    
+    let row = match user_record {
+        Ok(Some(r)) => r,
+        Ok(None) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "User not found" }))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Database error" }))).into_response(),
+    };
+    
+    // If the user has a phone number, decrypt it to create a hint
+    let mut hint = None;
+    if let Ok(enc_phone) = row.try_get::<String, _>("phone") {
+        if let Ok(plain_phone) = state.metadata_protector.decrypt(&enc_phone) {
+            if plain_phone.len() > 4 {
+                hint = Some(format!(".......{}", &plain_phone[plain_phone.len()-2..]));
+            }
+        }
+    }
+    
+    (StatusCode::OK, Json(serde_json::json!({ "success": true, "phone_hint": hint }))).into_response()
+}
+
+pub async fn forgot_password_confirm_phone(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<crate::models::ForgotPasswordConfirmPhoneRequest>,
+) -> impl IntoResponse {
+    let email = normalize_email(&payload.email);
+    
+    // Check if user exists
+    let user_record = sqlx::query(
+        "SELECT phone FROM users WHERE email = $1"
+    )
+    .bind(&email)
+    .fetch_optional(&state.db)
+    .await;
+    
+    let row = match user_record {
+        Ok(Some(r)) => r,
+        Ok(None) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "User not found" }))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Database error" }))).into_response(),
+    };
+    
+    if let Ok(enc_phone) = row.try_get::<String, _>("phone") {
+        if let Ok(plain_phone) = state.metadata_protector.decrypt(&enc_phone) {
+            if plain_phone != payload.phone {
+                return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Incorrect phone number" }))).into_response();
+            }
+        } else {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Error verifying phone" }))).into_response();
+        }
+    } else {
+         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "User does not have a registered phone number" }))).into_response();
+    }
+    
+    // Send OTP
+    let otp_code = format!("{:06}", rand::thread_rng().next_u32() % 1000000);
+    let expires_at = Utc::now() + Duration::minutes(15);
+    
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(otp_code.as_bytes());
+    let hashed_otp = hex::encode(hasher.finalize());
+    
+    let _ = sqlx::query("INSERT INTO otps (identifier, otp_code, expires_at) VALUES ($1, $2, $3)")
+        .bind(&email)
+        .bind(&hashed_otp)
+        .bind(expires_at)
+        .execute(&state.db)
+        .await;
+        
+    tracing::info!("📞 MOCK SMS to {}: Your NeuroCloud password reset code is {}", payload.phone, otp_code);
+    
+    (StatusCode::OK, Json(serde_json::json!({ "success": true, "message": "OTP sent to phone" }))).into_response()
+}
+
+pub async fn forgot_password_reset(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<crate::models::ForgotPasswordResetRequest>,
+) -> impl IntoResponse {
+    let email = normalize_email(&payload.email);
+    
+    // Hash incoming OTP to match DB
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(payload.otp_code.as_bytes());
+    let hashed_otp = hex::encode(hasher.finalize());
+    
+    let otp_record = sqlx::query(
+        "SELECT id, expires_at FROM otps WHERE identifier = $1 AND otp_code = $2 ORDER BY created_at DESC LIMIT 1"
+    )
+    .bind(&email)
+    .bind(&hashed_otp)
+    .fetch_optional(&state.db)
+    .await;
+    
+    let row = match otp_record {
+        Ok(Some(r)) => r,
+        Ok(None) => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "Invalid OTP code" }))).into_response(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Database error" }))).into_response(),
+    };
+    
+    let expires_at: chrono::DateTime<Utc> = row.get("expires_at");
+    if Utc::now() > expires_at {
+        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": "OTP has expired" }))).into_response();
+    }
+    
+    let id: uuid::Uuid = row.get("id");
+    let _ = sqlx::query("DELETE FROM otps WHERE id = $1").bind(id).execute(&state.db).await;
+
+    let password = payload.new_password.clone();
+    let hash_result = match task::spawn_blocking(move || {
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        argon2.hash_password(password.as_bytes(), &salt).map(|hash| hash.to_string())
+    }).await {
+        Ok(Ok(h)) => h,
+        _ => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Password hashing failed" }))).into_response(),
+    };
+    
+    let _ = sqlx::query("UPDATE users SET password_hash = $1 WHERE email = $2")
+        .bind(&hash_result)
+        .bind(&email)
+        .execute(&state.db)
+        .await;
+
+    (StatusCode::OK, Json(serde_json::json!({ "success": true }))).into_response()
+}
+
+#[derive(serde::Deserialize)]
+pub struct VerifyLogin2faRequest {
+    pub email: String,
+    pub otp_code: String,
+}
+
+pub async fn verify_login_2fa(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<VerifyLogin2faRequest>,
+) -> impl IntoResponse {
+    let email = normalize_email(&payload.email);
+    
+    // Hash incoming OTP to match DB
+    use sha2::Digest;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(payload.otp_code.as_bytes());
+    let hashed_otp = hex::encode(hasher.finalize());
+
+    let otp_record = sqlx::query(
+        "SELECT id, expires_at FROM otps WHERE identifier = $1 AND otp_code = $2 ORDER BY created_at DESC LIMIT 1"
+    )
+    .bind(&email)
+    .bind(&hashed_otp)
+    .fetch_optional(&state.db)
+    .await;
+
+    match otp_record {
+        Ok(Some(row)) => {
+            let expires_at: chrono::DateTime<chrono::Utc> = row.get("expires_at");
+            if chrono::Utc::now() > expires_at {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({ "error": "OTP has expired" })),
+                ).into_response();
+            }
+
+            let id: i32 = row.get("id");
+            let _ = sqlx::query("DELETE FROM otps WHERE id = $1").bind(id).execute(&state.db).await;
+
+            let record = sqlx::query_as::<_, crate::models::User>("SELECT * FROM users WHERE email = $1")
+                .bind(&email)
+                .fetch_optional(&state.db)
+                .await;
+
+            if let Ok(Some(user_row)) = record {
+                let token = create_jwt(&user_row.email, &state.jwt_secret);
+                let name = user_row.name.unwrap_or_else(|| user_row.email.clone());
+                let role = role_for_email(&user_row.email);
+                let user = UserProfile { email: user_row.email, name, role };
+
+                return auth_response(StatusCode::OK, token, user, state.cookie_secure).into_response();
+            }
+            (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "error": "User not found" }))).into_response()
+        }
+        _ => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Invalid OTP code" })),
+        ).into_response()
+    }
 }

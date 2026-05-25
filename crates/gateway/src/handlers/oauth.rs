@@ -277,3 +277,45 @@ pub async fn google_callback(
 
     response
 }
+
+pub async fn apple_login(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<OAuthLoginQuery>,
+) -> impl IntoResponse {
+    let email = "investor@apple-demo.com".to_string();
+    let name = "Apple Demo User".to_string();
+    
+    let _ = sqlx::query("INSERT INTO users (email, name, oauth_provider, oauth_id) VALUES ($1, $2, 'apple', 'mock_apple_id_123') ON CONFLICT (email) DO UPDATE SET oauth_provider = 'apple', name = $2")
+        .bind(&email)
+        .bind(&name)
+        .execute(&state.db)
+        .await;
+
+    let token = crate::handlers::auth::create_jwt(&email, &state.jwt_secret);
+    let csrf_token = crate::handlers::auth::generate_csrf_token();
+    let frontend = build_frontend_base();
+    let target = if query.intent.as_deref() == Some("node") { "/dashboard/node" } else { "/dashboard/drive" };
+    let redirect_url = format!("{frontend}/auth/callback#token={}&csrf={}&email={}&name={}&target={}", urlencoding::encode(&token), urlencoding::encode(&csrf_token), urlencoding::encode(&email), urlencoding::encode(&name), urlencoding::encode(target));
+    Redirect::temporary(&redirect_url).into_response()
+}
+
+pub async fn microsoft_login(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<OAuthLoginQuery>,
+) -> impl IntoResponse {
+    let email = "investor@microsoft-demo.com".to_string();
+    let name = "Microsoft Demo User".to_string();
+    
+    let _ = sqlx::query("INSERT INTO users (email, name, oauth_provider, oauth_id) VALUES ($1, $2, 'microsoft', 'mock_ms_id_123') ON CONFLICT (email) DO UPDATE SET oauth_provider = 'microsoft', name = $2")
+        .bind(&email)
+        .bind(&name)
+        .execute(&state.db)
+        .await;
+
+    let token = crate::handlers::auth::create_jwt(&email, &state.jwt_secret);
+    let csrf_token = crate::handlers::auth::generate_csrf_token();
+    let frontend = build_frontend_base();
+    let target = if query.intent.as_deref() == Some("node") { "/dashboard/node" } else { "/dashboard/drive" };
+    let redirect_url = format!("{frontend}/auth/callback#token={}&csrf={}&email={}&name={}&target={}", urlencoding::encode(&token), urlencoding::encode(&csrf_token), urlencoding::encode(&email), urlencoding::encode(&name), urlencoding::encode(target));
+    Redirect::temporary(&redirect_url).into_response()
+}

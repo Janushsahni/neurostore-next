@@ -155,6 +155,38 @@ const AuthRedirectRoute = ({ isAuthenticated, component, onAuth }) => {
   return React.createElement(component, { onAuth });
 };
 
+const AccordionItem = ({ question, answer }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <Motion.div 
+      variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+      className="border-b border-white/10"
+    >
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full py-5 flex items-center justify-between text-left focus:outline-none"
+      >
+        <span className="text-lg font-bold text-white">{question}</span>
+        <span className="text-white/50 transform transition-transform duration-300" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </span>
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <Motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <p className="pb-6 text-slate-400 text-[15px] leading-relaxed">{answer}</p>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+    </Motion.div>
+  );
+};
+
 // ═══════ LANDING PAGE ═══════
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -260,6 +292,42 @@ const LandingPage = () => {
         </Motion.div>
     </section>
 
+    {/* ── FAQ SECTION ── */}
+    <section className="px-6 pb-24 pt-12 relative max-w-3xl mx-auto">
+      <Motion.h2 
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="text-3xl md:text-[40px] font-bold text-white mb-10 tracking-tight"
+      >
+        Questions? Answered.
+      </Motion.h2>
+      
+      <Motion.div
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        variants={{
+          hidden: {},
+          visible: { transition: { staggerChildren: 0.1 } }
+        }}
+        className="border-t border-white/10"
+      >
+        <AccordionItem 
+          question="What is NeuroCloud+?" 
+          answer="NeuroCloud+ is our premium subscription that gives you more storage for your photos, files, and backups, along with additional features like enhanced privacy protections, advanced sharing, and more robust node connectivity."
+        />
+        <AccordionItem 
+          question="How do I upgrade to NeuroCloud+?" 
+          answer="Once you have signed in and created a free account, you can upgrade to NeuroCloud+ directly from your Dashboard by navigating to the Plans or Pricing section and selecting the tier that best fits your storage needs."
+        />
+        <AccordionItem 
+          question="Can my family share a NeuroCloud+ plan?" 
+          answer="Yes! With NeuroCloud+, you can share your storage pool with up to five other family members. Each member gets their own private, secure vault for their data, while pooling the total storage available."
+        />
+      </Motion.div>
+    </section>
+
     {/* ── FOOTER ── */}
     <footer className="bg-[#1c1c1e] px-6 py-6 border-t border-white/10">
       <div className="mx-auto max-w-5xl flex flex-col md:flex-row items-center justify-between text-[11px] text-slate-500 font-medium">
@@ -286,17 +354,19 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
   const isDashboard = location.pathname.startsWith("/dashboard") || location.pathname.startsWith("/admin");
   const isLanding = location.pathname === "/";
 
-  // Landing page navbar just has About Us and Logo
-  if (isLanding) {
+  // If not authenticated or on landing page, show the simplified navbar
+  if (!isAuthenticated || isLanding) {
       return (
-          <header className="absolute top-0 inset-x-0 z-50">
-            <nav className="flex items-center px-6 py-4">
-                <Link to="/" className="inline-flex items-center gap-2">
-                    <Cloud className="text-white" size={20} />
-                    <span className="font-display font-bold text-lg text-white tracking-tight">NeuroCloud</span>
+          <header className="fixed top-4 inset-x-0 z-50 px-4 flex justify-center pointer-events-none">
+            <nav className="pointer-events-auto flex items-center justify-between px-6 py-3 w-full max-w-4xl bg-white/5 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl">
+                <Link to="/" className="inline-flex items-center gap-3">
+                    <img src="/neurocloud_icon_modern.png" alt="NeuroCloud" className="w-7 h-7 rounded-lg shadow-sm" />
+                    <span className="font-display font-bold text-sm text-white tracking-wide">NeuroCloud</span>
                 </Link>
-                <div className="ml-auto">
-                    <Link to="/about" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">About Us</Link>
+                <div className="flex items-center">
+                    <Link to="/about" className="text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 px-4 py-2 rounded-full transition-all duration-300">
+                        About Us
+                    </Link>
                 </div>
             </nav>
           </header>
@@ -306,10 +376,10 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
   // Dashboard Navbar
   return (
     <header className="sticky top-0 z-[100]">
-      <nav className="bg-[#1c1c1e]/90 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-5 py-3 md:px-6">
-        <Link to="/" className="inline-flex items-center gap-2">
-          <Cloud className="text-white" size={20} />
-          <span className="font-display font-bold text-lg text-white tracking-tight">NeuroCloud</span>
+      <nav className="bg-[#1c1c1e]/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-5 py-3 md:px-6">
+        <Link to="/" className="inline-flex items-center gap-3">
+          <img src="/neurocloud_icon_modern.png" alt="NeuroCloud" className="w-6 h-6 rounded-md shadow-sm" />
+          <span className="font-display font-bold text-sm text-white tracking-wide">NeuroCloud</span>
         </Link>
 
         <div className="flex items-center gap-4">
@@ -317,8 +387,7 @@ const Navbar = ({ isAuthenticated, onLogout }) => {
           <button className="text-slate-400 hover:text-white p-1 transition"><LayoutGrid size={18}/></button>
           
           <div className="w-8 h-8 rounded-full bg-slate-700 overflow-hidden ml-2 cursor-pointer border border-slate-600">
-             {/* Avatar Placeholder */}
-             <div className="w-full h-full bg-gradient-to-tr from-emerald-400 to-blue-500"></div>
+             <div className="w-full h-full bg-gradient-to-tr from-[#007aff] to-indigo-500"></div>
           </div>
         </div>
       </nav>
